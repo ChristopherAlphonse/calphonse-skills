@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "interrogate-me": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "interogate/SKILL.md",
+      "computedHash": "784f0dbb7403b0f00324bce9a112f715342777a0daee7bbb7385f9c6f0a170ea"
+    }
+  }
+}
