@@ -7,6 +7,7 @@ Local agent skills for this workspace. Each entry maps a slash command to its SK
 | Skill | Description | File |
 | --- | --- | --- |
 | `/code-review-frontend` | Multi-agent PR review orchestrator — discovers quality tooling, spawns parallel specialist agents, reports verified findings only. | [code-review-frontend/SKILL.MD](code-review-frontend/SKILL.MD) |
+| `/documentation-writer` | Diátaxis documentation expert — tutorials, how-tos, reference, explanation — plus product copy principles aligned with brand voice. | [documentation-writer/SKILL.md](documentation-writer/SKILL.md) |
 | `/golang-pro` | Advanced Go: concurrency, microservices (gRPC/REST), pprof performance, idiomatic patterns, generics, table-driven tests. | [golang-pro/SKILL.md](golang-pro/SKILL.md) |
 | `/grill-with-docs` | Stress-tests a plan against the domain model, sharpens terminology, updates CONTEXT.md and ADRs inline as decisions settle. | [grill-with-docs/SKILL.MD](grill-with-docs/SKILL.MD) |
 | `/plan` | Strategic planning and architecture advisor — explores codebase, clarifies requirements, develops implementation strategy before any code is written. | [plan/SKILL.md](plan/SKILL.md) |

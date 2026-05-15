@@ -6,12 +6,17 @@ Each skill lives in its own folder with a `SKILL.md` file.
 `AGENTS.md` is the canonical index. Update it whenever a skill is added, removed,
 renamed, or split into smaller skills.
 
+`skills-lock.json` pins skills with content hashes. When you add or change a pinned
+skill, set `sourceType` and `skillPath`, then recompute `computedHash` as the
+SHA-256 of that skill’s `SKILL.md` (for example `shasum -a 256 path/to/SKILL.md`).
+
 ## Layout
 
 ```text
 skills/
   AGENTS.md
   README.md
+  skills-lock.json
   {skill-name}/
     SKILL.md
 ```
@@ -68,9 +73,10 @@ It delegates to:
 1. Create or update `{skill-name}/SKILL.md`.
 2. Keep frontmatter `name:` aligned with the folder and slash command name.
 3. Add or update the row in `AGENTS.md`.
-4. Prefer references to existing local skills over copying large repeated blocks.
-5. Keep durable output paths under `.planning/*`.
-6. Remove references to tools or folders that do not exist in this workspace.
+4. If the skill is listed in `skills-lock.json`, update its `computedHash` after any edit to `SKILL.md`.
+5. Prefer references to existing local skills over copying large repeated blocks.
+6. Keep durable output paths under `.planning/*`.
+7. Remove references to tools or folders that do not exist in this workspace.
 
 ## Quick Checks
 

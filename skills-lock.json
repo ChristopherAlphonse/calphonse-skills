@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "documentation-writer": {
+      "source": "local",
+      "sourceType": "local",
+      "skillPath": "documentation-writer/SKILL.md",
+      "computedHash": "1d04fe9b62683d04e8325769f56611c18ff4674ca9dc50558ee41952099c790a"
+    },
     "interrogate-me": {
       "source": "mattpocock/skills",
       "sourceType": "github",
