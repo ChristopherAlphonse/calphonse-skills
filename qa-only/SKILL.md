@@ -1,14 +1,16 @@
 ---
 name: qa-only
-version: 1.0.0
+version: 1.1.0
 description: |
   Report-only QA testing. Systematically tests a web application and produces a
   structured report with health score, screenshots, and repro steps — but never
   fixes anything. Use when asked to "just report bugs", "qa report only", or
   "test but don't fix". For the full test-fix-verify loop, use /qa instead.
   Proactively suggest when the user wants a bug report without any code changes.
+benefits-from: [playwright-cli]
 allowed-tools:
   - Bash
+  - Bash(playwright-cli:*)
   - Read
   - Write
   - AskUserQuestion
@@ -336,6 +338,56 @@ Write the report to `.planning/qa/`.
 **Outcome artifact:** `.planning/qa/test-outcome-{branch}-{YYYYMMDD-HHMMSS}.md`
 
 Report filenames use the domain and date: `qa-report-myapp-com-2026-03-12.md`
+
+---
+
+## Playwright CLI Integration
+
+Use `playwright-cli` alongside `$B` for capabilities the browser tool lacks.
+Load the `playwright-cli` skill before using any `playwright-cli` command.
+
+### When to use playwright-cli
+
+| Situation | Command |
+|---|---|
+| Bug is hard to repro — capture a trace | `playwright-cli tracing-start` / `tracing-stop` — see [references/tracing.md](../playwright-cli/references/tracing.md) |
+| Need video evidence for a bug report | `playwright-cli video-start` / `video-stop` — see [references/video-recording.md](../playwright-cli/references/video-recording.md) |
+| Existing `.spec.ts` / `.test.ts` files present | Run and heal them — see [references/playwright-tests.md](../playwright-cli/references/playwright-tests.md) |
+| Repo has a spec file describing expected behaviour | Use spec-driven mode — see [references/spec-driven-testing.md](../playwright-cli/references/spec-driven-testing.md) |
+| User asks to generate regression tests from findings | Generate from recorded interactions — see [references/test-generation.md](../playwright-cli/references/test-generation.md) |
+| Need request mocking to isolate a bug | `playwright-cli route` — see [references/request-mocking.md](../playwright-cli/references/request-mocking.md) |
+| Need to inspect a non-visible attribute | `playwright-cli eval "el => el.getAttribute(...)"` — see [references/element-attributes.md](../playwright-cli/references/element-attributes.md) |
+
+### Decision rule
+
+Use `$B` for all standard navigation, snapshotting, and interaction during exploration.
+Switch to `playwright-cli` when you need tracing, video, test generation, or to run existing Playwright specs.
+Both tools can be open at the same time in separate sessions.
+
+### Tracing workflow (for hard-to-repro bugs)
+
+```bash
+playwright-cli open <url>
+playwright-cli tracing-start
+# reproduce the bug steps
+playwright-cli tracing-stop
+# reference the trace file in the bug report
+```
+
+### Video evidence workflow
+
+```bash
+playwright-cli open <url>
+playwright-cli video-start bug-evidence.webm
+# walk through the broken flow
+playwright-cli video-stop
+# attach the .webm path in the bug report
+```
+
+### Test generation workflow (after QA session)
+
+Only generate tests when the user explicitly asks. Do not generate tests as part of report-only mode.
+Reference [references/test-generation.md](../playwright-cli/references/test-generation.md) for generation commands.
 
 ---
 
