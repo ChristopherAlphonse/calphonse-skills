@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/christopheralphonse/.agents/**)",
+      "Read(//Users/christopheralphonse/.claude/**)"
+    ]
+  }
+}
