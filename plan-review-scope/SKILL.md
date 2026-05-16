@@ -48,3 +48,6 @@ Return:
 - NOT in scope
 - Related TODOs
 - Remaining scope risks
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-review-scope``

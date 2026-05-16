@@ -540,3 +540,6 @@ Status:   CLEAN / DRIFT / MISSING
 - Do not commit, push, or modify any files
 - If codebase context is inadequate → gate on `/gsd-map-codebase` and `/grill-me-with-docs`
   before proceeding; a review without context is worse than no review
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill code-review-frontend``

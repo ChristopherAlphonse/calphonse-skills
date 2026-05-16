@@ -46,3 +46,6 @@ Return architecture findings ordered by severity. For each issue include:
 - Recommendation
 - Options if user judgment is needed
 - Failure mode if ignored
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-review-architecture``

@@ -196,3 +196,6 @@ When reviewing, flag these immediately:
 | `useState(undefined)` for inputs | Uncontrolled warning | Use empty string |
 | `React.FC` with generics | Generic inference breaks | Use explicit props |
 | Barrel files (`index.ts`) in app code | Bundle bloat, circular deps | Direct imports |
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill typescript-react-reviewer``

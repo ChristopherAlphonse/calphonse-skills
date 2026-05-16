@@ -24,3 +24,6 @@ Identify and document the repository's primary functionalities and workflows to 
 4. **Persistence:** Write the final analysis to `.planning/system/use_cases.md`.
 
 ---
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill codebase-exploration``

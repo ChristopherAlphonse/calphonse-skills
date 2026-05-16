@@ -122,3 +122,6 @@ When implementing Go features, provide:
 Go 1.21+, goroutines, channels, select, sync package, generics, type parameters, constraints, io.Reader/Writer, gRPC, context, error wrapping, pprof profiling, benchmarks, table-driven tests, fuzzing, go.mod, internal packages, functional options
 
 [Documentation](https://jeffallan.github.io/claude-skills/skills/language/golang-pro/)
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill golang-pro``

@@ -1301,3 +1301,6 @@ it('renders modal in portal', () => {
 **Last Updated**: October 2025
 **Skill Category**: Testing, React, Quality Assurance
 **Compatible With**: Jest 29+, React Testing Library 13+, React 16.8+
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill jest-react-testing``

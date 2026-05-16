@@ -74,3 +74,6 @@ Documents saved to `/tasks/` must follow this structure:
 - **Format:** Markdown (.md)
 - **Directory:** `.planning/tasks/`
 - **Filename:** `prd-[feature-name].md`
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill prd-mode``

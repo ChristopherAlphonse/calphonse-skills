@@ -98,3 +98,6 @@ Prevention: Establish environment parity requirements
 | 3-4 | `systematic-rca-process.md` | 7-step process from fact gathering to documentation |
 | 5 | `rca-report-template.md` | Incident, timeline, root cause, solutions, prevention |
 | 6 | `follow-up-prevention.md` | Action items, monitoring, sharing learnings, checklist |
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill root-cause-analysis``

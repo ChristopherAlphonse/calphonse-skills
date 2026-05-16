@@ -35,3 +35,6 @@ Return:
 - Core product bet
 - Biggest strategic risk
 - What success must prove
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-ceo-strategy``

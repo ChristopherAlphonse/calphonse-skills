@@ -76,3 +76,6 @@ Avoid:
 ```markdown
 Root cause: `cmd/stubbed/health` was removed, `mise services-up` runs `generate`, clears `gen/`, and starts `data-platform` with `gen/grpc` mounted...
 ```
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill pr-body-style``

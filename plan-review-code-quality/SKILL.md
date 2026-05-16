@@ -33,3 +33,6 @@ Return code quality findings ordered by severity. For each issue include:
 - Evidence
 - Recommendation
 - Whether the plan needs a TODO, plan edit, test, or implementation change
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-review-code-quality``

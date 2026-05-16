@@ -58,3 +58,6 @@ End with:
 - QA handoff path
 - Review artifact path
 - Recommended next skill, if any
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-review-wrapup``

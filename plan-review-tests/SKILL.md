@@ -76,3 +76,6 @@ Plan: {plan-path}
 ## Output
 
 Return the test diagram, missing tests, eval needs, and QA handoff path.
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-review-tests``

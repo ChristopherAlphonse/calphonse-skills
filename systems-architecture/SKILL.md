@@ -64,4 +64,6 @@ To maintain clarity and prioritize impact, follow these constraints:
 * **Prioritization:** Limit to a maximum of **10 major components**.
 
 ---
+---
 
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill systems-architecture``

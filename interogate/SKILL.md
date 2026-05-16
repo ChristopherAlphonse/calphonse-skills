@@ -37,3 +37,6 @@ Walk the design tree in dependency order:
 If a question can be answered by exploring the codebase, files, docs, or configuration, inspect those sources instead of asking me.
 
 Continue until the design is coherent, defensible, and ready to implement or present.
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill interogate``

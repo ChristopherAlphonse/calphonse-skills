@@ -124,3 +124,6 @@ Synthesize a 5-point guide:
 - Always spawn all 3 agents in one message — they are fully independent.
 - If a sub-agent can't write the file (read-only mode), collect its output and write the files yourself after all complete.
 - The synthesis step (Step 2) must wait for all 3 agents to finish before running.
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill whats-going-on``

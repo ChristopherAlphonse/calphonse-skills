@@ -83,3 +83,6 @@ Also write the QA handoff from `/plan-review-tests` to:
 `.planning/qa/test-plan-{branch}-{YYYYMMDD-HHMMSS}.md`
 
 Finish by showing a concise readiness summary and the path to the review artifact.
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-eng-review``

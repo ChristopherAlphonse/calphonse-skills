@@ -155,3 +155,6 @@ Do not write durable artifacts outside `.planning/*`.
 - Challenge proxy metrics that do not prove user value.
 - Ask what would make the plan fail — then remove or expose those paths.
 - Prefer complete, bounded work over shortcuts that leave quality gaps.
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill startup-ceo``

@@ -78,3 +78,6 @@ When a larger strategy document is useful, write it under:
 `.planning/strategy/{feature-slug}.md`
 
 Do not write durable workflow artifacts outside `.planning/*`.
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-ceo-review``

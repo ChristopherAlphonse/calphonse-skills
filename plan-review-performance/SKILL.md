@@ -33,3 +33,6 @@ Return performance findings ordered by severity with:
 - User or system impact
 - Recommendation
 - Test or metric needed
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-review-performance``

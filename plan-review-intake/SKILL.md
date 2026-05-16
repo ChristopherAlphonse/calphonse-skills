@@ -41,3 +41,6 @@ Return:
 - Relevant `.planning/*` context files
 - Existing TODO sources
 - Any missing context that materially limits review confidence
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-review-intake``

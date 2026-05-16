@@ -49,3 +49,6 @@ For useful rejected opportunities, ask whether to:
 - C) Put back into the current plan
 
 Do not write to any non-`.planning/*` project path.
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-ceo-wrapup``

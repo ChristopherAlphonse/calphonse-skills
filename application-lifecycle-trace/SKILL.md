@@ -58,3 +58,6 @@ tools:
 ---
 
 **Next Step:** I can now save this lifecycle trace to `.planning/memory/system/001_lifecycle_prd_generation.md`. Would you like me to finalize the file creation?
+---
+
+> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill application-lifecycle-trace``
