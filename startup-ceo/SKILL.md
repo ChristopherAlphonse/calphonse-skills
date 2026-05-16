@@ -5,7 +5,7 @@ description: |
   Unified founder-mode product review. Orchestrates intake, interrogation, scope
   mapping, strategy selection, opportunity surfacing, and artifact writing.
   Delegates parallel research to sub-agents. Keeps user in control of every scope change.
-benefits-from: [plan-ceo-review, plan-ceo-strategy, plan-ceo-opportunities, plan-ceo-wrap-up, grill-with-docs]
+benefits-from: [plan-ceo-review, plan-ceo-strategy, plan-ceo-opportunities, plan-ceo-wrap-up, interrogate-me]
 allowed-tools:
   - Read
   - Write
@@ -55,12 +55,12 @@ Wait for both sub-agents to complete before proceeding.
 
 ## Phase 2 — Interrogation (Interactive)
 
-Invoke the `grill-with-docs` skill.
+Invoke the `interrogate-me` skill.
 
 Pass the sub-agent findings from Phase 1 as context so the session is grounded in
 the actual plan and codebase state rather than abstract questions.
 
-`grill-with-docs` will:
+`interrogate-me` will:
 
 - Interview relentlessly about every aspect of the plan, one question at a time.
 - Challenge against any existing domain glossary (`CONTEXT.md`, `ADR`s).
