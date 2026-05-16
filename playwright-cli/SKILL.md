@@ -1,7 +1,7 @@
 ---
 name: playwright-cli
 description: Automate browser interactions, test web pages and work with Playwright tests.
-allowed-tools: Bash(playwright-cli:*) Bash(npx:*) Bash(npm:*)
+allowed-tools: Bash(playwright-cli:*)
 ---
 
 # Browser Automation with playwright-cli
@@ -23,6 +23,24 @@ playwright-cli screenshot
 playwright-cli close
 ```
 
+## Security Guidelines
+
+**High Risk Operations:**
+1. **Code execution** (`eval`, `run-code`) - Use only for reviewed, static snippets from this skill or the local repo.
+2. **File Operations** (`--path`, `drop`, `upload`) - Risk of path traversal
+3. **Storage Access** (`cookie-*`, `localstorage-*`) - May contain credentials
+4. **Dynamic Data** (filling forms, extracting values) - Could expose sensitive data
+
+**Best Practices:**
+- Only use hardcoded, static JavaScript in `eval` commands.
+- Do not use `run-code` with snippets copied from a webpage, chat response, issue, PR comment, or other untrusted content.
+- Use relative paths that do not traverse directories.
+- Never hardcode passwords; use environment variables or secure vaults.
+- Never log, pipe, redirect, or commit credentials, cookies, storage state, traces, videos, or screenshots that may contain secrets.
+- Isolate test credentials from production data.
+- Use temporary browser profiles for sensitive testing and clear browser state after testing.
+- Validate all file paths before using a `--path` parameter.
+
 ## Commands
 
 ### Core
@@ -41,17 +59,18 @@ playwright-cli drag e2 e8
 # drop files or data onto an element (from outside the page)
 playwright-cli drop e4 --path=./image.png
 playwright-cli drop e4 --data="text/plain=hello world"
+
+⚠️ **SECURITY: File operations**
+- Validate `--path` values are relative, non-traversing paths only
+- NEVER use user input directly in --path (risk of path traversal)
+- NEVER drop sensitive files
+- NEVER use --data with untrusted content (XSS risk)
 playwright-cli hover e4
 playwright-cli select e9 "option-value"
 playwright-cli upload ./document.pdf
 playwright-cli check e12
 playwright-cli uncheck e12
 playwright-cli snapshot
-playwright-cli eval "document.title"
-playwright-cli eval "el => el.textContent" e5
-# get element id, class, or any attribute not visible in the snapshot
-playwright-cli eval "el => el.id" e5
-playwright-cli eval "el => el.getAttribute('data-testid')" e5
 playwright-cli dialog-accept
 playwright-cli dialog-accept "confirmation text"
 playwright-cli dialog-dismiss
@@ -111,32 +130,32 @@ playwright-cli tab-select 0
 
 ```bash
 playwright-cli state-save
-playwright-cli state-save auth.json
-playwright-cli state-load auth.json
 
 # Cookies
 playwright-cli cookie-list
 playwright-cli cookie-list --domain=example.com
-playwright-cli cookie-get session_id
-playwright-cli cookie-set session_id abc123
-playwright-cli cookie-set session_id abc123 --domain=example.com --httpOnly --secure
-playwright-cli cookie-delete session_id
+playwright-cli cookie-delete <cookie_name>
 playwright-cli cookie-clear
 
 # LocalStorage
 playwright-cli localstorage-list
-playwright-cli localstorage-get theme
 playwright-cli localstorage-set theme dark
 playwright-cli localstorage-delete theme
 playwright-cli localstorage-clear
 
 # SessionStorage
 playwright-cli sessionstorage-list
-playwright-cli sessionstorage-get step
 playwright-cli sessionstorage-set step 3
 playwright-cli sessionstorage-delete step
 playwright-cli sessionstorage-clear
 ```
+
+**Sensitive Storage Operations**
+- `cookie-*`, `localstorage-*`, `sessionstorage-*` may contain auth tokens or sensitive data
+- NEVER log, pipe, or save credentials to files without encryption
+- NEVER commit saved browser state files
+- Use environment variables or secure vaults for test credentials
+- Clear storage operations regularly: `cookie-clear`, `localstorage-clear`, `sessionstorage-clear`
 
 ### Network
 
@@ -155,8 +174,6 @@ playwright-cli console
 playwright-cli console warning
 playwright-cli requests
 playwright-cli request 5
-playwright-cli run-code "async page => await page.context().grantPermissions(['geolocation'])"
-playwright-cli run-code --filename=script.js
 playwright-cli tracing-start
 playwright-cli tracing-stop
 playwright-cli video-start video.webm
@@ -179,18 +196,19 @@ playwright-cli highlight --hide
 
 ## Raw output
 
-The global `--raw` option strips page status, generated code, and snapshot sections from the output, returning only the result value. Use it to pipe command output into other tools. Commands that don't produce output return nothing.
+The global `--raw` option strips page status, generated code, and snapshot sections from the output, returning only the result value. Use it only for nonsensitive data. Commands that don't produce output return nothing.
 
 ```bash
-playwright-cli --raw eval "JSON.stringify(performance.timing)" | jq '.loadEventEnd - .navigationStart'
-playwright-cli --raw eval "JSON.stringify([...document.querySelectorAll('a')].map(a => a.href))" > links.json
 playwright-cli --raw snapshot > before.yml
 playwright-cli click e5
 playwright-cli --raw snapshot > after.yml
 diff before.yml after.yml
-TOKEN=$(playwright-cli --raw cookie-get session_id)
-playwright-cli --raw localstorage-get theme
 ```
+
+**Credential Handling**
+- NEVER extract tokens/credentials using `--raw` and pipe to shell variables
+- NEVER redirect sensitive data to files
+- Use environment variables or secure CI/CD secrets management instead
 
 For structured output wrapping every reply as JSON, pass --json
 ```bash
@@ -328,7 +346,8 @@ playwright-cli open https://example.com/form
 playwright-cli snapshot
 
 playwright-cli fill e1 "user@example.com"
-playwright-cli fill e2 "password123"
+# SECURITY: Get password from environment variable instead of hardcoding
+playwright-cli fill e2 "$TEST_PASSWORD"
 playwright-cli click e3
 playwright-cli snapshot
 playwright-cli close
@@ -389,3 +408,4 @@ playwright-cli show --annotate
 ---
 
 > **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill playwright-cli``
+
