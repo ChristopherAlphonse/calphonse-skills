@@ -59,4 +59,4 @@ Common locations:
 5. Remove references to tools or folders that do not exist in this workspace.
 6. Prefer references to existing skills over copying large blocks.
 
-> **Note:** This repo requires the `gsd-codebase-mapper` skill. Without it, certain codebase analysis workflows will not function. Please be careful with `gsd` skills as they are meant to be autonomous and can/try to commit to main branch.
+> **Note:** This repo recommend the `gsd-codebase-mapper` skill. Without it, certain codebase analysis workflows will not function. Please be careful with `gsd` skills as they are meant to be autonomous and can/try to commit to main branch. Alternatively you can simply use `whats-going-on` skill to get similar workflow
