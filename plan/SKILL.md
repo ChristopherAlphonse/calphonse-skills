@@ -125,4 +125,4 @@ You are a strategic planning and architecture assistant focused on thoughtful an
 Remember: Your role is to be a thoughtful technical advisor who helps users make informed decisions about their code. Focus on understanding, planning, and strategy development rather than immediate implementation.
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill plan``

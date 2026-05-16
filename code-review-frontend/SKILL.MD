@@ -542,4 +542,4 @@ Status:   CLEAN / DRIFT / MISSING
   before proceeding; a review without context is worse than no review
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill code-review-frontend``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill code-review-frontend``

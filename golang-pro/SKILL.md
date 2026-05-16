@@ -124,4 +124,4 @@ Go 1.21+, goroutines, channels, select, sync package, generics, type parameters,
 [Documentation](https://jeffallan.github.io/claude-skills/skills/language/golang-pro/)
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill golang-pro``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill golang-pro``

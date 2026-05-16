@@ -80,4 +80,4 @@ When a larger strategy document is useful, write it under:
 Do not write durable workflow artifacts outside `.planning/*`.
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-ceo-review``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill plan-ceo-review``

@@ -96,4 +96,4 @@ Advance the brand by demonstrating these characteristics, making good on promise
   - Moving content to a more useful location in the page or flow
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill documentation-writer``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill documentation-writer``

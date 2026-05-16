@@ -76,4 +76,4 @@ Documents saved to `/tasks/` must follow this structure:
 - **Filename:** `prd-[feature-name].md`
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill prd-mode``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill prd-mode``

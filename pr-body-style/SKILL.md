@@ -78,4 +78,4 @@ Root cause: `cmd/stubbed/health` was removed, `mise services-up` runs `generate`
 ```
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill pr-body-style``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill pr-body-style``

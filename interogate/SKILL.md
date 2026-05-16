@@ -39,4 +39,4 @@ If a question can be answered by exploring the codebase, files, docs, or configu
 Continue until the design is coherent, defensible, and ready to implement or present.
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill interogate``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill interogate``

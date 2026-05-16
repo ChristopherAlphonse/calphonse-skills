@@ -104,4 +104,4 @@ When working with task lists, the AI must:
 6. After implementing a sub‑task, update the file and then pause for user approval.
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill process-task-list``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill process-task-list``

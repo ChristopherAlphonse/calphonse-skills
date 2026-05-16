@@ -68,4 +68,4 @@ Use `/interrogate-me` before finalizing the task list. Let it stress-test the PR
 **Ask user if each task or subtask should be committed to git (must work in sequential order).&**
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill task-generation-mode``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill task-generation-mode``

@@ -88,4 +88,4 @@ If any of the three is missing, skip the ADR. Use the format in [ADR-FORMAT.md](
 </supporting-info>
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill interrogate-me``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill interrogate-me``

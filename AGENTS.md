@@ -3,7 +3,7 @@
 All skills are at the repository root. Install any skill with the [Skills CLI](https://github.com/vercel-labs/skills):
 
 ```bash
-npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill <name>
+npx skills add ChristopherAlphonse/calphonse-skills --skill <name>
 ```
 
 | Skill | Description |

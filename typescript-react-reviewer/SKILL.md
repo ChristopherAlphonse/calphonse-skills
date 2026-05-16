@@ -198,4 +198,4 @@ When reviewing, flag these immediately:
 | Barrel files (`index.ts`) in app code | Bundle bloat, circular deps | Direct imports |
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill typescript-react-reviewer``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill typescript-react-reviewer``

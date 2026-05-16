@@ -26,4 +26,4 @@ Identify and document the repository's primary functionalities and workflows to 
 ---
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill codebase-exploration``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill codebase-exploration``

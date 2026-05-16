@@ -126,4 +126,4 @@ Synthesize a 5-point guide:
 - The synthesis step (Step 2) must wait for all 3 agents to finish before running.
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill whats-going-on``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill whats-going-on``

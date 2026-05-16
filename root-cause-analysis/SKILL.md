@@ -100,4 +100,4 @@ Prevention: Establish environment parity requirements
 | 6 | `follow-up-prevention.md` | Action items, monitoring, sharing learnings, checklist |
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill root-cause-analysis``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill root-cause-analysis``

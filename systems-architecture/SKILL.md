@@ -66,4 +66,4 @@ To maintain clarity and prioritize impact, follow these constraints:
 ---
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill systems-architecture``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill systems-architecture``

@@ -49,4 +49,4 @@ Return:
 - Risks still open
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-ceo-opportunities``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill plan-ceo-opportunities``

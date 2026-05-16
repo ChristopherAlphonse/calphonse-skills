@@ -51,4 +51,4 @@ For useful rejected opportunities, ask whether to:
 Do not write to any non-`.planning/*` project path.
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-ceo-wrapup``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill plan-ceo-wrapup``

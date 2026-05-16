@@ -157,4 +157,4 @@ Do not write durable artifacts outside `.planning/*`.
 - Prefer complete, bounded work over shortcuts that leave quality gaps.
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill startup-ceo``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill startup-ceo``

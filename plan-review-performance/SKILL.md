@@ -35,4 +35,4 @@ Return performance findings ordered by severity with:
 - Test or metric needed
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-review-performance``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill plan-review-performance``

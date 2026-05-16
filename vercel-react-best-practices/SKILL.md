@@ -149,4 +149,4 @@ Each rule file contains:
 For the complete guide with all rules expanded: `AGENTS.md`
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill vercel-react-best-practices``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill vercel-react-best-practices``

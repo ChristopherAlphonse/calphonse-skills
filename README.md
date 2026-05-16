@@ -4,13 +4,13 @@ Install any skill from this repo using the [Skills CLI](https://github.com/verce
 
 ```bash
 # List available skills
-npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --list
+npx skills add ChristopherAlphonse/calphonse-skills --list
 
 # Install all skills
-npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --all
+npx skills add ChristopherAlphonse/calphonse-skills --all
 
 # Install a single skill
-npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill <skill-name>
+npx skills add ChristopherAlphonse/calphonse-skills --skill <skill-name>
 ```
 
 > **Note:** Some of these skills are from other repos and are being recycled and used in conjunction here. Some are mine and some are borrowed with minute tweaks.

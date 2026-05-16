@@ -388,4 +388,4 @@ playwright-cli show --annotate
 * **Inspecting element attributes** [references/element-attributes.md](references/element-attributes.md)
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill playwright-cli``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill playwright-cli``

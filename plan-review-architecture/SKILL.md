@@ -48,4 +48,4 @@ Return architecture findings ordered by severity. For each issue include:
 - Failure mode if ignored
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-review-architecture``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill plan-review-architecture``

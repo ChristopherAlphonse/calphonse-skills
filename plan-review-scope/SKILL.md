@@ -50,4 +50,4 @@ Return:
 - Remaining scope risks
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-review-scope``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill plan-review-scope``

@@ -536,4 +536,4 @@ app.post('/api/fetch-url', async (req, res) => {
 - **Snyk**: https://snyk.io/
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill owasp-security``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill owasp-security``

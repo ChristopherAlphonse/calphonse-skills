@@ -43,4 +43,4 @@ Return:
 - Any missing context that materially limits review confidence
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-review-intake``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill plan-review-intake``

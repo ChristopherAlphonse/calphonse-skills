@@ -60,4 +60,4 @@ End with:
 - Recommended next skill, if any
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-review-wrapup``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill plan-review-wrapup``

@@ -85,4 +85,4 @@ Also write the QA handoff from `/plan-review-tests` to:
 Finish by showing a concise readiness summary and the path to the review artifact.
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-eng-review``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill plan-eng-review``

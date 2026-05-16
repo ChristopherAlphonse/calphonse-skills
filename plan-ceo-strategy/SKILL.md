@@ -37,4 +37,4 @@ Return:
 - What success must prove
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill plan-ceo-strategy``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill plan-ceo-strategy``

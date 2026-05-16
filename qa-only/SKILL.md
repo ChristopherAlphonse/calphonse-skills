@@ -397,4 +397,4 @@ Reference [references/test-generation.md](../playwright-cli/references/test-gene
 12. **No test framework detected?** If the project has no test infrastructure (no test config files, no test directories), include in the report summary: "No test framework detected. Run `/qa` to bootstrap one and enable regression test generation."
 ---
 
-> **Install:** ``npx skills add https://github.com/ChristopherAlphonse/calphonse-skills --skill qa-only``
+> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill qa-only``
