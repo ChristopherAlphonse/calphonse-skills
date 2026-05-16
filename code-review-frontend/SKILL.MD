@@ -17,7 +17,7 @@ the diff, a config file, or declared as an [ASSUMPTION]. This skill does not fix
 ## Skill Directory
 
 ```
-SKILL_DIR=/Users/christopheralphonse/.agents/skills/code-review-frontend
+SKILL_DIR=./
 ```
 
 Sub-skill paths (read when relevant):
@@ -174,7 +174,7 @@ QUALITY CONTEXT (from main agent's discovery):
 
 YOUR TASK:
 1. Run: git diff origin/<base>
-2. Read: /Users/christopheralphonse/.agents/skills/code-review-frontend/checklist.md
+2. Read: ./checklist.md
 3. Review diff against every checklist category.
 4. Do NOT fix anything. Report findings only.
 
@@ -228,10 +228,10 @@ QUALITY CONTEXT (from main agent's discovery):
 YOUR TASK:
 1. Run: git diff origin/<base>
 2. Read in order:
-   /Users/christopheralphonse/.agents/skills/code-review-frontend/typescript-react-reviewer/SKILL.md
-   /Users/christopheralphonse/.agents/skills/code-review-frontend/typescript-react-reviewer/references/antipatterns.md
-   /Users/christopheralphonse/.agents/skills/code-review-frontend/typescript-react-reviewer/references/react19-patterns.md
-   /Users/christopheralphonse/.agents/skills/code-review-frontend/typescript-react-reviewer/references/checklist.md
+   ./typescript-react-reviewer/SKILL.md
+   ./typescript-react-reviewer/references/antipatterns.md
+   ./typescript-react-reviewer/references/react19-patterns.md
+   ./typescript-react-reviewer/references/checklist.md
 3. Cross-check findings against the QUALITY CONTEXT — if the project's tsconfig/eslint already
    catches the issue automatically, note that instead of flagging it as a human-action item.
 4. Do NOT fix anything. Report findings only.
@@ -283,7 +283,7 @@ QUALITY CONTEXT (from main agent's discovery):
 
 YOUR TASK:
 1. Run: git diff origin/<base>
-2. Read: /Users/christopheralphonse/.agents/skills/code-review-frontend/frontend-patterns/SKILL.md
+2. Read: ./frontend-patterns/SKILL.md
 3. Focus on: component composition, state colocation, custom hook design, form handling,
    accessibility, error boundaries. Skip React 19 hook correctness (typescript-react-reviewer covers that).
 4. Do NOT fix anything. Report findings only.
@@ -331,8 +331,8 @@ QUALITY CONTEXT (from main agent's discovery):
 YOUR TASK:
 1. Run: git diff origin/<base>
 2. Read:
-   /Users/christopheralphonse/.agents/skills/code-review-frontend/jest-react-testing/SKILL.md
-   /Users/christopheralphonse/.agents/skills/code-review-frontend/jest-react-testing/EXAMPLES.md
+   ./jest-react-testing/SKILL.md
+   ./jest-react-testing/EXAMPLES.md
 3. Look for the jest config file in the repo (jest.config.*, jest section in package.json).
    Read it — this tells you the actual test environment and setup. Cross-reference with findings.
 4. Also check: does production code in the diff lack test coverage that the QUALITY CONTEXT
@@ -387,9 +387,9 @@ QUALITY CONTEXT (from main agent's discovery):
 
 YOUR TASK:
 1. Run: git diff origin/<base>
-2. Read: /Users/christopheralphonse/.agents/skills/code-review-frontend/vercel-react-best-practices/SKILL.md
+2. Read: ./vercel-react-best-practices/SKILL.md
 3. For any rule that seems violated, read the specific rule file before reporting:
-   /Users/christopheralphonse/.agents/skills/code-review-frontend/vercel-react-best-practices/rules/<rule-name>.md
+   ./vercel-react-best-practices/rules/<rule-name>.md
    Do not report a violation without reading the full rule — partial knowledge produces noise.
 4. Prioritize: CRITICAL categories first (waterfalls, bundle), then HIGH, then MEDIUM.
 5. Do NOT fix anything. Report findings only.
