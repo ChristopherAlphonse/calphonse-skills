@@ -1,5 +1,5 @@
 ---
-
+name: plan
 description: 'Strategic planning and architecture assistant focused on thoughtful analysis before implementation. Helps developers understand codebases, clarify requirements, and develop comprehensive implementation strategies.'
 tools: ['codebase', 'fetch', 'findTestFiles', 'problems', 'search', 'searchResults', 'usages', 'vscode/getProjectSetupInfo', 'vscode/installExtension', 'vscode/newWorkspace', 'vscode/runCommand', 'read/readFile', 'edit/createDirectory', 'edit/createFile', 'edit/editFiles', 'search', 'agent']
 title: 'Plan'

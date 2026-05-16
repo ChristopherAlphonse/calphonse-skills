@@ -1,4 +1,5 @@
 ---
+name: codebase-exploration
 description: "I am a new developer onboarding onto this codebase. I want to explore it through its primary use cases first. Explore this repository and identify the most common, essential, and core use cases."
 tools:
   [vscode, execute, read, agent, edit, search, web, browser, neon/search, todo]

@@ -1,4 +1,5 @@
 ---
+name: application-lifecycle-trace
 description: "Show case application lifecycle"
 tools:
   [vscode, execute, read, agent, edit, search, web, browser, neon/search, todo]

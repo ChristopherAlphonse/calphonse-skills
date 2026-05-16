@@ -1,4 +1,5 @@
 ---
+name: systems-architecture
 description: 'Generates a high-level system architecture document by analyzing lifecycle documentation and identifying major actors, their interactions, and technologies used.'
 tools: ['vscode/getProjectSetupInfo', 'vscode/installExtension', 'vscode/newWorkspace', 'vscode/runCommand', 'read/readFile', 'edit/createDirectory', 'edit/createFile', 'edit/editFiles', 'search', 'agent']
 

@@ -39,7 +39,7 @@ prompt: |
 ```
 subagent_type: Explore
 description: "Trace application lifecycle"
-skill: $applicaton-lifecycle-tace
+skill: $application-lifecycle-trace
 prompt: |
   Trace the application lifecycle for the primary user-facing flows in this codebase.
 
@@ -57,7 +57,7 @@ prompt: |
 ```
 subagent_type: Explore
 description: "Map system architecture"
-skill: $system-architecture
+skill: $systems-architecture
 prompt: |
   Generate a high-level system architecture document for this codebase.
 
