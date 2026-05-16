@@ -24,6 +24,7 @@ npx skills add ChristopherAlphonse/calphonse-skills --skill <name>
 | [plan-ceo-strategy](plan-ceo-strategy/SKILL.md) | Selects founder-mode review posture and challenges product strategy before execution |
 | [plan-ceo-wrapup](plan-ceo-wrapup/SKILL.md) | Writes the founder/product review artifact under `.planning/reviews` |
 | [plan-eng-review](plan-eng-review/SKILL.md) | Engineering-manager plan review — architecture, data flow, edge cases, tests, performance, rollout, and failure modes |
+| [plan-research](plan-research/SKILL.md) | Phase or topic research before planning — produces RESEARCH.md under `.planning/` |
 | [plan-review-architecture](plan-review-architecture/SKILL.md) | Reviews architecture, data flow, dependencies, security boundaries, rollout, and failure scenarios |
 | [plan-review-code-quality](plan-review-code-quality/SKILL.md) | Reviews code organization, maintainability, local patterns, error handling, and diagram freshness |
 | [plan-review-intake](plan-review-intake/SKILL.md) | Finds review inputs for plan review workflows using local project files under `.planning` |
