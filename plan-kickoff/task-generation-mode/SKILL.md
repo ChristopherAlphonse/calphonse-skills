@@ -1,3 +1,8 @@
+---
+name: task-generation-mode
+description: Generates tasks by analyzing the PRD and breaking it into actionable work items.
+---
+
 ## Context
 
 - Current branch: `git branch --show-current`
