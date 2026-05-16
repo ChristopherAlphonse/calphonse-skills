@@ -3,6 +3,7 @@ name: playwright-cli
 description: Automate browser interactions, test web pages and work with Playwright tests.
 allowed-tools: Bash(playwright-cli:*)
 ---
+> **Security Audit Disclaimer:** This skill uses browser automation to interact with arbitrary web pages. By design, it visits external URLs, executes JavaScript (val), and accesses browser storage (cookies, localStorage) — behaviors that security scanners flag as W007/W011. These capabilities are inherent to Playwright-based testing and are not exploitable beyond the agent's existing tool access. Always use test/staging environments with isolated credentials.
 
 # Browser Automation with playwright-cli
 
@@ -408,4 +409,5 @@ playwright-cli show --annotate
 ---
 
 > **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill playwright-cli``
+
 
