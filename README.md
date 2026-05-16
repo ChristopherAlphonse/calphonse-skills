@@ -52,7 +52,7 @@ Common locations:
 
 ## Contributing a Skill
 
-1. Create `{skill-name}/SKILL.md` with frontmatter `name:` matching the folder name.
+1. Create `{skill-name}/SKILL.md` with front-matter `name:` matching the folder name.
 2. Add an entry to `AGENTS.md`.
 3. If the skill belongs in `skills-lock.json`, update its hash.
 4. Keep durable output paths under `.planning/*`.
