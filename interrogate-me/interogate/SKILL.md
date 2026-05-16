@@ -1,5 +1,5 @@
 ---
-name: interrogate-me
+name: interogate
 description: Stress-test a plan, architecture, design, or implementation by interviewing the user one question at a time until the design is clear, consistent, and defensible. Use when the user says "interrogate me" or wants rigorous design review.
 ---
 

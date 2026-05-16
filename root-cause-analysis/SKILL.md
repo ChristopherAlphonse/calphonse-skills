@@ -7,29 +7,59 @@ description: >
 
 # Root Cause Analysis
 
-## Table of Contents
+## Skill Workflow (Invocation Sequence)
 
-- [Overview](#overview)
-- [When to Use](#when-to-use)
-- [Quick Start](#quick-start)
-- [Reference Guides](#reference-guides)
-- [Best Practices](#best-practices)
+When this skill is loaded, follow these steps **in order**. Each step references
+the relevant guide in `references/` for full detail.
 
-## Overview
+### Step 1 — Define the Problem
 
-Root cause analysis (RCA) identifies underlying reasons for failures, enabling permanent solutions rather than temporary fixes.
+Pin down the symptom clearly. Write a concise problem statement.
 
-## When to Use
+> **Reference:** `the-5-whys-technique.md` - "Create a problem statement"
 
-- Production incidents
-- Customer-impacting issues
-- Repeated problems
-- Unexpected failures
-- Performance degradation
+### Step 2 — Choose a Technique
 
-## Quick Start
+Decide which tool fits the situation:
 
-Minimal working example:
+| Situation | Technique | Reference |
+|---|---|---|
+| Simple linear cause chain | **5 Whys** | `the-5-whys-technique.md` |
+| Multiple interacting causes | **Fishbone Diagram** | `fishbone-diagram.md` |
+| Complex / unknown territory | **Both** - start with Fishbone to surface categories, then 5 Whys on the top causes | both files |
+
+### Step 3 — Gather Supporting Facts
+
+Collect timeline, logs, metrics, and evidence before or during analysis.
+
+> **Reference:** `systematic-rca-process.md` - Steps 1-2 (Gather Facts, Reproduce)
+
+### Step 4 — Analyze (5 Whys or Fishbone)
+
+- **5 Whys:** Ask "Why?" iteratively until the root cause emerges.
+- **Fishbone:** Define category ribs (people, methods, materials, measurement, environment, policies), brainstorm causes, then use 5 Whys on top candidates.
+
+> **Reference:** `the-5-whys-technique.md` - Three Steps to the 5 Whys
+> **Reference:** `fishbone-diagram.md` - Five steps to creating a fishbone diagram
+> **Reference:** `root-cause-analysis-techniques.md` - systemic vs. individual causes
+
+### Step 5 — Document Findings
+
+Write the RCA report: incident, timeline, root cause, contributing factors, solutions (immediate/short-term/long-term).
+
+> **Reference:** `rca-report-template.md`
+
+### Step 6 — Plan Follow-Up
+
+Assign owners, track action items, define prevention measures, schedule verification.
+
+> **Reference:** `follow-up-prevention.md`
+
+### Step 7 — Polish with Business Focus
+
+Invoke `$documentation-writer` with a business-focus mindset to refine the output.
+
+## Quick Start (Minimal Example)
 
 ```yaml
 Example: Website Down
@@ -46,10 +76,10 @@ Why 3: Why were queries slow?
   Answer: Missing index on frequently queried column
 
 Why 4: Why was index missing?
-  Answer: Performance testing didn't use production-like data volume
+  Answer: Performance testing did not use production-like data volume
 
-Why 5: Why wasn't production-like data used?
-  Answer: Load testing environment doesn't mirror production
+Why 5: Why was production-like data not used?
+  Answer: Load testing environment does not mirror production
 
 Root Cause: Load testing environment under-provisioned
 
@@ -58,29 +88,13 @@ Solution: Update load testing environment with production-like data
 Prevention: Establish environment parity requirements
 ```
 
-## Reference Guides
+## Reference Guides (Detail)
 
-Detailed implementations in the `references/` directory:
-
-| Guide | Contents |
-|---|---|
-| [The 5 Whys Technique](references/the-5-whys-technique.md) | The 5 Whys Technique |
-| [Systematic RCA Process](references/systematic-rca-process.md) | Systematic RCA Process |
-| [RCA Report Template](references/rca-report-template.md) | RCA Report Template |
-| [Root Cause Analysis Techniques](references/root-cause-analysis-techniques.md) | Root Cause Analysis Techniques |
-| [Follow-Up & Prevention](references/follow-up-prevention.md) | Follow-Up & Prevention |
-
-## Best Practices
-
-### ✅ DO
-
-- Follow established patterns and conventions
-- Write clean, maintainable code
-- Add appropriate documentation
-- Test thoroughly before deploying
-
-### ❌ DON'T
-
-- Skip testing or validation
-- Ignore error handling
-- Hard-code configuration values
+| Step | Guide | Contents |
+|---|---|---|
+| 1-2 | `the-5-whys-technique.md` | Problem statement, Three Steps, PDSA integration |
+| 2 | `fishbone-diagram.md` | Five steps, healthcare categories, team brainstorming |
+| 2 | `root-cause-analysis-techniques.md` | Systemic vs. individual causes, example branches |
+| 3-4 | `systematic-rca-process.md` | 7-step process from fact gathering to documentation |
+| 5 | `rca-report-template.md` | Incident, timeline, root cause, solutions, prevention |
+| 6 | `follow-up-prevention.md` | Action items, monitoring, sharing learnings, checklist |
