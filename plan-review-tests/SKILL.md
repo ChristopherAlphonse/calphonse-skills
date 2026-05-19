@@ -15,6 +15,13 @@ allowed-tools:
 
 Verify that the plan has enough test coverage.
 
+## Guardrails
+
+- Start from success criteria and failure modes, then choose tests.
+- Prefer the smallest test set that gives confidence for the changed behavior.
+- Follow existing test framework and file placement before proposing new tooling.
+- Do not require broad coverage unrelated to the plan.
+
 ## Test Diagram
 
 Create an ASCII diagram covering:

@@ -20,9 +20,16 @@ allowed-tools:
 Review the plan from a founder/product strategy perspective before execution.
 Do not implement. Keep the user in control of every scope change.
 
+## Guardrails
+
+- Challenge assumptions directly and write down unresolved ambiguity.
+- Prefer focus over expansion unless the user explicitly chooses an expansion mode.
+- Treat each opportunity as optional until accepted. Do not smuggle rejected ideas into scope.
+- Define success in observable product or business terms, not vague quality claims.
+
 ## Skill Chain
 
-Run these local skills in order:
+For a full founder/product review, run these local skills in order:
 
 1. `/plan-review-intake` - find the plan and local `.planning/*` context.
 2. `/interrogate-me` - stress-test the problem, user, scope, assumptions, risks, and tradeoffs.

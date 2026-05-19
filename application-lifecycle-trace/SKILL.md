@@ -7,6 +7,13 @@ tools:
 
 #### **Title: PRD Generation**
 
+#### **Guardrails**
+
+- Trace only flows supported by source, docs, tests, or explicit user context.
+- Label inferred lifecycle steps as assumptions.
+- Keep the trace focused on primary flows. Do not add speculative components.
+- Do not modify source code.
+
 **User Story:** _As a developer, I want to provide a high-level feature idea and receive a structured, unambiguous PRD so that a junior developer can implement it with minimal oversight._
 
 ---

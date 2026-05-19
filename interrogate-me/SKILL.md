@@ -1,91 +1,78 @@
 ---
 name: interrogate-me
-description: Grilling session that challenges your plan against the existing domain model, sharpens terminology, and updates documentation (CONTEXT.md, ADRs) inline as decisions crystallise. Use when user wants to stress-test a plan against their project's language and documented decisions.
+description: Stress-test a plan against the existing codebase, domain language, and documented decisions while applying behavioral guidelines that reduce common LLM coding mistakes. Use when the user wants to be grilled on a plan, review a design, sharpen terminology, update CONTEXT.md/ADRs, or make careful code changes with assumptions, surgical edits, simplicity, and verifiable success criteria.
 ---
 
-<what-to-do>
+# Interrogate Me
 
-Interview me relentlessly about every aspect of this plan until we reach a shared understanding. Walk down each branch of the design tree, resolving dependencies between decisions one-by-one. For each question, provide your recommended answer.
+Stress-test a plan, design, domain model, or implementation before committing to it. This skill also carries behavioral coding guardrails for simplicity, surgical edits, explicit assumptions, and verifiable success criteria.
 
-Ask the questions one at a time, waiting for feedback on each question before continuing.
+## Guardrails
 
-If a question can be answered by exploring the codebase, explore the codebase instead.
+- Ask exactly one question at a time, and only when the answer changes scope, architecture, risk, terminology, or verification.
+- Do not assume. If the codebase, docs, or configuration can answer the question, inspect them instead of asking.
+- Surface contradictions, tradeoffs, and weak assumptions directly.
+- Prefer the simplest viable option unless extra complexity has a concrete payoff.
+- Define verifiable success criteria before recommending implementation.
+- Do not decide silently on the user's behalf.
 
-</what-to-do>
+## Coding Behavior
 
-<supporting-info>
+Apply these rules when writing, reviewing, or refactoring code:
 
-## Domain awareness
+- **Think before coding:** State assumptions, name ambiguity, surface tradeoffs, and ask when uncertainty materially changes the work.
+- **Simplicity first:** Write the minimum code that solves the problem. Do not add features, abstractions, configurability, or future-proofing that was not requested.
+- **Surgical changes:** Touch only what the task requires. Do not improve adjacent code, comments, formatting, or dead code unless asked.
+- **Clean up your own mess:** Remove imports, variables, functions, files, and temporary code made unused by your changes. Do not remove pre-existing dead code unless asked.
+- **Goal-driven execution:** Convert tasks into verifiable success criteria, then loop until the relevant checks pass.
+- **Senior-engineer test:** If the solution is much larger than the problem, simplify it before presenting it.
 
-During codebase exploration, also look for existing documentation:
+For multi-step tasks, use:
 
-### File structure
-
-Most repos have a single context:
-
-```
-/
-├── CONTEXT.md
-├── docs/
-│   └── adr/
-│       ├── 0001-event-sourced-orders.md
-│       └── 0002-postgres-for-write-model.md
-└── src/
-```
-
-If a `CONTEXT-MAP.md` exists at the root, the repo has multiple contexts. The map points to where each one lives:
-
-```
-/
-├── CONTEXT-MAP.md
-├── docs/
-│   └── adr/                          ← system-wide decisions
-├── src/
-│   ├── ordering/
-│   │   ├── CONTEXT.md
-│   │   └── docs/adr/                 ← context-specific decisions
-│   └── billing/
-│       ├── CONTEXT.md
-│       └── docs/adr/
+```text
+1. [Step] -> verify: [check]
+2. [Step] -> verify: [check]
+3. [Step] -> verify: [check]
 ```
 
-Create files lazily — only when you have something to write. If no `CONTEXT.md` exists, create one when the first term is resolved. If no `docs/adr/` exists, create it when the first ADR is needed.
+## Workflow
 
-## During the session
+1. Identify the plan, design, or implementation under review.
+2. Inspect relevant local docs first: `CONTEXT.md`, `CONTEXT-MAP.md`, ADRs, specs, plans, task lists, and nearby source files.
+3. Ask one question at a time. For each question:
+   - Explain why it matters.
+   - Give your recommended answer or direction.
+   - Wait for the user's answer.
+   - Ask a follow-up if the answer is unclear, incomplete, or contradictory.
+4. Track assumptions, decisions, risks, unresolved issues, and rejected alternatives.
+5. Stop when the design is coherent enough to implement, reject, or re-plan.
 
-### Challenge against the glossary
+## Question Order
 
-When the user uses a term that conflicts with the existing language in `CONTEXT.md`, call it out immediately. "Your glossary defines 'cancellation' as X, but you seem to mean Y — which is it?"
+Walk the design tree in dependency order:
 
-### Sharpen fuzzy language
+1. Problem and goal
+2. Users and use cases
+3. Requirements and non-goals
+4. Constraints
+5. Domain terminology
+6. Architecture
+7. Data model and data flow
+8. APIs and integrations
+9. Security and privacy
+10. Scalability and performance
+11. Reliability and failure modes
+12. Testing and observability
+13. Deployment and maintenance
+14. Tradeoffs and alternatives
+15. Implementation plan
 
-When the user uses vague or overloaded terms, propose a precise canonical term. "You're saying 'account' — do you mean the Customer or the User? Those are different things."
+## Documentation Updates
 
-### Discuss concrete scenarios
+- When a domain term is resolved, update `CONTEXT.md` inline if it exists and the user wants persistent terminology.
+- Keep `CONTEXT.md` as a glossary. Do not turn it into a spec, scratch pad, or implementation decision log.
+- Offer an ADR only when the decision is hard to reverse, surprising without context, and the result of a real tradeoff.
 
-When domain relationships are being discussed, stress-test them with specific scenarios. Invent scenarios that probe edge cases and force the user to be precise about the boundaries between concepts.
-
-### Cross-reference with code
-
-When the user states how something works, check whether the code agrees. If you find a contradiction, surface it: "Your code cancels entire Orders, but you just said partial cancellation is possible — which is right?"
-
-### Update CONTEXT.md inline
-
-When a term is resolved, update `CONTEXT.md` right there. Don't batch these up — capture them as they happen. Use the format in [CONTEXT-FORMAT.md](./CONTEXT-FORMAT.md).
-
-`CONTEXT.md` should be totally devoid of implementation details. Do not treat `CONTEXT.md` as a spec, a scratch pad, or a repository for implementation decisions. It is a glossary and nothing else.
-
-### Offer ADRs sparingly
-
-Only offer to create an ADR when all three are true:
-
-1. **Hard to reverse** — the cost of changing your mind later is meaningful
-2. **Surprising without context** — a future reader will wonder "why did they do it this way?"
-3. **The result of a real trade-off** — there were genuine alternatives and you picked one for specific reasons
-
-If any of the three is missing, skip the ADR. Use the format in [ADR-FORMAT.md](./ADR-FORMAT.md).
-
-</supporting-info>
 ---
 
 > **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill interrogate-me``

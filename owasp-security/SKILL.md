@@ -7,6 +7,13 @@ description: Implement secure coding practices following OWASP Top 10. Use when 
 
 Prevent common security vulnerabilities in web applications.
 
+## Guardrails
+
+- Tie each security recommendation to a concrete asset, entry point, trust boundary, or OWASP risk.
+- Do not add broad frameworks or policy layers when a focused validation, authorization, or configuration fix is enough.
+- Keep changes surgical. Mention unrelated vulnerabilities separately instead of fixing them opportunistically.
+- Verify with a test, exploit repro, config inspection, or source reference.
+
 ## OWASP Top 10 (2021)
 
 | # | Vulnerability | Prevention |

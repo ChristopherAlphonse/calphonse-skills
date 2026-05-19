@@ -12,6 +12,13 @@ description: |
 **Core contract:** Surface real issues. Never invent. Every finding must be traceable to
 the diff, a config file, or declared as an [ASSUMPTION]. This skill does not fix code.
 
+## Guardrails
+
+- Review only the changed behavior and its direct integration points.
+- Do not recommend broad rewrites, abstractions, or style churn unless they prevent a verified bug.
+- If evidence is weak, label the assumption or omit the finding.
+- Prefer findings with a concrete repro, failing test, config violation, or line-level reasoning.
+
 ---
 
 ## Skill Directory

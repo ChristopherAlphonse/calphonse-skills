@@ -8,6 +8,13 @@ origin: ECC
 
 Modern frontend patterns for React, Next.js, and performant user interfaces.
 
+## Guardrails
+
+- Match the app's existing component, state, styling, and data-fetching patterns before introducing a new one.
+- Build the smallest UI change that satisfies the requested behavior. Do not add speculative configurability.
+- Touch only files required by the feature or bug fix. Mention unrelated cleanup instead of doing it.
+- Verify with the most relevant test, typecheck, lint, or browser check for the changed surface.
+
 ## When to Activate
 
 - Building React components (composition, props, rendering)

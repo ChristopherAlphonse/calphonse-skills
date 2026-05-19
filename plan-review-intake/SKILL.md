@@ -13,6 +13,13 @@ allowed-tools:
 
 Gather the minimum context required for a plan review.
 
+## Guardrails
+
+- Read the smallest set of local files that can identify the plan, branch, scope, and known TODOs.
+- If multiple plans match, state the selection rule instead of guessing silently.
+- Do not inspect or edit unrelated source files in intake.
+- Report missing context that materially limits confidence.
+
 ## Steps
 
 1. Detect the repo root with `git rev-parse --show-toplevel`; if that fails, use the current directory.

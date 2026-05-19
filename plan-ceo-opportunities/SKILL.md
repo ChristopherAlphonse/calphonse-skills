@@ -14,6 +14,13 @@ allowed-tools:
 
 Evaluate opportunities according to the confirmed review mode.
 
+## Guardrails
+
+- Present each opportunity as optional until accepted.
+- Prefer removal or simplification when it improves the core outcome.
+- Do not add speculative features or positioning work without explicit user opt-in.
+- Tie every opportunity to effort, risk, and observable success.
+
 ## Evaluate
 
 - Stronger user outcome.

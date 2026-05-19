@@ -1,12 +1,19 @@
 ---
 name: security-review
-description: Use this skill when adding authentication, handling user input, working with secrets, creating API endpoints, or implementing payment/sensitive features. Provides comprehensive security checklist and patterns.
+description: Use this skill when adding authentication, handling user input, working with secrets, creating API endpoints, or implementing payment/sensitive features. Provides scoped security checklist and patterns.
 origin: ECC
 ---
 
 # Security Review Skill
 
 This skill ensures all code follows security best practices and identifies potential vulnerabilities.
+
+## Guardrails
+
+- Define assets, actors, trust boundaries, and assumptions before recommending controls.
+- Prefer the smallest mitigation that closes the verified risk. Do not add speculative security machinery.
+- Do not rewrite unrelated auth, validation, or persistence code while fixing one issue.
+- Verify security claims with tests, config checks, dependency evidence, or threat-model reasoning.
 
 ## Required Companion Skill
 

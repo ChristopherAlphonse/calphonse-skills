@@ -14,6 +14,13 @@ allowed-tools:
 
 Review architecture after scope is agreed.
 
+## Guardrails
+
+- Evaluate only architecture affected by the agreed scope.
+- Prefer existing boundaries and local patterns unless they cannot support the goal.
+- Recommend new abstractions only for current complexity, not hypothetical future cases.
+- Tie every architecture concern to a failure mode, integration risk, or verification step.
+
 ## Evaluate
 
 - Component boundaries and ownership.

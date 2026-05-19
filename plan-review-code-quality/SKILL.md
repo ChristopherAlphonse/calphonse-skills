@@ -14,6 +14,13 @@ allowed-tools:
 
 Review whether the plan fits the codebase cleanly.
 
+## Guardrails
+
+- Prefer existing local patterns over new abstractions.
+- Flag overengineering and underengineering with concrete evidence.
+- Do not recommend cleanup outside the plan's changed surface.
+- Tie recommendations to maintainability, correctness, or verification impact.
+
 ## Evaluate
 
 - Module boundaries and naming.

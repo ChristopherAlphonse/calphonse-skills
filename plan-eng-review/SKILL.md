@@ -17,13 +17,20 @@ allowed-tools:
 
 # Plan Engineering Review
 
-Review the plan thoroughly before code changes. Do not implement. Preserve the
+Review the plan carefully before code changes. Do not implement. Preserve the
 same behavior as the original skill by delegating each concern to smaller local
 skills and then synthesizing the result.
 
+## Guardrails
+
+- Do not silently expand the plan. Scope changes require explicit user agreement.
+- Prefer the simplest plan that satisfies the goal with verifiable success criteria.
+- Label assumptions, contradictions, and unresolved decisions instead of smoothing them over.
+- Recommend abstractions only when they remove current complexity or match established local patterns.
+
 ## Skill Chain
 
-Run these local skills in order:
+For a full engineering review, run these local skills in order:
 
 1. `/plan-review-intake` - find the plan, read `.planning/*` context, detect branch/base, and gather existing TODOs.
 2. `/interrogate-me` - stress-test assumptions, dependencies, architecture, APIs, tests, deployment, and failure modes one question at a time.
@@ -41,7 +48,7 @@ from the corresponding skill file name above.
 
 - Ask one decision question at a time when there is a genuine tradeoff.
 - Give an opinionated recommendation for every issue.
-- Prefer complete, well-tested implementations when the extra work is bounded.
+- Prefer complete, well-tested implementations when the extra work is bounded and directly supports the stated goal.
 - Do not silently expand or reduce scope. Scope changes require explicit user agreement.
 - If codebase exploration can answer a question, inspect files instead of asking.
 - Use `.planning/*` for every durable artifact. Do not write durable workflow artifacts outside `.planning/*`.
@@ -50,8 +57,8 @@ from the corresponding skill file name above.
 
 ## Shared Review Preferences
 
-- DRY is important; flag repetition aggressively.
-- Tests are non-negotiable; prefer too much meaningful coverage over too little.
+- DRY is important, but do not force abstraction for one-off code.
+- Tests are non-negotiable; prefer meaningful coverage tied to the plan's success criteria.
 - Aim for code that is engineered enough: not fragile, not overbuilt.
 - Handle edge cases explicitly.
 - Prefer explicit code over clever code.

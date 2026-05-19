@@ -14,6 +14,13 @@ allowed-tools:
 
 Review whether the plan introduces avoidable performance or scaling risk.
 
+## Guardrails
+
+- Focus on performance risks introduced or exposed by the plan.
+- Do not optimize without a plausible bottleneck, metric, or user impact.
+- Prefer simple query, batching, caching, or pagination fixes over broad rewrites.
+- Require a test, benchmark, trace, log, or metric for important claims.
+
 ## Evaluate
 
 - N+1 queries and repeated remote calls.

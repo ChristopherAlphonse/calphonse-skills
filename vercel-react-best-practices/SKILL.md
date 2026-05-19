@@ -9,7 +9,14 @@ metadata:
 
 # Vercel React Best Practices
 
-Comprehensive performance optimization guide for React and Next.js applications, maintained by Vercel. Contains 70 rules across 8 categories, prioritized by impact to guide automated refactoring and code generation.
+Performance optimization guide for React and Next.js applications, maintained by Vercel. Contains 70 rules across 8 categories, prioritized by impact to guide scoped refactoring and code generation.
+
+## Guardrails
+
+- Apply only rules relevant to the changed component, route, data path, or performance symptom.
+- Do not refactor broad React architecture just to satisfy a guideline.
+- Prefer measured or clearly user-visible performance wins over speculative optimization.
+- Verify with build output, profiler evidence, web vitals, tests, or code-level reasoning.
 
 ## When to Apply
 

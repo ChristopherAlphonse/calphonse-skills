@@ -34,6 +34,13 @@ title: "PRD"
 
 Generate clear, actionable Product Requirements Documents (PRDs) tailored for **junior developers**. Focus on the "what" and "why" to ensure unambiguous implementation. Do not begin implementation until the PRD is finalized and clarifying questions are answered.
 
+## Guardrails
+
+- Separate known requirements from assumptions, open questions, and non-goals.
+- Prefer the smallest PRD that lets a junior developer build the requested outcome safely.
+- Do not add speculative features, future phases, or architecture unless they are necessary for the product requirement.
+- Every functional requirement needs observable acceptance criteria.
+
 ## Required Companion Skill
 
 Use `/interrogate-me` as part of this workflow before finalizing the PRD. Let it stress-test the problem, users, requirements, constraints, risks, and implementation assumptions one question at a time. Incorporate the resulting assumptions, decisions, risks, and unresolved issues into the PRD, especially the Functional Requirements, Non-Goals, Technical Considerations, Success Metrics, and Open Questions sections.

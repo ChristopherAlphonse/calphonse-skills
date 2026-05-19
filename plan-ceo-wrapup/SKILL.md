@@ -13,6 +13,13 @@ allowed-tools:
 
 Write the product review artifact.
 
+## Guardrails
+
+- Preserve accepted scope exactly. Do not reintroduce rejected opportunities.
+- Separate decisions, assumptions, non-goals, and follow-ups.
+- Keep the artifact concise and action-oriented.
+- Put useful but out-of-scope work in TODOs only with user approval.
+
 ## Artifact
 
 Write or update:

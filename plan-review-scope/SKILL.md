@@ -14,6 +14,13 @@ allowed-tools:
 
 Challenge the plan before detailed review begins.
 
+## Guardrails
+
+- Find the minimum complete change that achieves the stated goal.
+- Do not expand or reduce scope without a user decision.
+- Treat speculative future flexibility as a scope risk.
+- Mark out-of-scope work explicitly.
+
 ## Review Questions
 
 Answer these from the plan and codebase:

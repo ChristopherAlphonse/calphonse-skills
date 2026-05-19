@@ -13,6 +13,13 @@ allowed-tools:
 
 Synthesize all review sections into a durable artifact.
 
+## Guardrails
+
+- Preserve reviewer findings without adding new unsupported claims.
+- Separate accepted scope, non-goals, TODO proposals, and unresolved decisions.
+- Keep the artifact concise enough to guide execution.
+- Ask before adding out-of-scope follow-ups to TODOs.
+
 ## Artifact
 
 Write or update:

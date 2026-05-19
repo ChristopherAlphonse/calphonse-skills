@@ -21,9 +21,16 @@ allowed-tools:
 Full founder/product review before execution. Do not implement. Every scope
 change requires explicit user opt-in.
 
-## Phase 1 — Parallel Research (Sub-Agents)
+## Guardrails
 
-Launch two sub-agents in parallel immediately. Do not wait for user input first.
+- Do not launch broad exploration when the plan, product surface, and decision needed are already clear.
+- Keep each scope change explicit, reversible when possible, and tied to a concrete user or business outcome.
+- Mark assumptions, rejected opportunities, and unresolved decisions plainly.
+- Prefer the smallest product shape that proves the strategic bet before proposing expansion.
+
+## Phase 1 — Research
+
+For a full review, gather both lenses below. If the plan, product surface, and decision needed are already clear from local files, do the intake inline instead of launching broad exploration.
 
 ### Sub-Agent A: Plan Intake
 

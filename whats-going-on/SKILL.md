@@ -5,7 +5,14 @@ description: Orchestrates a full codebase intelligence sweep by spawning 3 paral
 
 ## Purpose
 
-Run a comprehensive "what's going on here?" analysis on any codebase. Three agents work in parallel, each owning one lens. Results merge into one document a new engineer can actually use.
+Run a scoped "what's going on here?" analysis on any codebase. Three agents work in parallel, each owning one lens. Results merge into one document a new engineer can actually use.
+
+## Guardrails
+
+- Do not spawn agents for work that can be answered by reading one or two obvious files.
+- Require every claim in the synthesis to cite local evidence or be labeled as an assumption.
+- Focus on core use cases, lifecycle, and architecture. Avoid speculative roadmap or refactor advice.
+- Do not modify source code.
 
 ---
 

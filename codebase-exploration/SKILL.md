@@ -9,6 +9,13 @@ tools:
 
 Identify and document the repository's primary functionalities and workflows to facilitate developer onboarding.
 
+### **Guardrails**
+
+- Ground every use case in files, routes, tests, docs, or observed behavior.
+- Label assumptions and unknowns instead of filling gaps with guesses.
+- Prefer the smallest useful onboarding map: core flows first, peripheral features later.
+- Do not modify source code while exploring.
+
 #### **Required Content**
 
 1. **Core Use Cases:** An ordered list of the most essential and frequent use cases supported by the codebase.

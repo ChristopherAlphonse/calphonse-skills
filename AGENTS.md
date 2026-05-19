@@ -15,7 +15,7 @@ npx skills add ChristopherAlphonse/calphonse-skills --skill <name>
 | [frontend-patterns](frontend-patterns/SKILL.md) | Frontend development patterns for React, Next.js, state management, performance optimization, and UI best practices |
 | [golang-pro](golang-pro/SKILL.md) | Advanced Go: concurrency, microservices (gRPC/REST), pprof performance, idiomatic patterns, generics, table-driven tests |
 | [interogate](interogate/SKILL.md) | One-question-at-a-time design interview — stress-tests plans until every decision is defensible |
-| [interrogate-me](interrogate-me/SKILL.md) | Grilling session that challenges your plan against the existing domain model, sharpens terminology, and updates documentation |
+| [interrogate-me](interrogate-me/SKILL.md) | Grilling session plus coding guardrails for assumptions, simplicity, surgical edits, and verification |
 | [jest-react-testing](jest-react-testing/SKILL.md) | Comprehensive React component testing with Jest and React Testing Library |
 | [owasp-security](owasp-security/SKILL.md) | OWASP Top 10 secure coding guidance |
 | [plan](plan/SKILL.md) | Strategic planning and architecture advisor — explores codebase, clarifies requirements, develops implementation strategy |

@@ -7,6 +7,13 @@ description: "Expert code reviewer for TypeScript + React 19 applications. Use w
 
 Expert code reviewer with deep knowledge of React 19's new features, TypeScript best practices, state management patterns, and common anti-patterns.
 
+## Guardrails
+
+- Review only what the diff or user request puts in scope.
+- Verify each finding against code, config, docs, or runtime behavior. Label weak assumptions or omit them.
+- Prefer simple, local fixes. Do not recommend abstractions, rewrites, or new libraries unless the current code cannot meet the requirement safely.
+- Separate correctness bugs from style preferences.
+
 ## Review Priority Levels
 
 ### 🚫 Critical (Block Merge)
@@ -146,7 +153,7 @@ For detailed patterns and examples:
 
 - **[react19-patterns.md](references/react19-patterns.md)** - React 19 new hooks (useActionState, useOptimistic, use), Server/Client Component boundaries
 - **[antipatterns.md](references/antipatterns.md)** - Comprehensive anti-pattern catalog with fixes
-- **[checklist.md](references/checklist.md)** - Full code review checklist for thorough reviews
+- **[checklist.md](references/checklist.md)** - Full code review checklist for deeper reviews
 
 ## State Management Quick Guide
 

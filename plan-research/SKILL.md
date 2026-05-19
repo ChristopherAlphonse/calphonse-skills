@@ -18,6 +18,13 @@ allowed-tools:
 
 Research implementation approach **before** planning or coding. Produces `RESEARCH.md` (or an equivalent research artifact) that downstream planning skills consume.
 
+## Guardrails
+
+- Start by narrowing the research question and success criteria.
+- Prefer primary sources and local code evidence over broad surveys.
+- Label uncertainty, version risk, and assumptions.
+- Do not produce implementation plans or code unless explicitly asked.
+
 ## When to use
 
 - Research without planning yet

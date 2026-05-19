@@ -13,6 +13,15 @@ description: Generates tasks by analyzing the PRD and breaking it into actionabl
 
 ---
 
+### **Guardrails**
+
+- Convert ambiguity into explicit assumptions, open questions, or user checkpoints.
+- Prefer the smallest task breakdown that can deliver the PRD. Do not add speculative features, abstractions, or future-proofing.
+- Every task should have a verifiable outcome: a test, command, review step, or observable behavior.
+- Mark out-of-scope work explicitly instead of silently including it.
+
+---
+
 ### **Required Companion Skill**
 
 Use `/interrogate-me` before finalizing the task list. Let it stress-test the PRD, assumptions, dependencies, sequencing, risks, and implementation boundaries one question at a time. Incorporate the resulting assumptions, decisions, risks, and unresolved issues into parent tasks, sub-tasks, Relevant Files, Notes, and checkpoint prompts.
@@ -24,7 +33,7 @@ Use `/interrogate-me` before finalizing the task list. Let it stress-test the PR
 #### **Phase 1: Parent Tasks (High-Level)**
 
 1. **Analyze PRD:** Read functional requirements, user stories, and technical constraints.
-2. **Generate Roadmap:** Identify approximately **5 high-level parent tasks** (e.g., "Database Schema Setup," "API Layer Implementation").
+2. **Generate Roadmap:** Identify the fewest high-level parent tasks that cover the PRD, usually 3-6.
 3. **Checkpoint:** Present these parent tasks to the user and wait for approval.
 
 - _Required Message:_ "I have generated the high-level tasks based on the PRD. Ready to generate the sub-tasks? Respond with 'Go' to proceed."
@@ -42,16 +51,15 @@ Use `/interrogate-me` before finalizing the task list. Let it stress-test the PR
 - **Format:** Markdown (`.md`)
 - **Path:** `.planning/tasks/tasks-[prd-file-name].md`
 - **Structure:**
-- **Task List:** Hierarchical checkboxes (`- [ ] 1.0 ...`, `- [ ] 1.1 ...`).
-- **Relevant Files:** A list of potential code and test files involved.
-- **Notes:** Include testing commands and architectural reminders.
+  - **Task List:** Hierarchical checkboxes (`- [ ] 1.0 ...`, `- [ ] 1.1 ...`).
+  - **Relevant Files:** Potential code and test files involved.
+  - **Notes:** Testing commands and architectural reminders tied to the PRD.
 
 ---
 
 ### **Developer Guidelines**
 
 - **Test Placement:** Unit tests must be co-located with their respective source files (e.g., `feature.ts` and `feature.test.ts`).
-- **Tooling:** Use `think` to logically sequence dependencies (e.g., ensure the backend exists before the frontend attempts to consume it).
 - **Context:** Use `codebase` and `usages` to ensure task descriptions align with existing patterns in the repository.
 
 ---
@@ -65,7 +73,8 @@ Use `/interrogate-me` before finalizing the task list. Let it stress-test the PR
   - [ ] 1.3 Implement repository pattern for CRUD operations
 ```
 
-**Ask user if each task or subtask should be committed to git (must work in sequential order).&**
+**Ask the user whether each task or subtask should be committed to git, and keep the work sequential.**
+
 ---
 
 > **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill task-generation-mode``

@@ -13,6 +13,13 @@ description: >
 
 Write PR bodies that are short, business-focused, and accurate to the actual code change. Assume reviewers can read the diff; the PR body should explain the outcome, validation, and any non-obvious context.
 
+## Guardrails
+
+- Make every claim match the actual diff and current check status.
+- Do not mention speculative benefits, future work, or unrelated cleanup.
+- Keep validation concrete: commands, CI status, screenshots, or manual checks.
+- If uncertain, say what was not verified.
+
 ## Style Rules
 
 - Preserve the repository's PR template headings unless the user asks to change the template.

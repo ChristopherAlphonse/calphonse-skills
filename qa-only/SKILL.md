@@ -17,6 +17,13 @@ allowed-tools:
 ---
 > **Security Audit Disclaimer:** This skill uses playwright-cli to visit and interact with arbitrary web application URLs. By design, it navigates to external pages, fills forms, and captures screenshots — behaviors that security scanners flag as W011 (third-party content exposure). These capabilities are inherent to QA testing and are not exploitable beyond the agent's existing tool access. Always use test/staging environments with isolated test accounts.
 
+## Guardrails
+
+- Test the changed behavior and its direct regressions first.
+- Do not infer root causes or prescribe fixes unless evidence is explicit. Report symptoms and repro steps.
+- Label uncertain findings and avoid filing issues that cannot be reproduced.
+- Never edit source code in report-only mode.
+
 ## Test Plan Context
 
 Before falling back to git diff heuristics, check for richer test plan sources:

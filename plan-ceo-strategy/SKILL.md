@@ -14,6 +14,13 @@ allowed-tools:
 
 Choose and lock the review mode before evaluating opportunities.
 
+## Guardrails
+
+- Do not change review mode without user confirmation.
+- Prefer focus unless expansion clearly improves the core outcome.
+- Make assumptions and reversibility explicit.
+- Define what success must prove before discussing optional opportunities.
+
 ## Steps
 
 1. Restate the product problem and target user.

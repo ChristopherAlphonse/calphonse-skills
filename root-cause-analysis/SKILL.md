@@ -7,6 +7,13 @@ description: >
 
 # Root Cause Analysis
 
+## Guardrails
+
+- Start with the observed symptom and evidence. Do not jump to a favored cause.
+- Separate facts, assumptions, hypotheses, and confirmed causes.
+- Prefer the smallest corrective action that addresses the confirmed root cause.
+- Define how the fix will be verified and how recurrence will be detected.
+
 ## Skill Workflow (Invocation Sequence)
 
 When this skill is loaded, follow these steps **in order**. Each step references

@@ -9,6 +9,13 @@ tools: ['vscode/getProjectSetupInfo', 'vscode/installExtension', 'vscode/newWork
 
 Analyze lifecycle documentation and repository structure to generate a high-level system architecture document. The goal is to provide a "bird's-eye view" that identifies major logic centers, dependencies, and core technologies for new engineers.
 
+### **Guardrails**
+
+- Derive architecture from lifecycle docs and source evidence, not guesses.
+- Label uncertain ownership, boundaries, or data flow as assumptions.
+- Keep the diagram to major actors only. Do not model every file or helper.
+- Do not recommend refactors unless explicitly asked.
+
 ---
 
 ### **Mandated Output Structure**

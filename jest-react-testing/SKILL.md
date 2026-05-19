@@ -5,7 +5,14 @@ description: Comprehensive React component testing with Jest and React Testing L
 
 # Jest React Testing
 
-A comprehensive skill for testing React applications using Jest and React Testing Library. This skill covers everything from basic component testing to advanced patterns including mocking, async testing, custom hooks testing, and integration testing strategies.
+A testing skill for React applications using Jest and React Testing Library. It covers component tests, mocking, async testing, hooks testing, and integration testing patterns.
+
+## Guardrails
+
+- Start from the behavior under test and the user-visible success criteria.
+- Add the smallest test that would fail for the bug or missing behavior. Do not chase coverage for its own sake.
+- Prefer real user interactions and accessible queries over implementation details.
+- Keep mocks minimal and local. Do not rewrite test infrastructure unless configuration is the task.
 
 ## When to Use This Skill
 
