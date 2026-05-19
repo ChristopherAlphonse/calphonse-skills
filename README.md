@@ -13,6 +13,30 @@ npx skills add ChristopherAlphonse/calphonse-skills --all
 npx skills add ChristopherAlphonse/calphonse-skills --skill <skill-name>
 ```
 
+### Updating installed skills
+
+After this repository changes, update installed skills with:
+
+```bash
+npx skills update
+```
+
+Useful update options:
+
+```bash
+# Update global skills only
+npx skills update -g
+
+# Update project skills only
+npx skills update -p
+
+# Update one specific skill
+npx skills update <skill-name>
+
+# Update without prompts
+npx skills update -y
+```
+
 > **Note:** Some of these skills are from other repos and are being recycled and used in conjunction here. Some are mine and some are borrowed with minute tweaks.
 
 ## Philosophy
