@@ -2,7 +2,7 @@
 name: process-task-list
 description: 'Guidelines for managing task lists in markdown files to track progress on completing a PRD'
 tools: ['codebase', 'edit','editFiles', 'findTestFiles', 'new', 'problems', 'runCommands', 'runTests', 'search', 'terminalLastCommand', 'testFailure']
-title: 'Todo's'
+title: "Todo's"
 ---
 
 # Task List Management
