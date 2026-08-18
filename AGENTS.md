@@ -11,12 +11,13 @@ npx skills add ChristopherAlphonse/calphonse-skills --skill <name>
 | [application-lifecycle-trace](application-lifecycle-trace/SKILL.md) | Show case application lifecycle |
 | [code-review-frontend](code-review-frontend/SKILL.md) | Multi-agent PR review orchestrator — discovers quality tooling, spawns parallel specialist agents, reports verified findings only |
 | [codebase-exploration](codebase-exploration/SKILL.md) | Onboarding exploration — maps a repo through its primary use cases |
+| [csp](csp/SKILL.md) | Advanced CSP bypass techniques — policy weaknesses, nonce leakage, trusted-endpoint abuse, exfiltration channels CSP can't block |
 | [documentation-writer](documentation-writer/SKILL.md) | Diataxis documentation expert — tutorials, how-tos, reference, explanation — plus product copy principles aligned with brand voice |
 | [frontend-patterns](frontend-patterns/SKILL.md) | Frontend development patterns for React, Next.js, state management, performance optimization, and UI best practices |
 | [golang-pro](golang-pro/SKILL.md) | Advanced Go: concurrency, microservices (gRPC/REST), pprof performance, idiomatic patterns, generics, table-driven tests |
-| [interogate](interogate/SKILL.md) | One-question-at-a-time design interview — stress-tests plans until every decision is defensible |
 | [interrogate-me](interrogate-me/SKILL.md) | Grilling session plus coding guardrails for assumptions, simplicity, surgical edits, and verification |
 | [jest-react-testing](jest-react-testing/SKILL.md) | Comprehensive React component testing with Jest and React Testing Library |
+| [nextjs-proxy-csp-hardening](nextjs-proxy-csp-hardening/SKILL.md) | Build and review secure Next.js `proxy.ts` files — CSP, nonce-based script protection, and browser security headers |
 | [owasp-security](owasp-security/SKILL.md) | OWASP Top 10 secure coding guidance |
 | [plan](plan/SKILL.md) | Strategic planning and architecture advisor — explores codebase, clarifies requirements, develops implementation strategy |
 | [plan-ceo-opportunities](plan-ceo-opportunities/SKILL.md) | Surfaces product expansion, reduction, trust, and positioning opportunities one decision at a time |
@@ -43,5 +44,6 @@ npx skills add ChristopherAlphonse/calphonse-skills --skill <name>
 | [systems-architecture](systems-architecture/SKILL.md) | Produces a high-level architecture view from lifecycle documentation |
 | [task-generation-mode](task-generation-mode/SKILL.md) | Converts a PRD into a detailed, actionable implementation task list |
 | [typescript-react-reviewer](typescript-react-reviewer/SKILL.md) | Expert code reviewer for TypeScript + React 19 applications |
+| [typescript-strict-style](typescript-strict-style/SKILL.md) | Strict TypeScript/JavaScript coding discipline — safety, performance, then developer experience |
 | [vercel-react-best-practices](vercel-react-best-practices/SKILL.md) | React and Next.js performance optimization guidelines from Vercel Engineering |
 | [whats-going-on](whats-going-on/SKILL.md) | Orchestrates a full codebase intelligence sweep — 3 parallel agents synthesize into an onboarding document |
