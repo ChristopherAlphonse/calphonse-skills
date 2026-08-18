@@ -1,6 +1,6 @@
 ---
 name: typescript-strict-style
-description: Enforces a strict TypeScript/JavaScript coding discipline prioritized as safety, then performance, then developer experience. Use when writing or reviewing TS/JS for assertion discipline, exhaustive error handling, function-size and naming conventions, batching/performance design, or dependency minimalism.
+description: Enforces a strict TS/JS coding discipline prioritized as safety, performance, and developer experience. Use when writing/reviewing TS/JS for assertion discipline, exhaustive error handling, function-size and naming conventions, batching/performance design, or dependency minimalism.
 license: MIT
 metadata:
   author: ChristopherAlphonse
@@ -15,7 +15,8 @@ metadata:
 
 # TypeScript Strict Style
 
-A coding discipline for TypeScript/JavaScript application code, prioritized in order: **safety, then performance, then developer experience**. When two goals conflict, the earlier one wins.
+A coding discipline for TypeScript/JavaScript application code derived from Tigger style, and [The Power of Ten –
+Rules for Developing Safety Critical Code](https://spinroot.com/gerard/pdf/P10.pdf).
 
 ## Guardrails
 
@@ -86,15 +87,15 @@ A coding discipline for TypeScript/JavaScript application code, prioritized in o
 
 ## Quick Reference
 
-| Category | Rule of thumb |
-|---|---|
-| Safety | Bound every loop/queue; assert preconditions; handle every error explicitly |
-| Performance | Batch, don't loop-await; design for the hot path, don't retrofit it |
-| Naming | `camelCase`/`PascalCase`; units as suffix; no abbreviations |
-| State | No aliased mutable state; shrink scope; validate close to use |
-| Style | Prettier + ESLint strict; brace every `if`; enforce limits via lint, not memory |
-| Dependencies | Built-in beats library beats new dependency |
+| Category     | Rule of thumb                                                                   |
+| ------------ | ------------------------------------------------------------------------------- |
+| Safety       | Bound every loop/queue; assert preconditions; handle every error explicitly     |
+| Performance  | Batch, don't loop-await; design for the hot path, don't retrofit it             |
+| Naming       | `camelCase`/`PascalCase`; units as suffix; no abbreviations                     |
+| State        | No aliased mutable state; shrink scope; validate close to use                   |
+| Style        | Prettier + ESLint strict; brace every `if`; enforce limits via lint, not memory |
+| Dependencies | Built-in beats library beats new dependency                                     |
 
 ---
 
-> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill typescript-strict-style``
+> **Install:** `npx skills add ChristopherAlphonse/calphonse-skills --skill typescript-strict-style`
