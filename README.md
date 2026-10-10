@@ -127,21 +127,21 @@ Workflow output goes into `.planning/*` in the target project, not into `docs/`,
 
 ## Local Setup
 
-To edit a skill and have the change apply globally without reinstalling, symlink the repo into the skill stores your tools read:
+To edit a skill and have the change apply globally without reinstalling, symlink the repo into the skill store OpenCode reads:
 
 ```bash
 REPO=~/calphonse-skills
+mkdir -p ~/.config/opencode/skills
 
 for d in "$REPO"/*/; do
   [ -f "$d/SKILL.md" ] || continue
-  n=$(basename "$d")
-  mkdir -p ~/.config/opencode/skills ~/.claude/skills
-  ln -sfn "$d" ~/.config/opencode/skills/"$n"
-  ln -sfn "$d" ~/.claude/skills/"$n"
+  ln -sfn "${d%/}" ~/.config/opencode/skills/"$(basename "$d")"
 done
 ```
 
-`~/.config/opencode/skills` is the path OpenCode reads (`skills.paths` in `opencode.json`). Leave `~/.agents/skills` alone — it belongs to the Skills CLI and its lockfile.
+`~/.config/opencode/skills` is the path OpenCode reads (`skills.paths` in `opencode.json`). Edits to any `SKILL.md` take effect immediately — there is no reinstall step and no copy to keep in sync.
+
+Leave `~/.agents/skills` alone — it belongs to the Skills CLI and its lockfile.
 
 ## Notes
 

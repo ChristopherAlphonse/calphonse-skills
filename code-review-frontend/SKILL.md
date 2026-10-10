@@ -195,7 +195,7 @@ EVIDENCE RULES (critical — follow exactly):
 REPORT FORMAT (use exactly):
 
 ## [AGENT: base-checklist]
-Model: claude-sonnet-4-6
+Model: <assigned model>
 Skill: checklist.md
 
 ### Quality Config Used
@@ -252,7 +252,7 @@ EVIDENCE RULES:
 REPORT FORMAT (use exactly):
 
 ## [AGENT: typescript-react-reviewer]
-Model: claude-sonnet-4-6
+Model: <assigned model>
 Skill: typescript-react-reviewer/SKILL.md + references/
 
 ### Quality Config Used
@@ -305,7 +305,7 @@ EVIDENCE RULES:
 REPORT FORMAT (use exactly):
 
 ## [AGENT: frontend-patterns]
-Model: claude-haiku-4-5-20251001
+Model: <assigned model>
 Skill: frontend-patterns/SKILL.md
 
 ### Quality Config Used
@@ -355,7 +355,7 @@ EVIDENCE RULES:
 REPORT FORMAT (use exactly):
 
 ## [AGENT: jest-react-testing]
-Model: claude-haiku-4-5-20251001
+Model: <assigned model>
 Skill: jest-react-testing/SKILL.md
 
 ### Quality Config Used
@@ -411,7 +411,7 @@ EVIDENCE RULES:
 REPORT FORMAT (use exactly):
 
 ## [AGENT: vercel-perf]
-Model: claude-sonnet-4-6
+Model: <assigned model>
 Skill: vercel-react-best-practices/SKILL.md
 
 ### Quality Config Used
@@ -480,13 +480,15 @@ Codebase context: <from .planning/ | mapped via /gsd-map-codebase | [ASSUMPTION 
 
 ## Agent Summary
 
-| Agent | Model | Verdict | Verified | Assumptions |
-|-------|-------|---------|----------|-------------|
-| base-checklist | claude-sonnet-4-6 | BLOCK/WARN/PASS | N | N |
-| typescript-react-reviewer | claude-sonnet-4-6 | BLOCK/WARN/PASS | N | N |
-| frontend-patterns | claude-haiku-4-5-20251001 | BLOCK/WARN/PASS | N | N |
-| jest-react-testing | claude-haiku-4-5-20251001 | BLOCK/WARN/PASS | N | N |
-| vercel-perf | claude-sonnet-4-6 | BLOCK/WARN/PASS | N | N |
+| Agent | Tier | Model | Verdict | Verified | Assumptions |
+|-------|------|-------|---------|----------|-------------|
+| base-checklist | deep | <assigned model> | BLOCK/WARN/PASS | N | N |
+| typescript-react-reviewer | deep | <assigned model> | BLOCK/WARN/PASS | N | N |
+| frontend-patterns | focused | <assigned model> | BLOCK/WARN/PASS | N | N |
+| jest-react-testing | focused | <assigned model> | BLOCK/WARN/PASS | N | N |
+| vercel-perf | deep | <assigned model> | BLOCK/WARN/PASS | N | N |
+
+Tier reflects review depth, not a specific vendor. Deep agents handle broad cross-cutting analysis; focused agents handle narrow, well-bounded scans. Assign whatever models are available.
 
 **Overall: BLOCK / WARN / PASS**
 
