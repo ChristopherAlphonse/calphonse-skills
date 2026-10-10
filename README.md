@@ -34,6 +34,7 @@ npx skills update -y       # no prompts
 | Skill | Description |
 | --- | --- |
 | [whats-going-on](whats-going-on/SKILL.md) | One-pass codebase intelligence sweep — core use cases, lifecycle, architecture, where to start reading |
+| [map-codebase](map-codebase/SKILL.md) | Parallel mapper agents produce `.planning/codebase/` documents |
 | [application-lifecycle-trace](application-lifecycle-trace/SKILL.md) | Trace and explain an application's lifecycle end to end |
 | [systems-architecture](systems-architecture/SKILL.md) | High-level architecture document from lifecycle documentation |
 | [documentation-writer](documentation-writer/SKILL.md) | Diátaxis documentation plus brand-voice product copy |
@@ -42,7 +43,8 @@ npx skills update -y       # no prompts
 
 | Skill | Description |
 | --- | --- |
-| [prd-mode](prd-mode/SKILL.md) | Custom chat mode that generates scoped PRDs |
+| [feature-orchestrator](feature-orchestrator/SKILL.md) | Session 1 of a two-session feature workflow — settle it, then hand off an orchestration prompt |
+| [prd-mode](prd-mode/SKILL.md) | Turn abstract ideas into actionable project specs |
 | [task-generation-mode](task-generation-mode/SKILL.md) | Converts a PRD into an actionable implementation task list |
 | [process-task-list](process-task-list/SKILL.md) | Managing markdown task lists through a PRD |
 | [interrogate-me](interrogate-me/SKILL.md) | One-pass interrogation plus coding guardrails |
@@ -72,6 +74,12 @@ npx skills update -y       # no prompts
 | --- | --- |
 | [frontend-patterns](frontend-patterns/SKILL.md) | React and Next.js development patterns |
 | [vercel-react-best-practices](vercel-react-best-practices/SKILL.md) | React/Next.js performance guidelines from Vercel Engineering |
+
+### Working Style
+
+| Skill | Description |
+| --- | --- |
+| [ponytail](ponytail/SKILL.md) | Lazy senior dev mode — smallest change that fully solves the task, in a reply a busy human reads once |
 
 ## Philosophy
 
@@ -113,11 +121,30 @@ Workflow output goes into `.planning/*` in the target project, not into `docs/`,
 2. Add a row to the index table in [AGENTS.md](AGENTS.md), alphabetical.
 3. Add it to the matching category in this README.
 4. Keep durable output paths under `.planning/*`.
-5. Remove references to tools, folders, or sibling skills that do not exist.
-6. Prefer referencing existing skills over copying large blocks.
+5. If the skill links to `references/*.md` or an `@`-prefixed external workflow file, commit or verify that target. A missing reference silently disables the workflow.
+6. Remove references to tools, folders, or sibling skills that do not exist.
+7. Prefer referencing existing skills over copying large blocks.
+
+## Local Setup
+
+To edit a skill and have the change apply globally without reinstalling, symlink the repo into the skill stores your tools read:
+
+```bash
+REPO=~/calphonse-skills
+
+for d in "$REPO"/*/; do
+  [ -f "$d/SKILL.md" ] || continue
+  n=$(basename "$d")
+  mkdir -p ~/.config/opencode/skills ~/.claude/skills
+  ln -sfn "$d" ~/.config/opencode/skills/"$n"
+  ln -sfn "$d" ~/.claude/skills/"$n"
+done
+```
+
+`~/.config/opencode/skills` is the path OpenCode reads (`skills.paths` in `opencode.json`). Leave `~/.agents/skills` alone — it belongs to the Skills CLI and its lockfile.
 
 ## Notes
 
 Skills come from a mix of sources. Some are original, some are adapted from other repos with small changes.
 
-Some security skills cross-reference siblings that live in the upstream security collection rather than this repo. Those links are informational; the skill still works standalone.
+Some skills cross-reference siblings that live in other collections rather than this repo — the `csp` skill links to an upstream security set. Those links are informational; the skill still works standalone.

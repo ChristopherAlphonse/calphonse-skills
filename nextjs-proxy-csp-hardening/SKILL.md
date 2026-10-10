@@ -1,15 +1,11 @@
 ---
-
 name: nextjs-proxy-csp-hardening
-description:
-Build and review secure Next.js proxy.ts files that apply Content Security
-Policy, nonce-based script protection, and browser security headers. Use when
-adding CSP to a Next.js App Router project, migrating from middleware.ts to
-proxy.ts, or hardening an application against XSS, clickjacking, script
-injection, form hijacking, and unsafe browser capabilities.
-
-
-
+description: >
+  Build and review secure Next.js proxy.ts files that apply Content Security
+  Policy, nonce-based script protection, and browser security headers. Use when
+  adding CSP to a Next.js App Router project, migrating from middleware.ts to
+  proxy.ts, or hardening an application against XSS, clickjacking, script
+  injection, form hijacking, and unsafe browser capabilities.
 ---
 
 # SKILL: Next.js Proxy CSP Hardening
