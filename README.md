@@ -87,8 +87,8 @@ npx skills update -y       # no prompts
 
 | Skill | Description |
 | --- | --- |
-| [ponytail](ponytail/SKILL.md) | Lazy senior dev mode — smallest change that fully solves the task, and a reply a busy human reads once. Levels: lite, full, ultra |
 | [simplify](simplify/SKILL.md) | Restate the last message in plain human language, with no jargon |
+| [swe](swe/SKILL.md) | Lazy senior dev mode — smallest change that fully solves the task, and a reply a busy human reads once. Levels: lite, full, ultra |
 
 ## Philosophy
 

