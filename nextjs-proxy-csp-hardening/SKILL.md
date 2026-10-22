@@ -263,7 +263,7 @@ export default async function Page() {
 
   return (
     <Script
-      src="https://example.com/script.js"
+      src="/scripts/third-party.js"
       nonce={nonce}
       strategy="afterInteractive"
     />
@@ -299,31 +299,31 @@ Only add the services your app actually uses.
 ### Stripe
 
 ```ts
-`script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://js.stripe.com`,
-`frame-src 'self' https://js.stripe.com https://hooks.stripe.com`,
-`connect-src 'self' https://api.stripe.com`,
+`script-src 'self' 'nonce-${nonce}' 'strict-dynamic' PAYMENTS_SCRIPT_HOST`,
+`frame-src 'self' PAYMENTS_SCRIPT_HOST PAYMENTS_HOOKS_HOST`,
+`connect-src 'self' PAYMENTS_API_HOST`,
 ```
 
 ### Google Analytics
 
 ```ts
-`script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://www.googletagmanager.com`,
-`connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com`,
-`img-src 'self' blob: data: https: https://www.google-analytics.com`,
+`script-src 'self' 'nonce-${nonce}' 'strict-dynamic' TAG_MANAGER_HOST`,
+`connect-src 'self' ANALYTICS_HOST ANALYTICS_REGION_HOST`,
+`img-src 'self' blob: data: https: ANALYTICS_HOST`,
 ```
 
 ### PostHog
 
 ```ts
-`script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://app.posthog.com`,
-`connect-src 'self' https://app.posthog.com https://us.i.posthog.com https://eu.i.posthog.com`,
+`script-src 'self' 'nonce-${nonce}' 'strict-dynamic' PRODUCT_ANALYTICS_HOST`,
+`connect-src 'self' PRODUCT_ANALYTICS_HOST PRODUCT_ANALYTICS_US_HOST PRODUCT_ANALYTICS_EU_HOST`,
 `img-src 'self' blob: data: https:`,
 ```
 
 ### Sentry
 
 ```ts
-`connect-src 'self' https://*.ingest.sentry.io`,
+`connect-src 'self' ERROR_TRACKING_HOST`,
 ```
 
 ---
