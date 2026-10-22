@@ -46,3 +46,4 @@ npx skills add ChristopherAlphonse/calphonse-skills --skill <name>
 - Prefer referencing another skill in this repo over duplicating its content.
 - If a skill links to `references/*.md`, commit those files. A link to a missing file silently disables the workflow that depends on it.
 - Remove references to tools, folders, or sibling skills that no longer exist.
+- No URLs or real hostnames in any file here. Never fetch, browse, or search the web while using these skills unless the user explicitly asks in that conversation. Use placeholders like `API_ORIGIN` in examples.
