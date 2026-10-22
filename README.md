@@ -67,6 +67,18 @@ npx skills update -y       # no prompts
 | --- | --- |
 | [uat-documentation](uat-documentation/SKILL.md) | User Acceptance Testing documentation — test plans, step-by-step cases, and sign-off checklists non-technical stakeholders can execute |
 
+### Cloud
+
+| Skill | Description |
+| --- | --- |
+| [aws](aws/SKILL.md) | Index and router for AWS work — CLI/SDK, IaC, IAM, networking, storage, databases, compute, containers, serverless, messaging, CI/CD, security, observability, billing, Bedrock/SageMaker, Cognito auth |
+
+### .NET
+
+| Skill | Description |
+| --- | --- |
+| [dotnet](dotnet/SKILL.md) | Index and router for C#/.NET work — ASP.NET Core Web API endpoints, DTOs, error handling middleware, OpenAPI/Swagger, and design pattern reviews (Command, Factory, Repository, Provider, DI, SOLID) |
+
 ### Security
 
 | Skill | Description |
