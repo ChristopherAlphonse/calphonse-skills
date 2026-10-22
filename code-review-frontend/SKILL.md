@@ -70,7 +70,7 @@ Read any files that describe:
 After mapping completes, if enterprise work style / team conventions are still unclear:
 
 ```
-/interrogate-me
+/lets-talk-about-it
 ```
 
 **Do not proceed to review until codebase context is sufficient.** Assumptions without any
@@ -547,7 +547,7 @@ Status:   CLEAN / DRIFT / MISSING
 - Never claim a finding is real without pointing to the diff line or config that proves it
 - Never claim something is safe — safety claims require the same evidence standard as findings
 - Do not commit, push, or modify any files
-- If codebase context is inadequate → gate on `/gsd-map-codebase` and `/interrogate-me`
+- If codebase context is inadequate → gate on `/gsd-map-codebase` and `/lets-talk-about-it`
   before proceeding; a review without context is worse than no review
 ---
 
