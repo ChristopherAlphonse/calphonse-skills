@@ -47,7 +47,7 @@ npx skills update -y       # no prompts
 | [prd-mode](prd-mode/SKILL.md) | Turn abstract ideas into actionable project specs |
 | [task-generation-mode](task-generation-mode/SKILL.md) | Converts a PRD into an actionable implementation task list |
 | [process-task-list](process-task-list/SKILL.md) | Managing markdown task lists through a PRD |
-| [interrogate-me](interrogate-me/SKILL.md) | One-pass interrogation plus coding guardrails |
+| [lets-talk-about-it](lets-talk-about-it/SKILL.md) | One-pass interrogation plus coding guardrails |
 
 ### Code Review & Quality
 
