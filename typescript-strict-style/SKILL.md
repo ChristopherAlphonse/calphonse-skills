@@ -16,7 +16,7 @@ metadata:
 # TypeScript Strict Style
 
 A coding discipline for TypeScript/JavaScript application code derived from Tigger style, and [The Power of Ten –
-Rules for Developing Safety Critical Code](https://spinroot.com/gerard/pdf/P10.pdf).
+Rules for Developing Safety Critical Code](
 
 ## Guardrails
 

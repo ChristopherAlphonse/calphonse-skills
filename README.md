@@ -4,7 +4,7 @@ Personal agent skills that encode workflows, review standards, and testing ritua
 
 ## Quick Start
 
-Install any skill with the [Skills CLI](https://github.com/vercel-labs/skills):
+Install any skill with the Skills CLI:
 
 ```bash
 # List available skills

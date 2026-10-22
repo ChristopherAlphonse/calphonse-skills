@@ -263,7 +263,7 @@ const [user, config, profile] = await Promise.all([
 
 We can also create all the promises first, and do `Promise.all()` at the end.
 
-Reference: [https://github.com/shuding/better-all](https://github.com/shuding/better-all)
+Reference:
 
 ### 1.4 Prevent Waterfall Chains in API Routes
 
@@ -474,7 +474,7 @@ These optimizations provide 15-70% faster dev boot, 28% faster builds, 40% faste
 
 Libraries commonly affected: `lucide-react`, `@mui/material`, `@mui/icons-material`, `@tabler/icons-react`, `react-icons`, `@headlessui/react`, `@radix-ui/react-*`, `lodash`, `ramda`, `date-fns`, `rxjs`, `react-use`.
 
-Reference: [https://vercel.com/blog/how-we-optimized-package-imports-in-next-js](https://vercel.com/blog/how-we-optimized-package-imports-in-next-js)
+Reference:
 
 ### 2.2 Conditional Module Loading
 
@@ -636,7 +636,7 @@ const baseDir =
 
 In Next.js server code, this matters for output file tracing too. `path.join(process.cwd(), someVar)` can widen the traced file set because Next.js statically analyze `import`, `require`, and `fs` usage.
 
-Reference: [https://nextjs.org/docs/app/api-reference/config/next-config-js/output](https://nextjs.org/docs/app/api-reference/config/next-config-js/output), [https://nextjs.org/learn/seo/dynamic-imports](https://nextjs.org/learn/seo/dynamic-imports), [https://vite.dev/guide/features.html](https://vite.dev/guide/features.html), [https://esbuild.github.io/api/](https://esbuild.github.io/api/), [https://www.npmjs.com/package/@rollup/plugin-dynamic-import-vars](https://www.npmjs.com/package/@rollup/plugin-dynamic-import-vars), [https://webpack.js.org/guides/dependency-management/](https://webpack.js.org/guides/dependency-management/)
+Reference:
 
 ### 2.6 Preload Based on User Intent
 
@@ -780,7 +780,7 @@ export async function updateProfile(data: unknown) {
 }
 ```
 
-Reference: [https://nextjs.org/docs/app/guides/authentication](https://nextjs.org/docs/app/guides/authentication)
+Reference:
 
 ### 3.2 Avoid Duplicate Serialization in RSC Props
 
@@ -922,11 +922,11 @@ export async function getUser(id: string) {
 
 Use when sequential user actions hit multiple endpoints needing the same data within seconds.
 
-**With Vercel's [Fluid Compute](https://vercel.com/docs/fluid-compute):** LRU caching is especially effective because multiple concurrent requests can share the same function instance and cache. This means the cache persists across requests without needing external storage like Redis.
+**With Vercel's Fluid Compute:** LRU caching is especially effective because multiple concurrent requests can share the same function instance and cache. This means the cache persists across requests without needing external storage like Redis.
 
 **In traditional serverless:** Each invocation runs in isolation, so consider Redis for cross-process caching.
 
-Reference: [https://github.com/isaacs/node-lru-cache](https://github.com/isaacs/node-lru-cache)
+Reference:
 
 ### 3.5 Hoist Static I/O to Module Level
 
@@ -1074,7 +1074,7 @@ When not to use this pattern:
 
 - Sensitive data that shouldn't persist in memory
 
-With Vercel's [Fluid Compute](https://vercel.com/docs/fluid-compute), module-level caching is especially effective because multiple concurrent requests share the same function instance. The static assets stay loaded in memory across requests without cold start penalties.
+With Vercel's Fluid Compute, module-level caching is especially effective because multiple concurrent requests share the same function instance. The static assets stay loaded in memory across requests without cold start penalties.
 
 In traditional serverless, each cold start re-executes module-level code, but subsequent warm invocations reuse the loaded assets until the instance is recycled.
 
@@ -1285,7 +1285,7 @@ In Next.js, the `fetch` API is automatically extended with request memoization. 
 
 Use `React.cache()` to deduplicate these operations across your component tree.
 
-Reference: [https://react.dev/reference/react/cache](https://react.dev/reference/react/cache)
+Reference:
 
 ### 3.10 Use after() for Non-Blocking Operations
 
@@ -1359,7 +1359,7 @@ The response is sent immediately while logging happens in the background.
 
 - Works in Server Actions, Route Handlers, and Server Components
 
-Reference: [https://nextjs.org/docs/app/api-reference/functions/after](https://nextjs.org/docs/app/api-reference/functions/after)
+Reference:
 
 ---
 
@@ -1533,7 +1533,7 @@ function UpdateButton() {
 }
 ```
 
-Reference: [https://swr.vercel.app](https://swr.vercel.app)
+Reference:
 
 ### 4.4 Version and Minimize localStorage Data
 
@@ -1644,7 +1644,7 @@ function Form() {
 }
 ```
 
-Reference: [https://react.dev/learn/you-might-not-need-an-effect](https://react.dev/learn/you-might-not-need-an-effect)
+Reference:
 
 ### 5.2 Defer State Reads to Usage Point
 
@@ -1863,7 +1863,7 @@ function Profile({ user, loading }: Props) {
 }
 ```
 
-**Note:** If your project has [React Compiler](https://react.dev/learn/react-compiler) enabled, manual memoization with `memo()` and `useMemo()` is not necessary. The compiler automatically optimizes re-renders.
+**Note:** If your project has React Compiler enabled, manual memoization with `memo()` and `useMemo()` is not necessary. The compiler automatically optimizes re-renders.
 
 ### 5.7 Narrow Effect Dependencies
 
@@ -1945,7 +1945,7 @@ function Form() {
 }
 ```
 
-Reference: [https://react.dev/learn/removing-effect-dependencies#should-this-code-move-to-an-event-handler](https://react.dev/learn/removing-effect-dependencies#should-this-code-move-to-an-event-handler)
+Reference:
 
 ### 5.9 Split Combined Hook Computations
 
@@ -2005,7 +2005,7 @@ useEffect(() => {
 }, [pageTitle])
 ```
 
-**Note:** If your project has [React Compiler](https://react.dev/learn/react-compiler) enabled, it automatically optimizes dependency tracking and may handle some of these cases for you.
+**Note:** If your project has React Compiler enabled, it automatically optimizes dependency tracking and may handle some of these cases for you.
 
 ### 5.10 Subscribe to Derived State
 
@@ -2108,7 +2108,7 @@ function TodoList() {
 
 - State doesn't depend on previous value
 
-**Note:** If your project has [React Compiler](https://react.dev/learn/react-compiler) enabled, the compiler can automatically optimize some cases, but functional updates are still recommended for correctness and to prevent stale closure bugs.
+**Note:** If your project has React Compiler enabled, the compiler can automatically optimize some cases, but functional updates are still recommended for correctness and to prevent stale closure bugs.
 
 ### 5.12 Use Lazy State Initialization
 
@@ -2255,7 +2255,7 @@ function Search({ items }: { items: Item[] }) {
 
 **Note:** Wrap the expensive computation in `useMemo` with the deferred value as a dependency, otherwise it still runs on every render.
 
-Reference: [https://react.dev/reference/react/useDeferredValue](https://react.dev/reference/react/useDeferredValue)
+Reference:
 
 ### 5.15 Use useRef for Transient Values
 
@@ -2451,7 +2451,7 @@ function Container() {
 
 This is especially helpful for large and static SVG nodes, which can be expensive to recreate on every render.
 
-**Note:** If your project has [React Compiler](https://react.dev/learn/react-compiler) enabled, the compiler automatically hoists static JSX elements and optimizes component re-renders, making manual hoisting unnecessary.
+**Note:** If your project has React Compiler enabled, the compiler automatically hoists static JSX elements and optimizes component re-renders, making manual hoisting unnecessary.
 
 ### 6.4 Optimize SVG Precision
 
@@ -2622,7 +2622,7 @@ export default function Document() {
   return (
     <html>
       <head>
-        <script src="https://example.com/analytics.js" />
+        <script src="/scripts/analytics.js" />
         <script src="/scripts/utils.js" />
       </head>
       <body>{/* content */}</body>
@@ -2639,7 +2639,7 @@ import Script from 'next/script'
 export default function Page() {
   return (
     <>
-      <Script src="https://example.com/analytics.js" strategy="afterInteractive" />
+      <Script src="/scripts/analytics.js" strategy="afterInteractive" />
       <Script src="/scripts/utils.js" strategy="beforeInteractive" />
     </>
   )
@@ -2648,7 +2648,7 @@ export default function Page() {
 
 **Note:** In Next.js, prefer the `next/script` component with `strategy` prop instead of raw script tags:
 
-Reference: [https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script#defer](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script#defer)
+Reference:
 
 ### 6.9 Use Explicit Conditional Rendering
 
@@ -2710,8 +2710,8 @@ React DOM provides APIs to hint the browser about resources it will need. These 
 import { preconnect, prefetchDNS } from 'react-dom'
 
 export default function App() {
-  prefetchDNS('https://analytics.example.com')
-  preconnect('https://api.example.com')
+  prefetchDNS(ANALYTICS_ORIGIN)
+  preconnect(API_ORIGIN)
 
   return <main>{/* content */}</main>
 }
@@ -2775,7 +2775,7 @@ function Navigation() {
 
 | `preinitModule` | ES modules that must execute early |
 
-Reference: [https://react.dev/reference/react-dom#resource-preloading-apis](https://react.dev/reference/react-dom#resource-preloading-apis)
+Reference:
 
 ### 6.11 Use useTransition Over Manual Loading States
 
@@ -2849,7 +2849,7 @@ function SearchResults() {
 
 - **Interrupt handling**: New transitions automatically cancel pending ones
 
-Reference: [https://react.dev/reference/react/useTransition](https://react.dev/reference/react/useTransition)
+Reference:
 
 ---
 
@@ -2945,7 +2945,7 @@ function Box({ isHighlighted }: { isHighlighted: boolean }) {
 
 Prefer CSS classes over inline styles when possible. CSS files are cached by the browser, and classes provide better separation of concerns and are easier to maintain.
 
-See [this gist](https://gist.github.com/paulirish/5d52fb081b3570c81e3a) and [CSS Triggers](https://csstriggers.com/) for more information on layout-forcing operations.
+See this gist and CSS Triggers for more information on layout-forcing operations.
 
 ### 7.2 Build Index Maps for Repeated Lookups
 
@@ -3079,7 +3079,7 @@ function onAuthChange() {
 
 Use a Map (not a hook) so it works everywhere: utilities, event handlers, not just React components.
 
-Reference: [https://vercel.com/blog/how-we-made-the-vercel-dashboard-twice-as-fast](https://vercel.com/blog/how-we-made-the-vercel-dashboard-twice-as-fast)
+Reference:
 
 ### 7.5 Cache Storage API Calls
 
@@ -3549,7 +3549,7 @@ const min = Math.min(...numbers)
 const max = Math.max(...numbers)
 ```
 
-This works for small arrays, but can be slower or just throw an error for very large arrays due to spread operator limitations. Maximal array length is approximately 124000 in Chrome 143 and 638000 in Safari 18; exact numbers may vary - see [the fiddle](https://jsfiddle.net/qw1jabsx/4/). Use the loop approach for reliability.
+This works for small arrays, but can be slower or just throw an error for very large arrays due to spread operator limitations. Maximal array length is approximately 124000 in Chrome 143 and 638000 in Safari 18; exact numbers may vary - see the fiddle. Use the loop approach for reliability.
 
 ### 7.13 Use Set/Map for O(1) Lookups
 
@@ -3686,7 +3686,7 @@ function ChatRoom({ roomId, onConnected }: {
 }
 ```
 
-Reference: [https://react.dev/reference/react/useEffectEvent#effect-event-in-deps](https://react.dev/reference/react/useEffectEvent#effect-event-in-deps)
+Reference:
 
 ### 8.2 Initialize App Once, Not Per Mount
 
@@ -3724,7 +3724,7 @@ function Comp() {
 }
 ```
 
-Reference: [https://react.dev/learn/you-might-not-need-an-effect#initializing-the-application](https://react.dev/learn/you-might-not-need-an-effect#initializing-the-application)
+Reference:
 
 ### 8.3 Store Event Handlers in Refs
 
@@ -3801,10 +3801,10 @@ function SearchInput({ onSearch }: { onSearch: (q: string) => void }) {
 
 ## References
 
-1. [https://react.dev](https://react.dev)
-2. [https://nextjs.org](https://nextjs.org)
-3. [https://swr.vercel.app](https://swr.vercel.app)
-4. [https://github.com/shuding/better-all](https://github.com/shuding/better-all)
-5. [https://github.com/isaacs/node-lru-cache](https://github.com/isaacs/node-lru-cache)
-6. [https://vercel.com/blog/how-we-optimized-package-imports-in-next-js](https://vercel.com/blog/how-we-optimized-package-imports-in-next-js)
-7. [https://vercel.com/blog/how-we-made-the-vercel-dashboard-twice-as-fast](https://vercel.com/blog/how-we-made-the-vercel-dashboard-twice-as-fast)
+1.
+2.
+3.
+4.
+5.
+6.
+7.

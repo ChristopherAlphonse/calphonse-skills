@@ -53,4 +53,4 @@ function ChatRoom({ roomId, onConnected }: {
 }
 ```
 
-Reference: [React useEffectEvent: Effect Event in deps](https://react.dev/reference/react/useEffectEvent#effect-event-in-deps)
+Reference: React useEffectEvent: Effect Event in deps

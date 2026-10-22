@@ -81,7 +81,7 @@ Brief explanation of the rule and why it matters.
 
 Optional explanatory text after examples.
 
-Reference: [Link](https://example.com)
+Reference: Link
 
 ## File Naming Convention
 
@@ -120,4 +120,4 @@ When adding or modifying rules:
 
 ## Acknowledgments
 
-Originally created by [@shuding](https://x.com/shuding) at [Vercel](https://vercel.com).
+Originally created by @shuding at Vercel.

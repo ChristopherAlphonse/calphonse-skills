@@ -73,4 +73,4 @@ In Next.js, the `fetch` API is automatically extended with request memoization. 
 
 Use `React.cache()` to deduplicate these operations across your component tree.
 
-Reference: [React.cache documentation](https://react.dev/reference/react/cache)
+Reference: React.cache documentation

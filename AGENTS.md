@@ -2,7 +2,7 @@
 
 All skills live at the repository root as `{skill-name}/SKILL.md`. `AGENTS.md` is the canonical index — keep it in sync with the filesystem.
 
-Install any skill with the [Skills CLI](https://github.com/vercel-labs/skills):
+Install any skill with the Skills CLI:
 
 ```bash
 npx skills add ChristopherAlphonse/calphonse-skills --skill <name>

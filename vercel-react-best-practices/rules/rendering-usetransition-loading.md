@@ -72,4 +72,4 @@ function SearchResults() {
 - **Better responsiveness**: Keeps the UI responsive during updates
 - **Interrupt handling**: New transitions automatically cancel pending ones
 
-Reference: [useTransition](https://react.dev/reference/react/useTransition)
+Reference: useTransition

@@ -461,7 +461,7 @@ logSecurityEvent('suspicious_activity', { userId, pattern: 'rapid_requests' });
 import { URL } from 'url';
 
 // ✅ Validate URLs against allowlist
-const ALLOWED_HOSTS = ['api.example.com', 'cdn.example.com'];
+const ALLOWED_HOSTS = ['API_HOST', 'CDN_HOST'];
 
 function isAllowedUrl(urlString: string): boolean {
   try {
@@ -537,10 +537,10 @@ app.post('/api/fetch-url', async (req, res) => {
 
 ## Resources
 
-- **OWASP Top 10**: https://owasp.org/Top10/
-- **OWASP Cheat Sheets**: https://cheatsheetseries.owasp.org/
-- **Node.js Security**: https://nodejs.org/en/docs/guides/security/
-- **Snyk**: https://snyk.io/
+- **OWASP Top 10**:
+- **OWASP Cheat Sheets**:
+- **Node.js Security**:
+- **Snyk**:
 ---
 
 > **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill owasp-security``
