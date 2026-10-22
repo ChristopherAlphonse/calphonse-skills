@@ -1,5 +1,5 @@
 ---
-name: csp-bypass-advanced
+name: csp
 description: >-
   Advanced Content Security Policy bypass techniques. Use when XSS or data
   exfiltration is blocked by CSP and you need to find policy weaknesses, trusted

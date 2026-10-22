@@ -33,53 +33,62 @@ npx skills update -y       # no prompts
 
 | Skill | Description |
 | --- | --- |
-| [whats-going-on](whats-going-on/SKILL.md) | One-pass codebase intelligence sweep — core use cases, lifecycle, architecture, where to start reading |
-| [map-codebase](map-codebase/SKILL.md) | Parallel mapper agents produce `.planning/codebase/` documents |
+| [whats-going-on](whats-going-on/SKILL.md) | One-pass codebase intelligence sweep — core use cases, lifecycle, architecture, and where to start reading |
+| [codebase-mapper](codebase-mapper/SKILL.md) | Structured onboarding map of an existing codebase — tech stack, architecture, key flows, conventions, known concerns |
 | [application-lifecycle-trace](application-lifecycle-trace/SKILL.md) | Trace and explain an application's lifecycle end to end |
-| [systems-architecture](systems-architecture/SKILL.md) | High-level architecture document from lifecycle documentation |
-| [documentation-writer](documentation-writer/SKILL.md) | Diátaxis documentation plus brand-voice product copy |
+| [systems-architecture](systems-architecture/SKILL.md) | Generates a high-level system architecture document from lifecycle documentation — actors, interactions, technologies |
+| [documentation-writer](documentation-writer/SKILL.md) | Diátaxis documentation expert — tutorials, how-tos, reference, explanation — plus product copy principles aligned with brand voice |
+| [architecture-review](architecture-review/SKILL.md) | Read-only architecture and distributed-systems review — complexity, bottlenecks, reliability risks, and cost savings, with findings marked VERIFIED / [ASSUMPTION] / [NEEDS MEASUREMENT] |
 
 ### Planning & Requirements
 
 | Skill | Description |
 | --- | --- |
-| [feature-orchestrator](feature-orchestrator/SKILL.md) | Session 1 of a two-session feature workflow — settle it, then hand off an orchestration prompt |
-| [prd-mode](prd-mode/SKILL.md) | Turn abstract ideas into actionable project specs |
-| [task-generation-mode](task-generation-mode/SKILL.md) | Converts a PRD into an actionable implementation task list |
-| [process-task-list](process-task-list/SKILL.md) | Managing markdown task lists through a PRD |
-| [lets-talk-about-it](lets-talk-about-it/SKILL.md) | One-pass interrogation plus coding guardrails |
+| [feature-orchestrator](feature-orchestrator/SKILL.md) | Session 1 of a two-session feature workflow — settle a feature in conversation, then hand off a copy-ready orchestration prompt with a chosen sub-agent model roster |
+| [prd-mode](prd-mode/SKILL.md) | Turn abstract ideas into actionable project specs that align engineering and design on the problem and success metrics |
+| [task-generation-mode](task-generation-mode/SKILL.md) | Converts a PRD into a structured, actionable implementation task list with verifiable outcomes |
+| [lets-talk-about-it](lets-talk-about-it/SKILL.md) | One-pass interrogation plus coding guardrails — explicit assumptions, simplicity, surgical edits, verifiable success criteria |
 
 ### Code Review & Quality
 
 | Skill | Description |
 | --- | --- |
-| [code-review-frontend](code-review-frontend/SKILL.md) | Multi-agent PR review orchestrator — verified findings only, no fixes |
-| [thermo-nuclear-code-quality-review](thermo-nuclear-code-quality-review/SKILL.md) | Extremely strict maintainability review |
-| [typescript-react-reviewer](typescript-react-reviewer/SKILL.md) | TypeScript + React 19 review specialist |
-| [typescript-strict-style](typescript-strict-style/SKILL.md) | Strict TS/JS coding discipline |
-| [pr-body-style](pr-body-style/SKILL.md) | Draft and audit GitHub PR bodies |
+| [code-review-frontend](code-review-frontend/SKILL.md) | Multi-agent PR review orchestrator — discovers quality tooling, spawns parallel specialist agents, reports verified findings only, never fixes |
+| [thermo-nuclear-code-quality-review](thermo-nuclear-code-quality-review/SKILL.md) | Extremely strict maintainability review — abstraction quality, giant files, spaghetti-condition growth |
+| [typescript-react-reviewer](typescript-react-reviewer/SKILL.md) | Expert code reviewer for TypeScript + React 19 applications — anti-patterns, state management, type safety |
+| [typescript-strict-style](typescript-strict-style/SKILL.md) | Strict TS/JS discipline — assertion safety, exhaustive error handling, function size, naming, performance, dependency minimalism |
+| [pr-body-style](pr-body-style/SKILL.md) | Draft, rewrite, or audit GitHub PR bodies — accurate, short, business-focused |
+| [comment-sicko](comment-sicko/SKILL.md) | A deranged comment-hater that savors deletion and condemns workaround code |
+| [prove-it-works](prove-it-works/SKILL.md) | Verify a finished task against the real artifact, not a proxy, self-report, or "it compiles" |
+
+### Testing & Acceptance
+
+| Skill | Description |
+| --- | --- |
+| [uat-documentation](uat-documentation/SKILL.md) | User Acceptance Testing documentation — test plans, step-by-step cases, and sign-off checklists non-technical stakeholders can execute |
 
 ### Security
 
 | Skill | Description |
 | --- | --- |
-| [owasp-security](owasp-security/SKILL.md) | OWASP Top 10 secure coding |
-| [security-review](security-review/SKILL.md) | Scoped security checklist for auth, input, secrets, APIs, payments |
-| [csp](csp/SKILL.md) | Advanced CSP bypass techniques |
-| [nextjs-proxy-csp-hardening](nextjs-proxy-csp-hardening/SKILL.md) | Secure Next.js `proxy.ts` — CSP, nonces, security headers |
+| [owasp-security](owasp-security/SKILL.md) | OWASP Top 10 secure coding guidance — auth, XSS, SQLi, CSRF, API security |
+| [security-review](security-review/SKILL.md) | Scoped security checklist and patterns for auth, user input, secrets, API endpoints, and payment flows |
+| [csp](csp/SKILL.md) | Advanced CSP bypass techniques — policy weaknesses, nonce leakage, trusted-endpoint abuse, exfiltration channels CSP can't block |
+| [nextjs-proxy-csp-hardening](nextjs-proxy-csp-hardening/SKILL.md) | Build and review secure Next.js `proxy.ts` files — CSP, nonce-based script protection, browser security headers, `middleware.ts` migration |
 
 ### Frontend
 
 | Skill | Description |
 | --- | --- |
-| [frontend-patterns](frontend-patterns/SKILL.md) | React and Next.js development patterns |
-| [vercel-react-best-practices](vercel-react-best-practices/SKILL.md) | React/Next.js performance guidelines from Vercel Engineering |
+| [frontend-patterns](frontend-patterns/SKILL.md) | Frontend development patterns for React, Next.js, state management, performance optimization, and UI best practices |
+| [vercel-react-best-practices](vercel-react-best-practices/SKILL.md) | React and Next.js performance optimization guidelines from Vercel Engineering |
 
 ### Working Style
 
 | Skill | Description |
 | --- | --- |
-| [ponytail](ponytail/SKILL.md) | Lazy senior dev mode — smallest change that fully solves the task, in a reply a busy human reads once |
+| [ponytail](ponytail/SKILL.md) | Lazy senior dev mode — smallest change that fully solves the task, and a reply a busy human reads once. Levels: lite, full, ultra |
+| [simplify](simplify/SKILL.md) | Restate the last message in plain human language, with no jargon |
 
 ## Philosophy
 

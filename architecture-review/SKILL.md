@@ -1,6 +1,7 @@
 ---
- name: architecture-review
- description: |   Architecture and distributed-systems review that identifies unnecessary complexity, scalability bottlenecks, reliability risks, and infrastructure cost-saving opportunities. Recommends the simplest, most cost-effective architecture based on evidence, with findings marked VERIFIED, [ASSUMPTION], or [NEEDS MEASUREMENT]. Read-only by default, no fixes.   Use when: "review architecture", "distributed systems audit", "simplify my architecture", "make this scalable", "reduce infrastructure costs", "find bottlenecks", "architecture review", "/architecture-review"
+name: architecture-review
+description: >-
+  Architecture and distributed-systems review that identifies unnecessary complexity, scalability bottlenecks, reliability risks, and infrastructure cost-saving opportunities. Recommends the simplest, most cost-effective architecture based on evidence, with findings marked VERIFIED, [ASSUMPTION], or [NEEDS MEASUREMENT]. Read-only by default, no fixes.   Use when: "review architecture", "distributed systems audit", "simplify my architecture", "make this scalable", "reduce infrastructure costs", "find bottlenecks", "architecture review", "/architecture-review"
 ---
 
 # Architecture, Distributed Systems, and Cost Optimization Audit
