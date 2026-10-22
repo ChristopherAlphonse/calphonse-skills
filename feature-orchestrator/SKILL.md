@@ -29,7 +29,7 @@ Session 2 uses four roles:
 
 The user chooses the model and effort for the three sub-agent roles. Session 2 runs as many agents of each role as the work supports.
 
-Ask for the roster at handoff, every time you compile the prompt. Don't ask during the discussion. Session 1's own research sub-agents use the environment's preset Researcher. [references/model-roster.md](references/model-roster.md) covers how to ask (one question per role, recommended option first), how to check availability, and how to keep review independent.
+Ask for the roster at handoff, every time you compile the prompt. Don't ask during the discussion. Session 1's own research sub-agents use the environment's preset Researcher. Ask one question per role with the recommended option first, check that each chosen model is available, and pick a Reviewer setting that keeps review independent of the Implementer.
 
 ## Work conversationally
 
@@ -76,8 +76,8 @@ When the user asks for an overview, game plan, or recap, give a complete current
 
 Compile the Session 2 prompt only when the user asks for it or clearly declares the plan settled.
 
-1. Read [references/model-roster.md](references/model-roster.md) and ask the user for the roster: model and effort for Implementer, Researcher, and Reviewer. Draft nothing until they answer.
-2. Read [references/execution-prompt-contract.md](references/execution-prompt-contract.md) and adapt it to the feature.
+1. Ask the user for the roster: model and effort for Implementer, Researcher, and Reviewer. Draft nothing until they answer.
+2. Draft the prompt from the workflow choices below, adapted to the feature.
 3. Preserve hard-won decisions in specific language. "Follow best practices" loses information that took the whole conversation to establish.
 4. If a material choice is still open, ask for it. Don't disguise it as an instruction.
 
