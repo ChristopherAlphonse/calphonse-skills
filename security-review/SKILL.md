@@ -17,7 +17,7 @@ This skill ensures all code follows security best practices and identifies poten
 
 ## Required Companion Skill
 
-Use `/interrogate-me` as part of this workflow before finalizing security guidance or sign-off. Let it stress-test the feature, assets, actors, trust boundaries, data flows, attacker goals, secrets, permissions, integrations, failure modes, and deployment assumptions one question at a time. Incorporate the resulting assumptions, decisions, risks, and unresolved issues into the security checklist, threat model, verification steps, and final recommendations.
+Use `/lets-talk-about-it` as part of this workflow before finalizing security guidance or sign-off. Let it stress-test the feature, assets, actors, trust boundaries, data flows, attacker goals, secrets, permissions, integrations, failure modes, and deployment assumptions one question at a time. Incorporate the resulting assumptions, decisions, risks, and unresolved issues into the security checklist, threat model, verification steps, and final recommendations.
 
 ## When to Activate
 

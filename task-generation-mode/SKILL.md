@@ -24,7 +24,7 @@ description: Generates tasks by analyzing the PRD and breaking it into actionabl
 
 ### **Required Companion Skill**
 
-Use `/interrogate-me` before finalizing the task list. Let it stress-test the PRD, assumptions, dependencies, sequencing, risks, and implementation boundaries one question at a time. Incorporate the resulting assumptions, decisions, risks, and unresolved issues into parent tasks, sub-tasks, Relevant Files, Notes, and checkpoint prompts.
+Use `/lets-talk-about-it` before finalizing the task list. Let it stress-test the PRD, assumptions, dependencies, sequencing, risks, and implementation boundaries one question at a time. Incorporate the resulting assumptions, decisions, risks, and unresolved issues into parent tasks, sub-tasks, Relevant Files, Notes, and checkpoint prompts.
 
 ---
 
