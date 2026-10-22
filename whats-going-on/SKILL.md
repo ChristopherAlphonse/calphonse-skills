@@ -58,6 +58,8 @@ Only write these when the repo is complex enough that separate docs will stay us
 - `.planning/system/lifecycle.md`
 - `.planning/system/architecture.md`
 
----
+## Teaching The Map
 
-> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill whats-going-on``
+If the user asks to be walked through the codebase or a subsystem instead of handed a document, follow [references/teach.md](references/teach.md).
+
+--- ``npx skills add ChristopherAlphonse/calphonse-skills --skill whats-going-on``
