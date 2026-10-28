@@ -1,22 +1,11 @@
 ---
 name: typescript-strict-style
 description: Enforces a strict TS/JS coding discipline prioritized as safety, performance, and developer experience. Use when writing/reviewing TS/JS for assertion discipline, exhaustive error handling, function-size and naming conventions, batching/performance design, or dependency minimalism.
-license: MIT
-metadata:
-  author: ChristopherAlphonse
-  version: "1.0.0"
-  domain: language
-  triggers: strict style, coding style, style guide, assertions, invariant, naming conventions, code review style, safety performance developer experience
-  role: specialist
-  scope: style-guide
-  output-format: code
-  related-skills: typescript-react-reviewer, code-review-frontend, owasp-security
 ---
 
 # TypeScript Strict Style
 
-A coding discipline for TypeScript/JavaScript application code derived from Tigger style, and [The Power of Ten –
-Rules for Developing Safety Critical Code](
+A coding discipline for TypeScript/JavaScript application code derived from Tigger style.
 
 ## Guardrails
 
@@ -97,5 +86,3 @@ Rules for Developing Safety Critical Code](
 | Dependencies | Built-in beats library beats new dependency                                     |
 
 ---
-
-> **Install:** `npx skills add ChristopherAlphonse/calphonse-skills --skill typescript-strict-style`
