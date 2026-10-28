@@ -29,17 +29,21 @@ Create `.planning/system/` if needed.
 # What's Going On - <repo name>
 
 ## Core Use Cases
+
 - <use case>: <what it does>
   Evidence: <key files>
 
 ## Lifecycle
+
 - <flow>: <entry> -> <validation/business logic> -> <persistence/external call> -> <result>
 
 ## Architecture
+
 | Component | Responsibility | Key Files |
-| --- | --- | --- |
+| --------- | -------------- | --------- |
 
 ## New Engineer Navigation
+
 - Start here: <file/doc>
 - Core logic: <files>
 - Data enters/exits: <files/routes/jobs>
@@ -47,6 +51,7 @@ Create `.planning/system/` if needed.
 - Run first: <command>
 
 ## Assumptions And Unknowns
+
 - <only if needed>
 ```
 
@@ -61,5 +66,3 @@ Only write these when the repo is complex enough that separate docs will stay us
 ## Teaching The Map
 
 If the user asks to be walked through the codebase or a subsystem instead of handed a document, follow [references/teach.md](references/teach.md).
-
---- ``npx skills add ChristopherAlphonse/calphonse-skills --skill whats-going-on``
