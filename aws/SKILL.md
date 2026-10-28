@@ -10,20 +10,20 @@ description: >-
 
 # AWS
 
-This file is an index. The sub-skills live in sibling directories under this folder, each at
-`<name>/SKILL.md`. Pick the row that matches the task, then read only that one `SKILL.md`.
+This file is an index. The sub-skills live under `references/`, each at
+`references/<name>/guide.md`. Pick the row that matches the task, then read only that one `guide.md`.
 
 ## Context rules (read these first)
 
 - The table below is enough to choose. Do not open a sub-skill to find out what it covers.
 - Open a sub-skill only when the task needs its guidance and you can't do the task well without it.
   Simple, well-known questions (a basic CLI flag, a one-line explanation) don't need one.
-- Read one `SKILL.md` at a time. Read a second only if the task clearly crosses into its area.
+- Read one `guide.md` at a time. Read a second only if the task clearly crosses into its area.
 - A sub-skill's `references/`, `scripts/` and `assets/` are off limits until that sub-skill's
-  `SKILL.md` tells you to open a specific file for the step you are on. Never list or bulk-read them.
+  `guide.md` tells you to open a specific file for the step you are on. Never list or bulk-read them.
 - Don't re-read a sub-skill already loaded in this session.
 - Some sub-skills (`aws-database`, `aws-networking`, `aws-serverless`, `aws-messaging-and-streaming`,
-  `aws-storage`) are themselves routers. Read their `SKILL.md`, then open only the one reference it
+  `aws-storage`) are themselves routers. Read their `guide.md`, then open only the one reference it
   points you to.
 
 ## Sub-skills
@@ -32,30 +32,30 @@ Paths are relative to this directory.
 
 | Task | Read |
 |------|------|
-| Get AWS CLI/SDK credentials, `aws login`, expired or missing credentials | `signing-in-to-aws/SKILL.md` |
-| IAM roles, policies, trust policies, STS, Organizations, policy generation | `aws-iam/SKILL.md` |
-| User sign-up/sign-in, Cognito, Amplify auth, JWT authorizers, OAuth/OIDC | `aws-auth/SKILL.md` |
-| Security Hub, GuardDuty, Inspector, Macie, Detective, Security Lake | `aws-security/SKILL.md` |
-| CDK (TypeScript/Python): constructs, stacks, `cdk deploy/synth/diff` | `aws-cdk/SKILL.md` |
-| CloudFormation templates, validation, cfn-lint/cfn-guard, failed stacks | `aws-cloudformation/SKILL.md` |
-| CodePipeline, CodeBuild, CodeDeploy, CodeArtifact, buildspec/appspec | `aws-deployment/SKILL.md` |
-| EC2, Auto Scaling, AMIs, IMDSv2, Systems Manager | `aws-compute/SKILL.md` |
-| EKS, ECS, Fargate, ECR, Elastic Beanstalk | `aws-containers/SKILL.md` |
-| Lambda, API Gateway, Step Functions, EventBridge, event-driven design | `aws-serverless/SKILL.md` |
-| Choosing or operating a database (Aurora, RDS, DynamoDB, etc.) | `aws-database/SKILL.md` |
-| S3, EFS, FSx, EBS, storage selection, migration, cost | `aws-storage/SKILL.md` |
-| Route 53, CloudFront, Transit Gateway, Direct Connect, VPN, WAF, Shield | `aws-networking/SKILL.md` |
-| SQS, SNS, EventBridge, Kinesis, MQ, Firehose, SES, end-user messaging | `aws-messaging-and-streaming/SKILL.md` |
-| CloudWatch, Log Insights, alarms, Application Signals, Omni | `aws-observability/SKILL.md` |
-| First-time CloudWatch Omni setup (Space, access grants, ADOT) | `../setting-up-cloudwatch-observability/SKILL.md` |
-| Bedrock: model invocation, Knowledge Bases, Agents, Guardrails, AgentCore | `amazon-bedrock/SKILL.md` |
-| SageMaker: fine-tuning, model deployment, endpoints, MLflow | `aws-ai-ml/SKILL.md` |
-| Cost analysis, budgets, Savings Plans, right-sizing, pricing, Free Tier | `aws-billing-and-cost-management/SKILL.md` |
-| Writing code with the AWS SDK for JavaScript v3 (`@aws-sdk/*`) | `aws-sdk-js-v3-usage/SKILL.md` |
-| Writing code with boto3/botocore | `aws-sdk-python-usage/SKILL.md` |
-| Writing Swift code with `aws-sdk-swift` | `aws-sdk-swift-usage/SKILL.md` |
-| Building full-stack apps with AWS Blocks (`@aws-blocks`) | `aws-blocks/SKILL.md` |
-| Migrating a vibe-coded or frontend web app to AWS | `launch-with-aws/SKILL.md` |
+| Get AWS CLI/SDK credentials, `aws login`, expired or missing credentials | `references/signing-in-to-aws/guide.md` |
+| IAM roles, policies, trust policies, STS, Organizations, policy generation | `references/aws-iam/guide.md` |
+| User sign-up/sign-in, Cognito, Amplify auth, JWT authorizers, OAuth/OIDC | `references/aws-auth/guide.md` |
+| Security Hub, GuardDuty, Inspector, Macie, Detective, Security Lake | `references/aws-security/guide.md` |
+| CDK (TypeScript/Python): constructs, stacks, `cdk deploy/synth/diff` | `references/aws-cdk/guide.md` |
+| CloudFormation templates, validation, cfn-lint/cfn-guard, failed stacks | `references/aws-cloudformation/guide.md` |
+| CodePipeline, CodeBuild, CodeDeploy, CodeArtifact, buildspec/appspec | `references/aws-deployment/guide.md` |
+| EC2, Auto Scaling, AMIs, IMDSv2, Systems Manager | `references/aws-compute/guide.md` |
+| EKS, ECS, Fargate, ECR, Elastic Beanstalk | `references/aws-containers/guide.md` |
+| Lambda, API Gateway, Step Functions, EventBridge, event-driven design | `references/aws-serverless/guide.md` |
+| Choosing or operating a database (Aurora, RDS, DynamoDB, etc.) | `references/aws-database/guide.md` |
+| S3, EFS, FSx, EBS, storage selection, migration, cost | `references/aws-storage/guide.md` |
+| Route 53, CloudFront, Transit Gateway, Direct Connect, VPN, WAF, Shield | `references/aws-networking/guide.md` |
+| SQS, SNS, EventBridge, Kinesis, MQ, Firehose, SES, end-user messaging | `references/aws-messaging-and-streaming/guide.md` |
+| CloudWatch, Log Insights, alarms, Application Signals, Omni | `references/aws-observability/guide.md` |
+| First-time CloudWatch Omni setup (Space, access grants, ADOT) | `references/setting-up-cloudwatch-observability/guide.md` |
+| Bedrock: model invocation, Knowledge Bases, Agents, Guardrails, AgentCore | `references/amazon-bedrock/guide.md` |
+| SageMaker: fine-tuning, model deployment, endpoints, MLflow | `references/aws-ai-ml/guide.md` |
+| Cost analysis, budgets, Savings Plans, right-sizing, pricing, Free Tier | `references/aws-billing-and-cost-management/guide.md` |
+| Writing code with the AWS SDK for JavaScript v3 (`@aws-sdk/*`) | `references/aws-sdk-js-v3-usage/guide.md` |
+| Writing code with boto3/botocore | `references/aws-sdk-python-usage/guide.md` |
+| Writing Swift code with `aws-sdk-swift` | `references/aws-sdk-swift-usage/guide.md` |
+| Building full-stack apps with AWS Blocks (`@aws-blocks`) | `references/aws-blocks/guide.md` |
+| Migrating a vibe-coded or frontend web app to AWS | `references/launch-with-aws/guide.md` |
 
 ## No match
 
