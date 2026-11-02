@@ -19,6 +19,7 @@ npx skills add ChristopherAlphonse/calphonse-skills --skill <name>
 | [codebase-mapper](codebase-mapper/SKILL.md) | Structured onboarding map of an existing codebase — tech stack, architecture, key flows, conventions, known concerns |
 | [comment-sicko](comment-sicko/SKILL.md) | A deranged comment-hater that savors deletion and condemns workaround code |
 | [csp](csp/SKILL.md) | Advanced CSP bypass techniques — policy weaknesses, nonce leakage, trusted-endpoint abuse, exfiltration channels CSP can't block |
+| [demo-script](demo-script/SKILL.md) | Short, natural, spoken demo script that explains what changed, shows it working, and ties it to business value |
 | [documentation-writer](documentation-writer/SKILL.md) | Diátaxis documentation expert — tutorials, how-tos, reference, explanation — plus product copy principles aligned with brand voice |
 | [dotnet](dotnet/SKILL.md) | Index and router for C#/.NET work — ASP.NET Core Web API endpoints, DTOs, error handling middleware, OpenAPI/Swagger, and design pattern reviews (Command, Factory, Repository, Provider, DI, SOLID) |
 | [feature-orchestrator](feature-orchestrator/SKILL.md) | Session 1 of a two-session feature workflow — settle a feature in conversation, then hand off a copy-ready orchestration prompt with a chosen sub-agent model roster |

@@ -38,6 +38,7 @@ npx skills update -y       # no prompts
 | [application-lifecycle-trace](application-lifecycle-trace/SKILL.md) | Trace and explain an application's lifecycle end to end |
 | [systems-architecture](systems-architecture/SKILL.md) | Generates a high-level system architecture document from lifecycle documentation — actors, interactions, technologies |
 | [documentation-writer](documentation-writer/SKILL.md) | Diátaxis documentation expert — tutorials, how-tos, reference, explanation — plus product copy principles aligned with brand voice |
+| [demo-script](demo-script/SKILL.md) | Short, natural, spoken demo script that explains what changed, shows it working, and ties it to business value |
 | [architecture-review](architecture-review/SKILL.md) | Read-only architecture and distributed-systems review — complexity, bottlenecks, reliability risks, and cost savings, with findings marked VERIFIED / [ASSUMPTION] / [NEEDS MEASUREMENT] |
 
 ### Planning & Requirements
