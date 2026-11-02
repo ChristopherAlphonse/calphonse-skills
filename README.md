@@ -59,13 +59,7 @@ npx skills update -y       # no prompts
 | [typescript-strict-style](typescript-strict-style/SKILL.md) | Strict TS/JS discipline — assertion safety, exhaustive error handling, function size, naming, performance, dependency minimalism |
 | [pr-body-style](pr-body-style/SKILL.md) | Draft, rewrite, or audit GitHub PR bodies — accurate, short, business-focused |
 | [comment-sicko](comment-sicko/SKILL.md) | A deranged comment-hater that savors deletion and condemns workaround code |
-| [prove-it-works](prove-it-works/SKILL.md) | Verify a finished task against the real artifact, not a proxy, self-report, or "it compiles" |
-
-### Testing & Acceptance
-
-| Skill | Description |
-| --- | --- |
-| [uat-documentation](uat-documentation/SKILL.md) | User Acceptance Testing documentation — test plans, step-by-step cases, and sign-off checklists non-technical stakeholders can execute |
+| [prove-it-works](prove-it-works/SKILL.md) | Verify a finished task against the real artifact, not a proxy, self-report, or "it compiles", then write a UAT document so the user can confirm it themselves |
 
 ### Cloud
 
@@ -100,7 +94,7 @@ npx skills update -y       # no prompts
 | Skill | Description |
 | --- | --- |
 | [simplify](simplify/SKILL.md) | Restate the last message in plain human language, with no jargon |
-| [swe](swe/SKILL.md) | Lazy senior dev mode — smallest change that fully solves the task, and a reply a busy human reads once. Levels: lite, full, ultra |
+| [swe](swe/SKILL.md) | Lazy senior dev mode — smallest change that fully solves the task, and a reply a busy human reads once |
 
 ## Philosophy
 
