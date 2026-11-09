@@ -376,7 +376,7 @@ npm ci  # Instead of npm install
 - [ ] Dependencies up to date
 - [ ] No known vulnerabilities (npm audit clean)
 - [ ] Lock files committed
-- [ ] Dependabot enabled on GitHub
+- [ ] Automated dependency update checks enabled
 - [ ] Regular security updates
 
 ## Security Testing
@@ -451,8 +451,3 @@ Before ANY production deployment:
 ---
 
 **Remember**: Security is not optional. One vulnerability can compromise the entire platform. When in doubt, err on the side of caution.
----
-
-> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill security-review``
-
-

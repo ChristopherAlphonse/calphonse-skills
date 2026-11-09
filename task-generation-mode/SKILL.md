@@ -74,7 +74,3 @@ Use `/lets-talk-about-it` before finalizing the task list. Let it stress-test th
 ```
 
 **Ask the user whether each task or subtask should be committed to git, and keep the work sequential.**
-
----
-
-> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill task-generation-mode``

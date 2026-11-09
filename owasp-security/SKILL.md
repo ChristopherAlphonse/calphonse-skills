@@ -541,6 +541,3 @@ app.post('/api/fetch-url', async (req, res) => {
 - **OWASP Cheat Sheets**:
 - **Node.js Security**:
 - **Snyk**:
----
-
-> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill owasp-security``

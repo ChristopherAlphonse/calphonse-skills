@@ -62,7 +62,7 @@ Hunt only the files in that diff, and only the lines that diff shows as added (`
 
 ### Scope verification is mandatory, not assumed
 
-Reading a file's current full contents (`cat`, `read_file`) is NOT evidence that a comment was added on this branch. It only proves the comment exists today. The only valid evidence that a comment is in scope is its own line appearing as a `+` line in the actual diff output (`git diff $BASE...HEAD`, or the saved diff file).
+Reading a file's current full contents (`cat`, or any file-read tool) is NOT evidence that a comment was added on this branch. It only proves the comment exists today. The only valid evidence that a comment is in scope is its own line appearing as a `+` line in the actual diff output (`git diff $BASE...HEAD`, or the saved diff file).
 
 Before judging ANY comment:
 

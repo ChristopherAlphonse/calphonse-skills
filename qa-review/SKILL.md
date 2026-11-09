@@ -1,23 +1,36 @@
 ---
-name: thermo-nuclear-code-quality-review
+name: qa-review
 description: Run an extremely strict maintainability review for abstraction quality, giant files, and spaghetti-condition growth. Use for a thermo-nuclear code quality review, thermonuclear review, deep code quality audit, or especially harsh maintainability review.
 disable-model-invocation: true
 ---
 
 # Thermo-Nuclear Code Quality Review
 
-Use this skill for an unusually strict review focused on implementation quality, maintainability, abstraction quality, and codebase health.
+Use this skill for an unusually strict review focused on the quality and maintainability of the code the author changed.
 
-Above all, this skill should push the reviewer to be **ambitious** about code structure. Do not merely identify local cleanup opportunities. Actively search for "code judo" moves: restructurings that preserve behavior while making the implementation dramatically simpler, smaller, more direct, and more elegant.
+Above all, this skill should push the reviewer to be **ambitious** about how the author's change is structured. Do not merely identify local cleanup opportunities. Actively search for "code judo" moves: ways to restructure the author's change that preserve behavior while making it dramatically simpler, smaller, more direct, and more elegant.
+
+## Scope: the author's changes only
+
+Review what the author wrote or modified in this change. Nothing else.
+
+- Get the change set from the diff against the base branch. Every finding must point to a line the diff adds or modifies, or to code whose behavior the diff directly changes.
+- Never report a problem that already existed in code the author did not touch. This includes old spaghetti, oversized files, missing types, duplicated helpers, and outdated patterns. Do not mention them as "side notes", "while I was here", or "for a follow-up". Unbounded scope is the failure this rule prevents.
+- Touching a file does not put the whole file in scope. Only the changed lines, and what those lines do to their immediate surroundings, are in scope.
+- Read untouched code only to judge the author's change: to check whether a canonical helper already exists, whether a layer boundary is respected, or how the new code interacts with its callers. What you learn there is evidence for a finding about the author's code, never a finding in itself.
+- Suggested fixes must be edits to the author's own changes: simplify them, move them, split them, or replace them with an existing helper. Do not ask the author to refactor, rename, or clean up code they did not write in this change.
+- A change counts as making the surrounding code worse only when the diff itself introduced the problem, for example a new branch added to an existing function, or a file pushed over the size limit by the new lines.
+- If a pre-existing problem blocks a clean implementation, say so in one sentence tied to the author's change and recommend the smallest local workaround. Do not recommend fixing the pre-existing problem in this change.
+- If the diff cannot be obtained, stop and ask. Do not fall back to reviewing the whole codebase.
 
 ## Core Prompt
 
 Start from this baseline:
 
-> Perform a deep code quality audit of the current branch's changes.
+> Perform a deep code quality audit of the current branch's changes, and only those changes.
 > Rethink how to structure / implement the changes to meaningfully improve code quality without impacting behavior.
-> Work to improve abstractions, modularity, reduce Spaghetti code, improve succinctness and legibility.
-> Be ambitious, if there is a clear path to improving the implementation that involves restructuring some of the codebase, go for it.
+> Work to improve abstractions, modularity, reduce Spaghetti code, improve succinctness and legibility in the code the author wrote.
+> Be ambitious about restructuring the author's own change. Do not widen the review to code the author did not touch.
 > Be extremely thorough and rigorous. Measure twice, cut once.
 
 ## Non-Negotiable Additional Standards
@@ -28,7 +41,7 @@ Apply the baseline prompt above, plus these explicit review rules:
    - Do not stop at "this could be a bit cleaner."
    - Look for opportunities to reframe the change so that whole branches, helpers, modes, conditionals, or layers disappear entirely.
    - Prefer the solution that makes the code feel inevitable in hindsight.
-   - Assume there is often a "code judo" move available: a re-organization that uses the existing architecture more effectively and makes the change dramatically simpler and more elegant.
+   - Assume there is often a "code judo" move available: a re-organization of the author's change that uses the existing architecture more effectively and makes it dramatically simpler and more elegant.
    - If you see a path to delete complexity rather than rearrange it, push hard for that path.
 
 1. **Do not let a PR push a file from under 1k lines to over 1k lines without a very strong reason.**
@@ -37,7 +50,7 @@ Apply the baseline prompt above, plus these explicit review rules:
    - If the diff crosses that threshold, explicitly ask whether the code should be decomposed first.
    - Only waive this if there is a compelling structural reason and the resulting file is still clearly organized.
 
-2. **Do not allow random spaghetti growth in existing code.**
+2. **Do not allow the change to cause random spaghetti growth in existing code.**
    - Be highly suspicious of new ad-hoc conditionals, scattered special cases, or one-off branches inserted into unrelated flows.
    - If a change adds "weird if statements in random places", treat that as a design problem, not a stylistic nit.
    - Prefer pushing the logic into a dedicated abstraction, helper, state machine, policy object, or separate module instead of tangling an existing path.
@@ -60,8 +73,8 @@ Apply the baseline prompt above, plus these explicit review rules:
 
 6. **Keep logic in the canonical layer and reuse existing helpers.**
    - Call out feature logic leaking into shared paths or implementation details leaking through APIs.
-   - Prefer existing canonical utilities/helpers over bespoke one-offs.
-   - Push code toward the right package, service, or module instead of normalizing architectural drift.
+   - Prefer existing canonical utilities/helpers over bespoke one-offs in the author's new code.
+   - Push the author's new code toward the right package, service, or module instead of normalizing architectural drift.
 
 7. **Treat unnecessary sequential orchestration and non-atomic updates as design smells when the cleaner structure is obvious.**
    - If independent work is serialized for no good reason, ask whether the flow should run in parallel instead.
@@ -70,7 +83,7 @@ Apply the baseline prompt above, plus these explicit review rules:
 
 ## Primary Review Questions
 
-For every meaningful change, ask:
+For every meaningful change in the diff, ask:
 
 - Is there a "code judo" move that would make this dramatically simpler?
 - Can this change be reframed so fewer concepts, branches, or helper layers are needed?
@@ -90,7 +103,7 @@ For every meaningful change, ask:
 
 Escalate findings when you see:
 
-- A complicated implementation where a cleaner reframing could delete whole categories of complexity.
+- A complicated implementation in the diff where a cleaner reframing could delete whole categories of complexity.
 - Refactors that move code around but fail to reduce the number of concepts a reader must hold in their head.
 - A file crossing 1000 lines due to the PR, especially if the new code could be split out.
 - New conditionals bolted onto unrelated code paths.
@@ -100,7 +113,7 @@ Escalate findings when you see:
 - Thin wrappers or identity abstractions that add indirection without simplifying anything.
 - Unnecessary casts, `any`, `unknown`, or optional params that muddy the real contract.
 - Copy-pasted logic instead of extracted helpers.
-- Narrow edge-case handling implemented in the middle of an already busy function.
+- Narrow edge-case handling the diff adds in the middle of an already busy function.
 - Refactors that technically pass tests but make the code less modular or less readable.
 - "Temporary" branching that is likely to become permanent debt.
 - Bespoke helpers where the codebase already has a canonical utility for the job.
@@ -112,12 +125,14 @@ Escalate findings when you see:
 
 When you identify a code-quality problem, prefer suggestions like:
 
-- Delete a whole layer of indirection rather than polishing it.
+All remedies apply to the author's changed code only.
+
+- Delete a whole layer of indirection the author added rather than polishing it.
 - Reframe the state model so conditionals disappear instead of getting centralized.
 - Change the ownership boundary so the feature becomes a natural extension of an existing abstraction.
 - Turn special-case logic into a simpler default flow with fewer exceptions.
 - Extract a helper or pure function.
-- Split a large file into smaller focused modules.
+- Split the author's new code out of a file the diff pushes past the size limit.
 - Move feature-specific logic behind a dedicated abstraction.
 - Replace condition chains with a typed model or explicit dispatcher.
 - Separate orchestration from business logic.
@@ -164,6 +179,7 @@ Prioritize findings in this order:
 7. Legibility and maintainability concerns
 
 Do not flood the review with low-value nits if there are larger structural issues.
+Do not list problems in code the author did not change, even briefly.
 Prefer a smaller number of high-conviction comments over a long list of cosmetic notes.
 
 ## Approval Bar
@@ -182,7 +198,7 @@ The bar for approval is:
 
 Treat these as presumptive blockers unless the author can justify them clearly:
 
-- the PR preserves a lot of incidental complexity when there is a plausible code-judo move that would delete it
+- the PR's own changes carry a lot of incidental complexity when there is a plausible code-judo move that would delete it
 - the PR pushes a file from below 1000 lines to above 1000 lines
 - the PR adds ad-hoc branching that makes an existing flow more tangled
 - the PR solves a local problem by scattering feature checks across shared code

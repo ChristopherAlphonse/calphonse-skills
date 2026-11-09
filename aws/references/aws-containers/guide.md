@@ -17,7 +17,7 @@ When accessing AWS documentation, use the `aws___read_documentation` and `aws___
 This skill can be loaded two ways, and they resolve the skill's own bundled reference files from different places. Determine how the skill was loaded before reading a reference file:
 
 - **Loaded through the AWS MCP Server's `aws___retrieve_skill` tool:** The skill is not installed on the local filesystem. You MUST fetch each reference via `aws___retrieve_skill` with the `file` parameter (e.g. `file="references/ecs.md"` or `file="references/action-logs.md"`). Do NOT `file_read` these paths locally — they do not exist on disk.
-- **Installed locally** (e.g. `.kiro/skills/aws-containers/` or `~/.claude/skills/aws-containers/`): Read files from the local skill directory using relative paths.
+- **Installed locally** (e.g. `~/.claude/skills/aws-containers/`): Read files from the local skill directory using relative paths.
 
 This distinction applies only to the skill's own packaged files. User data and session artifacts are always read from and written to the user's working directory. Never fetch or write customer data through `aws___retrieve_skill`.
 

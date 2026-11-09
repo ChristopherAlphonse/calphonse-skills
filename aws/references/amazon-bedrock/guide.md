@@ -13,8 +13,7 @@ a reference or running a script:
   `file="scripts/fetch_bedrock_agent.py"`), and run the script from the
   returned content. Do NOT `file_read` these paths locally — they do not exist
   on disk.
-- **Installed locally** (e.g. `.kiro/skills/amazon-bedrock/` or
-  `~/.claude/skills/amazon-bedrock/`): Read and run files from the local skill
+- **Installed locally** (e.g. `~/.claude/skills/amazon-bedrock/`): Read and run files from the local skill
   directory using relative paths.
 
 This distinction applies only to the skill's own packaged files. User data and

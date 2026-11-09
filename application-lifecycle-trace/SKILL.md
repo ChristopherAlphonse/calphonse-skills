@@ -1,8 +1,6 @@
 ---
 name: application-lifecycle-trace
 description: "Show case application lifecycle"
-tools:
-  [vscode, execute, read, agent, edit, search, web, browser, neon/search, todo]
 ---
 
 #### **Title: PRD Generation**
@@ -50,7 +48,7 @@ tools:
 #### **Quick Reference**
 
 - **Event Triggers:** User prompt containing "new feature" or "PRD".
-- **File Format:** Standard GFM (GitHub Flavored Markdown).
+- **File Format:** Standard Markdown.
 - **Error Handling:** If requirements are ambiguous, the AI **must** re-trigger the clarification loop.
 - **Validation:** Final PRD must be legible by a "Junior Developer" profile.
 
@@ -59,12 +57,9 @@ tools:
 #### **Related Lifecycles**
 
 1. **Task Decomposition:** Converting a PRD into a `tasks-prd-*.md` file.
-2. **DAP Implementation:** Creating a Deployment Action Plan for schema changes.
+2. **Rollout Planning:** Creating a deployment plan for schema changes.
 3. **System Onboarding:** Generating `use_cases.md` from repo analysis.
 
 ---
 
 **Next Step:** I can now save this lifecycle trace to `.planning/memory/system/001_lifecycle_prd_generation.md`. Would you like me to finalize the file creation?
----
-
-> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill application-lifecycle-trace``

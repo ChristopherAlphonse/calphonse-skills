@@ -1,8 +1,6 @@
 ---
 name: systems-architecture
 description: 'Generates a high-level system architecture document by analyzing lifecycle documentation and identifying major actors, their interactions, and technologies used.'
-tools: ['vscode/getProjectSetupInfo', 'vscode/installExtension', 'vscode/newWorkspace', 'vscode/runCommand', 'read/readFile', 'edit/createDirectory', 'edit/createFile', 'edit/editFiles', 'search', 'agent']
-
 ---
 
 ### **Core Objective**
@@ -69,8 +67,3 @@ To maintain clarity and prioritize impact, follow these constraints:
 * **Major Actors Only:** Include only components where significant logic resides. If its removal would require a major rewrite, include it.
 * **Exclusions:** Omit simple pass-throughs, thin wrappers, utility libraries, pure UI components, and configuration-only files.
 * **Prioritization:** Limit to a maximum of **10 major components**.
-
----
----
-
-> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill systems-architecture``

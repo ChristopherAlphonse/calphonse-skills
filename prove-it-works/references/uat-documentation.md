@@ -11,7 +11,7 @@ follow by hand to confirm the software does what was asked.
   business users approve it.
 - The user asks for "UAT docs," "test cases for the business," "acceptance
   test checklist," or similar.
-- Jira or Confluence stories list requirements that need to become
+- Tickets or wiki pages list requirements that need to become
   step-by-step instructions for a non-technical tester.
 
 ## When Not to Use
@@ -23,9 +23,9 @@ follow by hand to confirm the software does what was asked.
 
 ## What You Need First
 
-- The feature, story, or release to document. If it is tracked in Jira or
-  Confluence, fetch it with the `atlassian-to-doc` skill instead of
-  guessing at the requirements.
+- The feature, story, or release to document. If it is tracked in a ticket or
+  wiki page, read it there instead of guessing at the
+  requirements.
 - The requirements (also called acceptance criteria). Take them from the
   ticket or spec if one exists. If none exists, ask the user instead of
   making them up.
@@ -39,8 +39,8 @@ follow by hand to confirm the software does what was asked.
 
 ### Step 1: Gather the requirements
 
-1. If a Jira issue or Confluence page describes the feature, fetch it with
-   the `atlassian-to-doc` skill and copy the requirements word for word
+1. If a ticket or wiki page describes the feature, read it
+   and copy the requirements word for word
    where possible.
 2. If there is no ticket, ask the user for the requirements or read the
    relevant spec or README in the project. Do not invent scenarios based on
@@ -80,8 +80,8 @@ plus a sign-off block (tester name, date, overall result, approver).
 ### Step 5: Save the document and report back
 
 Save the document to the agreed location. Tell the user what you made and
-where it is. Do not save it to version control or create a Jira or
-Confluence item unless the user explicitly asks.
+where it is. Do not save it to version control or create a ticket or
+wiki page unless the user explicitly asks.
 
 ## Final Checks
 

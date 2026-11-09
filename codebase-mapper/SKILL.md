@@ -32,7 +32,7 @@ stack, architecture, conventions, and known concerns — not code changes.
 - The repo has fewer than ~5 source files — just read it directly, mapping
   overhead isn't justified.
 - Docs already exist and are current (check `docs/`, `README.md`, and any
-  `.kiro/steering/*.md` first) — update them instead of generating a parallel set.
+  agent steering or context files first) — update them instead of generating a parallel set.
 
 ## Inputs / Prerequisites
 
@@ -40,7 +40,7 @@ stack, architecture, conventions, and known concerns — not code changes.
 - Preferred output location. Default: `docs/onboarding/` inside the target
   repo. Confirm with the user if a repo already has a docs convention
   (e.g. an existing `docs/` or `.planning/` folder) rather than assuming.
-- Any existing steering/context files (`.kiro/steering/*.md`, `AGENTS.md`,
+- Any existing steering/context files (`AGENTS.md`,
   `README.md`) — read these first, they often already contain authoritative
   architecture/dependency info that should be reused, not re-derived.
 
@@ -48,20 +48,20 @@ stack, architecture, conventions, and known concerns — not code changes.
 
 ### Step 1: Reconnaissance
 
-1. Read `README.md`, `AGENTS.md`, and any `.kiro/steering/*.md` in the repo
+1. Read `README.md`, `AGENTS.md`, and any steering or context files in the repo
    — these frequently already document purpose, dependencies, and structure.
-2. Run `code` with `operation: generate_codebase_overview` on the repo root
-   to get a high-level structural summary.
-3. Use `glob` to inventory top-level project/module directories and config
+2. Get a high-level structural summary of the repo (directory tree, top-level
+   modules, entry points).
+3. Inventory top-level project/module directories and config
    files (`*.csproj`, `package.json`, `pom.xml`, `Cargo.toml`, `Makefile`,
-   `terraform/*.tf`, `.gitlab-ci.yml`, etc.) to identify stack and tooling.
+   `terraform/*.tf`, CI pipeline files, etc.) to identify stack and tooling.
 
 ### Step 2: Decide scope — single pass vs. parallel
 
 - **Small/medium repo (single service, one language):** do steps 3-6
   yourself, directly, in one pass.
 - **Large or multi-module repo (multiple independently-buildable projects,
-  or a monorepo):** use `subagent` to fan out one stage per concern area
+  or a monorepo):** use sub-agents to fan out one stage per concern area
   (stack/integrations, architecture/structure, conventions/testing,
   concerns) against the same repo root, then consolidate their findings
   into the documents below yourself. Don't spawn agents for a repo small
@@ -69,7 +69,7 @@ stack, architecture, conventions, and known concerns — not code changes.
 
 ### Step 3: Identify architecture and key flows
 
-- Use `code` (`search_symbols`, `get_document_symbols`) and `grep` to find
+- Use symbol search and text search to find
   entry points (`Program.cs`, `main.*`, route/controller registrations),
   the data layer (DbContext, repository/service interfaces), and
   integration points (HTTP clients, message queues, external API calls).
@@ -81,7 +81,7 @@ stack, architecture, conventions, and known concerns — not code changes.
 
 - Note naming/style conventions actually used in the code (not aspirational
   ones from a style guide) — DTO patterns, error handling patterns, layering.
-- Use `glob`/`grep` to find the test projects/directories and how to run
+- Search the tree to find the test projects/directories and how to run
   them (check `Makefile`, CI config, or project files for the actual command).
 
 ### Step 5: Note concerns

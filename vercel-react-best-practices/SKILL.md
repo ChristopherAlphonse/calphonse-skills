@@ -154,6 +154,3 @@ Each rule file contains:
 ## Full Compiled Document
 
 For the complete guide with all rules expanded: `AGENTS.md`
----
-
-> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill vercel-react-best-practices``

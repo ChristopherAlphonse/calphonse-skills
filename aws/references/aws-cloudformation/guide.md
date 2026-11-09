@@ -21,8 +21,7 @@ skill was loaded before you read a reference:
   filesystem for them — they are not there, and any local file that happens to
   match the name is unrelated to this skill.
 - **Installed locally** (the skill lives in a local skills directory such as
-  `.claude/skills/aws-cloudformation/`, `~/.claude/skills/aws-cloudformation/`,
-  or `.kiro/skills/aws-cloudformation/`). Read references from the local skill
+  `.claude/skills/aws-cloudformation/` or `~/.claude/skills/aws-cloudformation/`). Read references from the local skill
   directory using the relative paths shown throughout this documentation.
 
 This distinction applies **only** to the skill's own packaged files. Every

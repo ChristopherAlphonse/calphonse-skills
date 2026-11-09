@@ -5,7 +5,6 @@
 - [Purpose](#purpose)
 - [Choose the installation path](#choose-the-installation-path)
 - [Configure the server](#configure-the-server)
-- [Kiro CLI configuration](#kiro-cli-configuration)
 - [Generic LSP clients](#generic-lsp-clients)
 - [Validation workflow](#validation-workflow)
 - [Security Considerations](#security-considerations)
@@ -77,57 +76,6 @@ collects anonymous usage and performance metrics, not CloudFormation template co
 If the user explicitly asks to disable it, honor that preference. Resolve client identity and version from the installed
 client instead of hardcoding them.
 
-## Kiro CLI configuration
-
-Initialize code intelligence in the project root:
-
-```text
-/code init
-```
-
-Then add the server to `.kiro/settings/lsp.json`. Replace the command and argument placeholders with the exact stdio
-invocation from the standalone installation guide:
-
-```json
-{
-  "languages": {
-    "cfn-lsp": {
-      "name": "cloudformation-languageserver",
-      "command": "<server-command>",
-      "args": ["<server-arguments>"],
-      "file_extensions": ["json", "yaml", "yml", "cfn", "template"],
-      "project_patterns": [],
-      "exclude_patterns": [],
-      "multi_workspace": false,
-      "initialization_options": {
-        "aws": {
-          "clientInfo": {
-            "extension": {
-              "name": "kiro-cli",
-              "version": "<installed-client-version>"
-            }
-          },
-          "telemetryEnabled": true
-        }
-      }
-    }
-  }
-}
-```
-
-If the documented invocation needs multiple arguments, represent each as a separate `args` entry. Adjust file extensions
-and project patterns to the repository rather than treating the example as a universal selector.
-
-Restart Kiro CLI after changing the file, or force code-intelligence reinitialization:
-
-```text
-/code init -f
-/code status
-```
-
-`/code status` should show `cfn-lsp` as initialized. Use code-intelligence tools for symbol navigation, hover,
-completion, diagnostics, and code actions rather than simulating those features with text search.
-
 ## Generic LSP clients
 
 For another LSP-capable editor, translate the standalone stdio command and the initialization options above into
@@ -165,7 +113,6 @@ Follow the [shared security guidance](security-considerations.md) when handling 
 | Server does not initialize | Re-read the selected release's prerequisites and confirm the installed artifact matches the platform |
 | Client reports an immediate process exit | Compare the configured command and argument array with the installation guide |
 | No diagnostics or completion | Confirm the file selector routes this file to the server and the document is recognized as CloudFormation |
-| Kiro CLI cannot see the server | Run `/code status`, inspect `.kiro/settings/lsp.json`, then restart or run `/code init -f` |
 
 ## Authoritative references
 

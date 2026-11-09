@@ -67,8 +67,7 @@ output so a reviewer can run it again instead of taking your word.
 
 Keep the script and its output where the user can see them. Save them to
 version control only for large or complex work where the trail must be
-auditable later, such as a big port or migration (see the
-**show-me-your-work** skill).
+auditable later, such as a big port or migration.
 
 ### Step 5: Report what you checked
 

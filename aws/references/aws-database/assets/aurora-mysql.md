@@ -14,7 +14,6 @@
 - **Min cost**: ~$0 with auto-pause; ~$45/month always-on at 0.5 ACU (compute only; storage billed separately)
 - **Time to first query**: 10-15 min (VPC + cluster setup)
 - **Key features**: Serverless, Global Database, I/O-Optimized, parallel query
-- **Migration tooling**: Aurora MySQL power for Kiro (AI-assisted RDS MySQL → Aurora MySQL migration via the Kiro IDE; a migration aid, not an engine feature)
 - **Limitations**: No Express Configuration, no pgvector equivalent
 - **Best for**: Existing MySQL workloads, teams with MySQL expertise
 - **Not for**: New apps without MySQL requirement

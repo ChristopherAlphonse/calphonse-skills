@@ -64,10 +64,10 @@ Read any files that describe:
 **If `.planning/` is empty or missing codebase context** → stop and run:
 
 ```
-/gsd-map-codebase
+/codebase-mapper
 ```
 
-After mapping completes, if enterprise work style / team conventions are still unclear:
+After mapping completes, if team conventions are still unclear:
 
 ```
 /lets-talk-about-it
@@ -96,8 +96,7 @@ find . -maxdepth 3 -name "tsconfig*.json" 2>/dev/null | head -10
 # Build / quality scripts
 cat package.json 2>/dev/null | grep -A 30 '"scripts"'
 
-# CI quality gates
-find . -path "./.git" -prune -o -name "*.yml" -path "*/.github/workflows/*" -print 2>/dev/null | head -10
+# CI quality gates: locate the repo's CI pipeline config and read its lint/test/build steps
 
 # Stylelint, commitlint, husky, lint-staged
 find . -maxdepth 3 \( -name ".stylelintrc*" -o -name ".commitlintrc*" -o -name ".lintstagedrc*" \) 2>/dev/null | head -10
@@ -463,7 +462,7 @@ Branch: <branch>
 Base: <base>
 Files changed: <N files, +X -Y lines>
 Agents run: <list>
-Codebase context: <from .planning/ | mapped via /gsd-map-codebase | [ASSUMPTION — no map found]>
+Codebase context: <from .planning/ | mapped via /codebase-mapper | [ASSUMPTION — no map found]>
 
 ---
 
@@ -474,7 +473,7 @@ Codebase context: <from .planning/ | mapped via /gsd-map-codebase | [ASSUMPTION 
 | ESLint | .eslintrc.js | react-hooks/exhaustive-deps, @typescript-eslint/strict |
 | Prettier | .prettierrc | semi: false, printWidth: 100 |
 | TypeScript | tsconfig.json | strict: true, noUncheckedIndexedAccess: false |
-| CI | .github/workflows/ci.yml | lint + typecheck + test required |
+| CI | <CI config file> | lint + typecheck + test required |
 
 ---
 
@@ -547,8 +546,5 @@ Status:   CLEAN / DRIFT / MISSING
 - Never claim a finding is real without pointing to the diff line or config that proves it
 - Never claim something is safe — safety claims require the same evidence standard as findings
 - Do not commit, push, or modify any files
-- If codebase context is inadequate → gate on `/gsd-map-codebase` and `/lets-talk-about-it`
+- If codebase context is inadequate → gate on `/codebase-mapper` and `/lets-talk-about-it`
   before proceeding; a review without context is worse than no review
----
-
-> **Install:** ``npx skills add ChristopherAlphonse/calphonse-skills --skill code-review-frontend``

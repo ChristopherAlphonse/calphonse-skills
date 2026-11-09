@@ -36,14 +36,7 @@ ls "<THIS_SKILL_DIR>/../sagemaker-mlflow/SKILL.md" 2>/dev/null \
 
 ```
 
-If `MLFLOW_SKILLS_MISSING`, you MUST ask the user before proceeding:
-> The MLflow connection and workflow skills aren't installed yet. Would you like me to install them?
->
-> ```bash
-> npx skills add mlflow/skills --all --agent <agent> --copy
-> ```
-
-After user confirms, run the install command and re-run the check. Remember the result for Phase 2 routing and Phase 4 hand-off.
+If `MLFLOW_SKILLS_MISSING`, tell the user the MLflow connection and workflow skills are not available in this environment, and that they can add them themselves if they want them. Do not install anything. Remember the result for Phase 2 routing and Phase 4 hand-off.
 
 ### Phase 2: Route Intent
 
