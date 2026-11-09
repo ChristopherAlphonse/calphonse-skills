@@ -10,35 +10,27 @@ After the agent gives an answer you can't follow, say something like:
 simplify
 ```
 
-```
-ELI5
-```
+Before:
 
-```
-what does that mean
-```
+> Without --retries, RetryPolicy.maxAttempts is undefined, so withRetry() falls through to a single attempt and no backoff timer is created. HttpClient logs nothing extra and the request fails fast on the first error. An empty string, the literal "undefined" that the CI template writes when the variable is missing, and a non-numeric value all take the same path. This is covered by ConfigParserTests and RetryPolicyTests. I also ran it locally without the flag, and it goes straight from Client: sending request to the error. Locally there's no proxy, so the compose file sets NO_PROXY=*.
+
+After:
+
+> Nothing breaks, it just doesn't retry: without the flag, a failed request gives up on the first error instead of trying again.
 
 ## Checking a sentence
 
-You can also hand it your own sentence and ask if it reads correctly. Put the text after the skill name:
+You can also hand it your own sentence and ask if it reads correctly or to reword it. Put the text after the skill name:
 
 ```
-/simplify is this the correct way to say this: Can you send me the invoice that you promised yesterday? I am waiting for it since Monday.
+/simplify can you clean this up before I send it: yo bro after PR merges does it need to be tested in staging; my PR for a config changed just got merged not sure if it needs to be tested in staging
 ```
 
-Example reply:
+Reply:
 
-> Not quite. "I am waiting for it since Monday" should be "I have been waiting for it since Monday", because the waiting started in the past and is still going.
->
-> Corrected version:
->
-> > Can you send me the invoice you promised yesterday? I have been waiting for it since Monday.
->
-> I also dropped "that", which the sentence doesn't need.
->
-> I did not check which invoice you mean or whether "yesterday" is the right day, so I kept both as you wrote them.
+> Hey, my pull request for a config change just got merged. Does it still need to be tested in staging?
 
-The reply fixes the grammar, keeps your wording where it can, and says what it left unchecked.
+The reply is only the reworded text, in plain words. No grammar lesson.
 
 ## Rules
 
@@ -55,4 +47,4 @@ The reply fixes the grammar, keeps your wording where it can, and says what it l
 | ------------------------------- | --------------------------------------------------------- |
 | `SKILL.md`                      | Rules the agent follows                                   |
 | `references/technical-check.md` | Two before/after examples of restating technical messages |
-| `references/sentence-check.md`  | Rules and an example for checking a user's own sentence   |
+| `references/sentence-check.md`  | Reword a user's own sentence in plain words               |

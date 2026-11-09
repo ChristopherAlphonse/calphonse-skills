@@ -1,27 +1,39 @@
 # Sentence check
 
-Use this when the user gives you their own sentence and asks if it reads correctly, not when they want your last message restated.
+Use this when the user gives you their own sentence or short passage and asks if it reads correctly or asks you to reword it, not when they want your last message restated.
 
-## Reply in this order
+Reply with the reworded sentence, in plain words. No verdict, no grammar terms, no list of what was wrong.
 
-1. **Verdict.** "Not quite" or "Yes, that reads fine."
-2. **Errors.** Name each real error and why it is one. Skip style preferences.
-3. **Corrected version.** Stay as close to the user's wording as you can.
-4. **Changes.** One line on anything you trimmed or swapped.
-5. **Not checked.** What you could not verify, such as who a pronoun means or whether a fact is right. Leave those words as written.
+- Keep the user's meaning and as much of their wording as you can.
+- Use short, everyday words.
+- Don't add facts or change what the sentence says.
 
-## Example
+## Example 1
 
 Input:
 
-> Is this the correct way to say this: Can you send me the invoice that you promised yesterday? I am waiting for it since Monday.
+> Is this the correct way to say this: Are there any plans to update the docs for the new login page? I think the layout could be more cleaner. After we finish the beta.
 
 Reply:
 
-> Not quite. "I am waiting for it since Monday" should be "I have been waiting for it since Monday", because the waiting started in the past and is still going.
->
-> > Can you send me the invoice you promised yesterday? I have been waiting for it since Monday.
->
-> I also dropped "that", which the sentence doesn't need.
->
-> I did not check which invoice you mean or whether "yesterday" is the right day, so I kept both as written.
+> Do we plan to update the docs for the new login page? I think the layout could be cleaner once the beta is done.
+
+## Example 2
+
+Input:
+
+> Can you fix and clean this up before I send it: hey i was tring to run the the build on my machine and its failing, i dont know if its my setup or something with the repo. should i just ask someone or
+
+Reply:
+
+> Hi, the build is failing on my machine, and I don't know if the problem is my setup or the repo. Could someone help me work out which it is?
+
+## Example 3
+
+Input:
+
+> Can you clean this up before I send it: yo bro after PR merges does it need to be tested in staging; my PR for a config changed just got merged not sure if it needs to be tested in staging
+
+Reply:
+
+> Hey, my pull request for a config change just got merged. Does it still need to be tested in staging?

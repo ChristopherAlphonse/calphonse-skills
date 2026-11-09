@@ -4,11 +4,11 @@ Example 1 (explaining behavior)
 
 Before:
 
-> Without --traceparent, TraceParent is null, so StartFromTraceParent returns null and no span is started. Worker skips the "continuing trace" log line and the run goes ahead normally, just untraced. An empty value, the literal "null" that EventBridge sends when the field is missing, and a malformed value all behave the same way. This is covered by AppArgumentsFactoryTests and TraceContinuationTests. I also ran it locally without the flag, and it goes straight from Worker: starting with args… to the job. Locally there's no collector, so the compose files set OTEL_SDK_DISABLED=true.
+> Without --retries, RetryPolicy.maxAttempts is undefined, so withRetry() falls through to a single attempt and no backoff timer is created. HttpClient logs nothing extra and the request fails fast on the first error. An empty string, the literal "undefined" that the CI template writes when the variable is missing, and a non-numeric value all take the same path. This is covered by ConfigParserTests and RetryPolicyTests. I also ran it locally without the flag, and it goes straight from Client: sending request to the error. Locally there's no proxy, so the compose file sets NO_PROXY=*.
 
 After:
 
-> Nothing breaks, it just runs untraced, because without the flag no trace gets started and the job carries on as normal.
+> Nothing breaks, it just doesn't retry: without the flag, a failed request gives up on the first error instead of trying again.
 
 Example 2 (diagnosis and recommendation)
 
