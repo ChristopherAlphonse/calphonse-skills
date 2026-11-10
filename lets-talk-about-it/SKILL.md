@@ -1,6 +1,6 @@
 ---
 name: lets-talk-about-it
-description: One-pass interrogation and coding guardrails. Use to stress-test a plan, design, code change, or domain term against local code/docs while enforcing explicit assumptions, simplicity, surgical edits, and verifiable success criteria.
+description: One-pass interrogation and coding guardrails. Use to stress-test a plan, design, code change, or domain term against local code/docs while enforcing explicit assumptions, simplicity, surgical edits, and verifiable success criteria. Also guides a longer feature discussion and turns the settled feature into a copy-ready prompt for a separate implementation session with a chosen sub-agent model roster. Use to explore, narrow, summarize, or hand off a substantial feature without implementing it.
 ---
 
 # Lets Talk About It
@@ -34,3 +34,7 @@ Return only what the task needs:
 - Risks / tradeoffs
 - Verification checklist
 - `CONTEXT.md` or ADR updates, only when a durable domain term or hard-to-reverse decision was actually resolved
+
+## Feature Handoff
+
+When the user wants to explore a substantial feature over several turns and hand it to a separate implementation session, follow `FEATURE-ORCHESTRATOR.md`. It does not implement in this session.

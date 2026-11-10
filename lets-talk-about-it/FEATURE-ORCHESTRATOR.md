@@ -1,8 +1,3 @@
----
-name: feature-orchestrator
-description: Guide an iterative product and technical discussion, then turn the settled feature into a copy-ready orchestration prompt for a separate implementation session with a user-chosen model roster for its Implementer, Researcher, and Reviewer sub-agents. Use when the user wants to explore, narrow, summarize, or hand off a substantial feature without implementing it in the current session.
----
-
 # Feature Orchestrator
 
 This skill runs Session 1 of a two-session workflow. Session 1 thinks: it helps the user settle what to build and why. Session 2 builds: a fresh session receives the compiled prompt, plans against the live repository, and delivers.
