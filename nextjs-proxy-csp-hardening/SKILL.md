@@ -614,3 +614,67 @@ A bad answer using this skill:
 ## Related
 
 - [references/csp-bypass-techniques.md](references/csp-bypass-techniques.md): per-directive bypasses, nonce leakage, trusted-endpoint abuse, exfiltration channels. Read it only to test or review a policy the user owns or is authorized to test. Do not use it to build a policy or to attack a third-party site.
+- [scripts/check_csp.py](scripts/check_csp.py): run against `http://localhost:PORT` (or any site you own) to check the live policy for the gaps in that reference — missing `base-uri`/`form-action`/`frame-ancestors`, `unsafe-inline`/`unsafe-eval`/wildcard sources, Report-Only-only, header/meta conflicts. It only reads headers and HTML; it sends no payloads. Needs Python 3.8+, stdlib only; check with `python3 --version` first and tell the user to install it if missing (python.org, or `brew install python3` / the OS package manager) before running `python3 scripts/check_csp.py` (omit the URL to auto-detect a local dev server, or pass one explicitly, e.g. `http://localhost:3000`).
+
+## Red Team / Blue Team / Orchestrator Workflow
+
+Use this when the user wants the policy attacked and fixed, not just reviewed, e.g. "pen-test my CSP", "red team this", "find and fix CSP flaws". Scope: CSP only — this is not a general pen test. Only run against an app the user owns or is explicitly authorized to test (localhost or a site they confirm is theirs).
+
+You are the orchestrator. Do not find or fix flaws yourself — spawn the two agents below with `invoke_sub_agent` (`general-task-execution`), one after the other (blue team needs red team's findings), then check both against OWASP yourself.
+
+### Step 1: Red Team
+
+Spawn one agent with this prompt (fill in `<URL>`):
+
+```
+You are a red team CSP tester. Target: <URL>, which the user owns or is authorized to test. Do not test any other host.
+
+1. Run: python3 nextjs-proxy-csp-hardening/scripts/check_csp.py <URL>
+2. Read: nextjs-proxy-csp-hardening/references/csp-bypass-techniques.md
+3. For every FAIL the script reports, and every gap you find by reading the actual policy
+   against that reference (missing directives, risky keywords, nonce reuse across two
+   requests), state the concrete bypass it enables, citing the reference section.
+4. Do not fix anything. Report findings only.
+
+REPORT FORMAT:
+## Red Team Findings
+| # | Severity | Directive/Header | Evidence (script FAIL or policy value) | Bypass enabled | Reference section |
+|---|----------|------------------|------------------------------------------|-----------------|--------------------|
+
+### Verdict: BLOCK (any exploitable gap) | PASS (none)
+```
+
+### Step 2: Blue Team
+
+Spawn one agent, pasting in the Red Team Findings table:
+
+```
+You are a blue team CSP fixer. Fix only the findings below — do not scope-creep into unrelated
+hardening.
+
+RED TEAM FINDINGS:
+<paste table>
+
+1. Read: nextjs-proxy-csp-hardening/SKILL.md (sections 3-10) for the correct directive values
+   and the default `proxy.ts` shape.
+2. Find the project's proxy.ts (or middleware.ts if not yet migrated) and propose the exact
+   diff that closes each finding. Keep every unrelated line unchanged.
+3. Do not weaken any directive to "fix" a false positive — if a finding looks wrong, say so
+   instead of touching the policy.
+
+REPORT FORMAT:
+## Blue Team Fix
+| # | Finding | Directive before | Directive after |
+|---|---------|-------------------|------------------|
+
+<diff or full file>
+```
+
+### Step 3: Orchestrator Compliance Check
+
+With both reports in hand, verify yourself — do not delegate this step:
+
+1. For each Blue Team fix, confirm it actually closes the matching Red Team finding (re-read the diff, don't trust the agent's own claim).
+2. Cross-check the resulting policy against `security-review/references/owasp-top-10.md`: CSP work maps mainly to A03 (Injection/XSS) and A05 (Security Misconfiguration) — confirm the fix doesn't leave either open.
+3. Confirm the four no-fallback directives (`base-uri`, `object-src`, `form-action`, `frame-ancestors`) are present and not weakened by the fix.
+4. Report: findings count, fixes applied, any finding left open and why, and the OWASP mapping checked. Apply the diff only after the user confirms.

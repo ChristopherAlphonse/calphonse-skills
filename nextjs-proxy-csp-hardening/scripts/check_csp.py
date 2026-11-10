@@ -9,8 +9,15 @@ check nonce reuse), reads the CSP header(s) and any <meta> CSP tag, and flags
 the same no-fallback gaps and risky keywords an attacker would look for first.
 
 Usage:
+    python check_csp.py                                  # auto-detect local Next.js dev server
     python check_csp.py https://example.com
     python check_csp.py https://example.com --insecure   # skip TLS verification
+
+Auto-detection (when no URL is given) looks, in order, for:
+    1. PORT in .env / .env.local / .env.development in the current directory
+    2. a --port/-p flag or PORT=... in the "dev" script of ./package.json
+    3. a plain TCP connect to each of the common Next.js ports (3000, 3001, 4000, 8080)
+It does not read database URLs or other secrets — only what decides which port to hit.
 
 Requires: only the Python standard library. Only use against a site you own
 or are authorized to test.
@@ -20,11 +27,16 @@ Exit code: 0 if no findings, 1 if any FAIL finding, 2 on fetch/usage error.
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import re
+import socket
 import ssl
 import sys
 import urllib.error
 import urllib.request
+
+COMMON_PORTS = [3000, 3001, 4000, 8080]
 
 NO_FALLBACK_DIRECTIVES = ["base-uri", "form-action", "frame-ancestors"]
 RISKY_KEYWORDS = {
@@ -33,6 +45,45 @@ RISKY_KEYWORDS = {
     "data:": "`<script src=\"data:text/javascript,...\">` bypass.",
     "*": "Wildcard source allows any origin.",
 }
+
+
+def discover_local_url(project_dir: str = ".") -> str:
+    """Find the port a local Next.js dev server is likely running on.
+
+    shortcut: checks only the current directory and localhost, not a monorepo's
+    sub-packages or a remote host; pass the URL explicitly for those.
+    """
+    for env_file in (".env.local", ".env.development", ".env"):
+        path = os.path.join(project_dir, env_file)
+        if os.path.isfile(path):
+            with open(path, encoding="utf-8", errors="ignore") as f:
+                match = re.search(r"^PORT=(\d+)", f.read(), re.MULTILINE)
+            if match:
+                return f"http://localhost:{match.group(1)}"
+
+    package_json = os.path.join(project_dir, "package.json")
+    if os.path.isfile(package_json):
+        with open(package_json, encoding="utf-8", errors="ignore") as f:
+            try:
+                dev_script = json.load(f).get("scripts", {}).get("dev", "")
+            except json.JSONDecodeError:
+                dev_script = ""
+        match = re.search(r"(?:--port|-p)[= ](\d+)", dev_script) or re.search(
+            r"PORT=(\d+)", dev_script
+        )
+        if match:
+            return f"http://localhost:{match.group(1)}"
+
+    for port in COMMON_PORTS:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(0.5)
+            if sock.connect_ex(("localhost", port)) == 0:
+                return f"http://localhost:{port}"
+
+    raise RuntimeError(
+        "could not auto-detect a local dev server; pass the URL explicitly, "
+        f"e.g. http://localhost:3000 (checked common ports: {COMMON_PORTS})"
+    )
 
 
 def fetch(url: str, insecure: bool) -> tuple[dict[str, str], str]:
@@ -57,11 +108,11 @@ def parse_policy(policy: str) -> dict[str, list[str]]:
 
 def find_meta_csp(body: str) -> str | None:
     match = re.search(
-        r'<meta[^>]+http-equiv=["\']Content-Security-Policy["\'][^>]+content=["\']([^"\']+)["\']',
+        r"""<meta[^>]+http-equiv=(["'])Content-Security-Policy\1[^>]+content=(["'])(.*?)\2""",
         body,
         re.IGNORECASE,
     )
-    return match.group(1) if match else None
+    return match.group(3) if match else None
 
 
 def extract_nonces(policy: str) -> set[str]:
@@ -129,14 +180,23 @@ def check(headers: dict[str, str], body: str) -> list[tuple[str, str]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("url")
+    parser.add_argument("url", nargs="?", help="defaults to auto-detecting a local dev server")
     parser.add_argument("--insecure", action="store_true", help="skip TLS certificate verification")
     args = parser.parse_args()
 
+    url = args.url
+    if url is None:
+        try:
+            url = discover_local_url()
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+        print(f"Auto-detected: {url}")
+
     try:
-        headers, body = fetch(args.url, args.insecure)
+        headers, body = fetch(url, args.insecure)
     except (urllib.error.URLError, ValueError) as exc:
-        print(f"ERROR: could not fetch {args.url}: {exc}", file=sys.stderr)
+        print(f"ERROR: could not fetch {url}: {exc}", file=sys.stderr)
         return 2
 
     findings = check(headers, body)
