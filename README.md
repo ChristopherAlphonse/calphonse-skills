@@ -61,7 +61,7 @@ npx skills update -y       # no prompts
 
 ### Security
 
-- [security-review](security-review/SKILL.md): Secure-coding checklist, focused security guidance, and full evidence-based codebase audits (recon, hunting, independent validation, schema-checked findings and reports), with OWASP Top 10, cloud, and attack-class references
+- [security-review](security-review/SKILL.md): Secure-coding checklist, focused security guidance, OWASP scans of source and running apps you own (Semgrep, ZAP), and full evidence-based codebase audits (recon, hunting, independent validation, schema-checked findings and reports), with OWASP Top 10, cloud, and attack-class references
 - [nextjs-proxy-csp-hardening](nextjs-proxy-csp-hardening/SKILL.md): Build and review secure Next.js `proxy.ts` files: CSP, nonce-based script protection, browser security headers, `middleware.ts` migration; includes a CSP bypass-techniques reference for authorized testing
 
 ### Frontend
