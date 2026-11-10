@@ -1,6 +1,6 @@
 ---
 name: prd-mode
-description: Help users transform abstract ideas into actionable project specs that align engineering and design teams on the problem and success metrics.
+description: Help users transform abstract ideas into actionable project specs that align engineering and design teams on the problem and success metrics. Also converts a finished PRD into a structured, checkable implementation task list. Use for writing or reviewing a PRD, and for "generate tasks from this PRD".
 ---
 
 # Writing Product Requirement Documents
@@ -88,6 +88,10 @@ See `references/artifacts.md` for the full list with details.
 - **Premature high fidelity mocks** - It anchors the team to a specific solution before they have fully explored the problem space or technical constraints.
 - **Ignoring non-goals** - Failing to establish what you are not building leads to scope creep and loss of focus on the primary problem.
 - **Waterfall handoffs** - Excluding designers and engineers from early planning creates inefficiencies and misses opportunities for innovation.
+
+## From PRD to Tasks
+
+When the user has a PRD and wants an implementation task list, follow `references/task-generation.md`. It runs two phases with a user checkpoint between them and writes `.planning/tasks/tasks-[prd-file-name].md`.
 
 ## Deep Dive
 

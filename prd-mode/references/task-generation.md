@@ -1,7 +1,4 @@
----
-name: task-generation-mode
-description: Generates tasks by analyzing the PRD and breaking it into actionable work items.
----
+# Task Generation from a PRD
 
 ## Context
 
