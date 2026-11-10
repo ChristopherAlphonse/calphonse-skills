@@ -1,18 +1,6 @@
----
-name: owasp-security
-description: Implement secure coding practices following OWASP Top 10. Use when preventing security vulnerabilities, implementing authentication, securing APIs, or conducting security reviews. Triggers on OWASP, security, XSS, SQL injection, CSRF, authentication security, secure coding, vulnerability.
----
+# OWASP Top 10 Reference
 
-# OWASP Top 10 Security
-
-Prevent common security vulnerabilities in web applications.
-
-## Guardrails
-
-- Tie each security recommendation to a concrete asset, entry point, trust boundary, or OWASP risk.
-- Do not add broad frameworks or policy layers when a focused validation, authorization, or configuration fix is enough.
-- Keep changes surgical. Mention unrelated vulnerabilities separately instead of fixing them opportunistically.
-- Verify with a test, exploit repro, config inspection, or source reference.
+Deep prevention patterns per OWASP risk. The scoped checklist and guardrails live in `../SKILL.md`; dependency scanning and the pre-deployment checklist live there too.
 
 ## OWASP Top 10 (2021)
 
@@ -304,19 +292,8 @@ app.use(session({
 
 ## A06: Vulnerable Components
 
-### Dependency Scanning
-```bash
-# Check for vulnerabilities
-npm audit
-npm audit fix
-
-# Use Snyk for deeper scanning
-npx snyk test
-npx snyk monitor
-
-# Keep dependencies updated
-npx npm-check-updates -u
-```
+### Dependency Overrides
+Scanning commands: see `../SKILL.md` section 9.
 
 ```json
 // package.json - Use exact versions or ranges
@@ -499,40 +476,6 @@ app.post('/api/fetch-url', async (req, res) => {
   const response = await fetch(url);
   // ...
 });
-```
-
-## Security Checklist
-
-```markdown
-## Pre-Deployment Checklist
-
-### Authentication
-- [ ] Passwords hashed with bcrypt (cost ≥ 12)
-- [ ] JWT tokens have short expiry
-- [ ] Session cookies are httpOnly, secure, sameSite
-- [ ] Rate limiting on auth endpoints
-
-### Authorization
-- [ ] All endpoints have auth checks
-- [ ] RBAC implemented correctly
-- [ ] No IDOR vulnerabilities
-
-### Input/Output
-- [ ] All input validated with Zod/Joi
-- [ ] SQL queries parameterized
-- [ ] XSS prevented (CSP, escaping)
-- [ ] File uploads validated and sandboxed
-
-### Infrastructure
-- [ ] HTTPS enforced
-- [ ] Security headers configured
-- [ ] Dependencies audited
-- [ ] Secrets in environment variables
-
-### Monitoring
-- [ ] Security events logged
-- [ ] Error monitoring enabled
-- [ ] Alerts configured
 ```
 
 ## Resources

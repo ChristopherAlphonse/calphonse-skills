@@ -1,6 +1,6 @@
 ---
 name: security-review
-description: Use this skill when adding authentication, handling user input, working with secrets, creating API endpoints, or implementing payment/sensitive features. Provides scoped security checklist and patterns.
+description: Use this skill when adding authentication, handling user input, working with secrets, creating API endpoints, or implementing payment/sensitive features. Provides scoped security checklist and patterns, with OWASP Top 10 reference material. Triggers on OWASP, secure coding, XSS, SQL injection, CSRF, authentication security, vulnerability.
 origin: ECC
 ---
 
@@ -18,6 +18,11 @@ This skill ensures all code follows security best practices and identifies poten
 ## Required Companion Skill
 
 Use `/lets-talk-about-it` as part of this workflow before finalizing security guidance or sign-off. Let it stress-test the feature, assets, actors, trust boundaries, data flows, attacker goals, secrets, permissions, integrations, failure modes, and deployment assumptions one question at a time. Incorporate the resulting assumptions, decisions, risks, and unresolved issues into the security checklist, threat model, verification steps, and final recommendations.
+
+## References
+
+- [references/owasp-top-10.md](references/owasp-top-10.md): deep OWASP A01–A10 prevention patterns (IDOR, NoSQL/command injection, MFA, SSRF, logging). Read when a checklist item needs more than the short pattern here.
+- [references/cloud-infrastructure-security.md](references/cloud-infrastructure-security.md): cloud, IAM, logging/monitoring, and CI/CD security checklist.
 
 ## When to Activate
 

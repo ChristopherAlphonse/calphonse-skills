@@ -78,8 +78,7 @@ npx skills update -y       # no prompts
 
 | Skill | Description |
 | --- | --- |
-| [owasp-security](owasp-security/SKILL.md) | OWASP Top 10 secure coding guidance — auth, XSS, SQLi, CSRF, API security |
-| [security-review](security-review/SKILL.md) | Scoped security checklist and patterns for auth, user input, secrets, API endpoints, and payment flows |
+| [security-review](security-review/SKILL.md) | Scoped security checklist and patterns for auth, user input, secrets, API endpoints, and payment flows, with OWASP Top 10 and cloud-infrastructure references |
 | [csp](csp/SKILL.md) | Advanced CSP bypass techniques — policy weaknesses, nonce leakage, trusted-endpoint abuse, exfiltration channels CSP can't block |
 | [nextjs-proxy-csp-hardening](nextjs-proxy-csp-hardening/SKILL.md) | Build and review secure Next.js `proxy.ts` files — CSP, nonce-based script protection, browser security headers, `middleware.ts` migration |
 

@@ -20,12 +20,11 @@ All skills live at the repository root as `{skill-name}/SKILL.md`. `AGENTS.md` i
 | [frontend-patterns](frontend-patterns/SKILL.md) | Frontend development patterns for React, Next.js, state management, performance optimization, and UI best practices |
 | [lets-talk-about-it](lets-talk-about-it/SKILL.md) | One-pass interrogation plus coding guardrails — explicit assumptions, simplicity, surgical edits, verifiable success criteria |
 | [nextjs-proxy-csp-hardening](nextjs-proxy-csp-hardening/SKILL.md) | Build and review secure Next.js `proxy.ts` files — CSP, nonce-based script protection, browser security headers, `middleware.ts` migration |
-| [owasp-security](owasp-security/SKILL.md) | OWASP Top 10 secure coding guidance — auth, XSS, SQLi, CSRF, API security |
 | [pr-body-style](pr-body-style/SKILL.md) | Draft, rewrite, or audit PR bodies — accurate, short, business-focused |
 | [prd-mode](prd-mode/SKILL.md) | Turn abstract ideas into actionable project specs that align engineering and design on the problem and success metrics |
 | [prove-it-works](prove-it-works/SKILL.md) | Verify a finished task against the real artifact, not a proxy, self-report, or "it compiles", then write a UAT document so the user can confirm it themselves |
 | [qa-review](qa-review/SKILL.md) | Strict maintainability review of the author's changes only — abstraction quality, giant files, spaghetti-condition growth |
-| [security-review](security-review/SKILL.md) | Scoped security checklist and patterns for auth, user input, secrets, API endpoints, and payment flows |
+| [security-review](security-review/SKILL.md) | Scoped security checklist and patterns for auth, user input, secrets, API endpoints, and payment flows, with OWASP Top 10 and cloud-infrastructure references |
 | [simplify](simplify/SKILL.md) | Restate the last message in plain human language, with no jargon |
 | [swe](swe/SKILL.md) | Lazy senior dev mode — smallest change that fully solves the task, and a reply a busy human reads once |
 | [systems-architecture](systems-architecture/SKILL.md) | Generates a high-level system architecture document from lifecycle documentation — actors, interactions, technologies |
