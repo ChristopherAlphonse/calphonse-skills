@@ -34,7 +34,6 @@ npx skills update -y       # no prompts
 | Skill | Description |
 | --- | --- |
 | [whats-going-on](whats-going-on/SKILL.md) | One-pass codebase intelligence sweep — core use cases, lifecycle, architecture, and where to start reading; includes lifecycle-trace and architecture-document references |
-| [codebase-mapper](codebase-mapper/SKILL.md) | Merged into `whats-going-on` — pointer only |
 | [documentation-writer](documentation-writer/SKILL.md) | Diátaxis documentation expert — tutorials, how-tos, reference, explanation — plus product copy principles |
 | [demo-script](demo-script/SKILL.md) | Short, natural, spoken demo script that explains what changed, shows it working, and ties it to business value |
 | [architecture-review](architecture-review/SKILL.md) | Read-only architecture and distributed-systems review — complexity, bottlenecks, reliability risks, and cost savings, with findings marked VERIFIED / [ASSUMPTION] / [NEEDS MEASUREMENT] |
