@@ -1,459 +1,67 @@
 ---
 name: security-review
-description: Use this skill when adding authentication, handling user input, working with secrets, creating API endpoints, or implementing payment/sensitive features. Provides scoped security checklist and patterns, with OWASP Top 10 reference material. Triggers on OWASP, secure coding, XSS, SQL injection, CSRF, authentication security, vulnerability.
+description: Use for secure coding and security audits. Checklist mode when adding authentication, authorization, user input, file uploads, secrets, API endpoints, or payment/sensitive features. Guidance mode for security questions, focused reviews, threat modeling, finding triage, and vulnerability research. Full audit mode for an explicit codebase audit or pen test that produces validated findings and a report. Includes OWASP Top 10, cloud, attack-class references, and schema/coverage validators. Triggers on OWASP, secure coding, XSS, SQL injection, CSRF, SSRF, authentication security, vulnerability, security audit, pen test, threat model.
 origin: ECC
 ---
 
-# Security Review Skill
+# Security Review
 
-This skill ensures all code follows security best practices and identifies potential vulnerabilities.
+Find and prevent vulnerabilities that cross a real trust boundary. Three modes, one evidence bar.
 
 ## Guardrails
 
 - Define assets, actors, trust boundaries, and assumptions before recommending controls.
+- A finding names the lower-trust principal, the input or action, the control that should stop it, the boundary crossed, and the concrete result. A missing best practice, guessed deployment behavior, or self-impact is not a finding.
 - Prefer the smallest mitigation that closes the verified risk. Do not add speculative security machinery.
 - Do not rewrite unrelated auth, validation, or persistence code while fixing one issue.
-- Verify security claims with tests, config checks, dependency evidence, or threat-model reasoning.
+- Verify security claims with tests, config checks, dependency evidence, or threat-model reasoning. Do not assume deployment facts that are not in the source: report them as needing validation with the exact missing fact.
+- Never run target-controlled code, probe live or shared systems, or use real credentials. Execution rules are in [references/audit/WORKFLOW.md](references/audit/WORKFLOW.md) under "Universal execution safety". If the sandbox controls cannot be met, do not execute: say what is missing and give a safe validation plan.
 
-## Required Companion Skill
+## Pick a mode
 
-Use `/lets-talk-about-it` as part of this workflow before finalizing security guidance or sign-off. Let it stress-test the feature, assets, actors, trust boundaries, data flows, attacker goals, secrets, permissions, integrations, failure modes, and deployment assumptions one question at a time. Incorporate the resulting assumptions, decisions, risks, and unresolved issues into the security checklist, threat model, verification steps, and final recommendations.
+| Mode | Use when | What to do |
+| --- | --- | --- |
+| **Checklist** | Writing or reviewing a diff, PR, or feature that touches auth, user input, uploads, secrets, endpoints, payments, or sensitive data | Work through [references/secure-coding-checklist.md](references/secure-coding-checklist.md). Use only the sections the change touches. Go deeper with the OWASP and cloud references. |
+| **Guidance** | Security question, focused review of one component, threat model, triage of a reported finding, vulnerability research on a specific issue | Use the relevant parts of [references/audit/WORKFLOW.md](references/audit/WORKFLOW.md) (core principles, severity anchors, fix guidance) and the matching companion from [references/audit/ATTACK-CLASSES.md](references/audit/ATTACK-CLASSES.md). Do not run all phases, create an output directory, or write artifacts. |
+| **Full audit** | The user explicitly asks to audit or pen-test a codebase, wants a full, comprehensive, or end-to-end review, or asks for report artifacts | Follow all six phases in [references/audit/WORKFLOW.md](references/audit/WORKFLOW.md). Writes files to an output directory outside the target. |
 
-## References
+If a request could mean Guidance or Full audit, ask one focused question before creating any file or launching the workflow. Loading this skill does not authorize a full audit.
 
-- [references/owasp-top-10.md](references/owasp-top-10.md): deep OWASP A01–A10 prevention patterns (IDOR, NoSQL/command injection, MFA, SSRF, logging). Read when a checklist item needs more than the short pattern here.
-- `nextjs-proxy-csp-hardening` skill: use it for CSP, nonces, and security headers in a Next.js app.
-- [references/cloud-infrastructure-security.md](references/cloud-infrastructure-security.md): cloud, IAM, logging/monitoring, and CI/CD security checklist.
+## Required companion skill
 
-## When to Activate
+In Checklist and Guidance modes, use `/lets-talk-about-it` before finalizing security guidance or sign-off. Let it stress-test the feature, assets, actors, trust boundaries, data flows, attacker goals, secrets, permissions, integrations, failure modes, and deployment assumptions one question at a time. Fold the resulting assumptions, decisions, risks, and unresolved issues into the checklist, threat model, verification steps, and recommendations. Full audit mode is source-driven and does not use it, apart from the single mode question above.
 
-- Implementing authentication or authorization
-- Handling user input or file uploads
-- Creating new API endpoints
-- Working with secrets or credentials
-- Implementing payment features
-- Storing or transmitting sensitive data
-- Integrating third-party APIs
+## Reference map
 
-## Security Checklist
+Read a file only when the task needs it.
 
-### 1. Secrets Management
+| File | Read when |
+| --- | --- |
+| [references/secure-coding-checklist.md](references/secure-coding-checklist.md) | Checklist mode: secrets, input validation, SQL injection, authn/authz, XSS, CSRF, rate limiting, data exposure, dependencies, pre-deploy list |
+| [references/owasp-top-10.md](references/owasp-top-10.md) | A checklist item needs more than the short pattern: IDOR, NoSQL/command injection, MFA, SSRF, logging (A01 to A10) |
+| [references/cloud-infrastructure-security.md](references/cloud-infrastructure-security.md) | Cloud, IAM, logging/monitoring, CI/CD security |
+| `nextjs-proxy-csp-hardening` skill | CSP, nonces, and security headers in a Next.js app |
+| [references/audit/WORKFLOW.md](references/audit/WORKFLOW.md) | Guidance or Full audit: execution safety, write isolation, profiles and budget, core principles, severity anchors, the six phases, anti-patterns |
+| [references/audit/RECONNAISSANCE.md](references/audit/RECONNAISSANCE.md) | Full audit phase 1: recon agents, architecture, coverage ledger |
+| [references/audit/HUNTING.md](references/audit/HUNTING.md) | Full audit phase 2: hunter prompts, waves, coverage critics |
+| [references/audit/VALIDATION-AND-REPORTING.md](references/audit/VALIDATION-AND-REPORTING.md) | Full audit phases 3 to 6: verifiers, `findings.json`, report files |
+| [references/audit/ATTACK-CLASSES.md](references/audit/ATTACK-CLASSES.md) | Choosing attack classes and which domain companion applies |
+| [references/harness-design.md](references/harness-design.md) | Designing or scaling an automated, multi-repo vulnerability pipeline |
 
-#### FAIL: NEVER Do This
-```typescript
-const apiKey = "sk-proj-xxxxx"  // Hardcoded secret
-const dbPassword = "password123" // In source code
-```
+Domain companions, all in `references/audit/` and selected through `ATTACK-CLASSES.md`: `WEB-PROTOCOL-AND-AUTH.md`, `CLIENT-SIDE.md`, `AI-AND-LLM.md`, `PROTOCOLS-RPC-AND-MESSAGING.md`, `DATA-ISOLATION-AND-LIFECYCLE.md`, `RESOURCE-EXHAUSTION-AND-AVAILABILITY.md`, `SUPPLY-CHAIN-AND-RELEASE.md`, `CLOUD-AND-DEPLOYMENT.md`, `DESKTOP-MOBILE-AND-LOCAL-IPC.md`, `MEMORY-SAFETY-AND-BINARY.md`.
 
-#### PASS: ALWAYS Do This
-```typescript
-const apiKey = process.env.OPENAI_API_KEY
-const dbUrl = process.env.DATABASE_URL
+## Scripts
 
-// Verify secrets exist
-if (!apiKey) {
-  throw new Error('OPENAI_API_KEY not configured')
-}
-```
+All in `scripts/`. They need Node.js only (no installs) and read `report-schema.json` from the same directory.
 
-#### Verification Steps
-- [ ] No hardcoded API keys, tokens, or passwords
-- [ ] All secrets in environment variables
-- [ ] `.env.local` in .gitignore
-- [ ] No secrets in git history
-- [ ] Production secrets in hosting platform (Vercel, Railway)
-
-### 2. Input Validation
-
-#### Always Validate User Input
-```typescript
-import { z } from 'zod'
-
-// Define validation schema
-const CreateUserSchema = z.object({
-  email: z.string().email(),
-  name: z.string().min(1).max(100),
-  age: z.number().int().min(0).max(150)
-})
-
-// Validate before processing
-export async function createUser(input: unknown) {
-  try {
-    const validated = CreateUserSchema.parse(input)
-    return await db.users.create(validated)
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return { success: false, errors: error.errors }
-    }
-    throw error
-  }
-}
-```
-
-#### File Upload Validation
-```typescript
-function validateFileUpload(file: File) {
-  // Size check (5MB max)
-  const maxSize = 5 * 1024 * 1024
-  if (file.size > maxSize) {
-    throw new Error('File too large (max 5MB)')
-  }
-
-  // Type check
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif']
-  if (!allowedTypes.includes(file.type)) {
-    throw new Error('Invalid file type')
-  }
-
-  // Extension check
-  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif']
-  const extension = file.name.toLowerCase().match(/\.[^.]+$/)?.[0]
-  if (!extension || !allowedExtensions.includes(extension)) {
-    throw new Error('Invalid file extension')
-  }
-
-  return true
-}
-```
-
-#### Verification Steps
-- [ ] All user inputs validated with schemas
-- [ ] File uploads restricted (size, type, extension)
-- [ ] No direct use of user input in queries
-- [ ] Whitelist validation (not blacklist)
-- [ ] Error messages don't leak sensitive info
-
-### 3. SQL Injection Prevention
-
-#### FAIL: NEVER Concatenate SQL
-```typescript
-// DANGEROUS - SQL Injection vulnerability
-const query = `SELECT * FROM users WHERE email = '${userEmail}'`
-await db.query(query)
-```
-
-#### PASS: ALWAYS Use Parameterized Queries
-```typescript
-// Safe - parameterized query
-const { data } = await supabase
-  .from('users')
-  .select('*')
-  .eq('email', userEmail)
-
-// Or with raw SQL
-await db.query(
-  'SELECT * FROM users WHERE email = $1',
-  [userEmail]
-)
-```
-
-#### Verification Steps
-- [ ] All database queries use parameterized queries
-- [ ] No string concatenation in SQL
-- [ ] ORM/query builder used correctly
-- [ ] Supabase queries properly sanitized
-
-### 4. Authentication & Authorization
-
-#### JWT Token Handling
-```typescript
-// FAIL: WRONG: localStorage (vulnerable to XSS)
-localStorage.setItem('token', token)
-
-// PASS: CORRECT: httpOnly cookies
-res.setHeader('Set-Cookie',
-  `token=${token}; HttpOnly; Secure; SameSite=Strict; Max-Age=3600`)
-```
-
-#### Authorization Checks
-```typescript
-export async function deleteUser(userId: string, requesterId: string) {
-  // ALWAYS verify authorization first
-  const requester = await db.users.findUnique({
-    where: { id: requesterId }
-  })
-
-  if (requester.role !== 'admin') {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 403 }
-    )
-  }
-
-  // Proceed with deletion
-  await db.users.delete({ where: { id: userId } })
-}
-```
-
-#### Row Level Security (Supabase)
-```sql
--- Enable RLS on all tables
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-
--- Users can only view their own data
-CREATE POLICY "Users view own data"
-  ON users FOR SELECT
-  USING (auth.uid() = id);
-
--- Users can only update their own data
-CREATE POLICY "Users update own data"
-  ON users FOR UPDATE
-  USING (auth.uid() = id);
-```
-
-#### Verification Steps
-- [ ] Tokens stored in httpOnly cookies (not localStorage)
-- [ ] Authorization checks before sensitive operations
-- [ ] Row Level Security enabled in Supabase
-- [ ] Role-based access control implemented
-- [ ] Session management secure
-
-### 5. XSS Prevention
-
-#### Sanitize HTML
-```typescript
-import DOMPurify from 'isomorphic-dompurify'
-
-// ALWAYS sanitize user-provided HTML
-function renderUserContent(html: string) {
-  const clean = DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'p'],
-    ALLOWED_ATTR: []
-  })
-  return <div dangerouslySetInnerHTML={{ __html: clean }} />
-}
-```
-
-#### Content Security Policy
-```typescript
-// next.config.js
-const securityHeaders = [
-  {
-    key: 'Content-Security-Policy',
-    value: `
-      default-src 'self';
-      script-src 'self' 'unsafe-eval' 'unsafe-inline';
-      style-src 'self' 'unsafe-inline';
-      img-src 'self' data: https:;
-      font-src 'self';
-      connect-src 'self' API_ORIGIN;
-    `.replace(/\s{2,}/g, ' ').trim()
-  }
-]
-```
-
-#### Verification Steps
-- [ ] User-provided HTML sanitized
-- [ ] CSP headers configured
-- [ ] No unvalidated dynamic content rendering
-- [ ] React's built-in XSS protection used
-
-### 6. CSRF Protection
-
-#### CSRF Tokens
-```typescript
-import { csrf } from '@/lib/csrf'
-
-export async function POST(request: Request) {
-  const token = request.headers.get('X-CSRF-Token')
-
-  if (!csrf.verify(token)) {
-    return NextResponse.json(
-      { error: 'Invalid CSRF token' },
-      { status: 403 }
-    )
-  }
-
-  // Process request
-}
-```
-
-#### SameSite Cookies
-```typescript
-res.setHeader('Set-Cookie',
-  `session=${sessionId}; HttpOnly; Secure; SameSite=Strict`)
-```
-
-#### Verification Steps
-- [ ] CSRF tokens on state-changing operations
-- [ ] SameSite=Strict on all cookies
-- [ ] Double-submit cookie pattern implemented
-
-### 7. Rate Limiting
-
-#### API Rate Limiting
-```typescript
-import rateLimit from 'express-rate-limit'
-
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per window
-  message: 'Too many requests'
-})
-
-// Apply to routes
-app.use('/api/', limiter)
-```
-
-#### Expensive Operations
-```typescript
-// Aggressive rate limiting for searches
-const searchLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 10, // 10 requests per minute
-  message: 'Too many search requests'
-})
-
-app.use('/api/search', searchLimiter)
-```
-
-#### Verification Steps
-- [ ] Rate limiting on all API endpoints
-- [ ] Stricter limits on expensive operations
-- [ ] IP-based rate limiting
-- [ ] User-based rate limiting (authenticated)
-
-### 8. Sensitive Data Exposure
-
-#### Logging
-```typescript
-// FAIL: WRONG: Logging sensitive data
-console.log('User login:', { email, password })
-console.log('Payment:', { cardNumber, cvv })
-
-// PASS: CORRECT: Redact sensitive data
-console.log('User login:', { email, userId })
-console.log('Payment:', { last4: card.last4, userId })
-```
-
-#### Error Messages
-```typescript
-// FAIL: WRONG: Exposing internal details
-catch (error) {
-  return NextResponse.json(
-    { error: error.message, stack: error.stack },
-    { status: 500 }
-  )
-}
-
-// PASS: CORRECT: Generic error messages
-catch (error) {
-  console.error('Internal error:', error)
-  return NextResponse.json(
-    { error: 'An error occurred. Please try again.' },
-    { status: 500 }
-  )
-}
-```
-
-#### Verification Steps
-- [ ] No passwords, tokens, or secrets in logs
-- [ ] Error messages generic for users
-- [ ] Detailed errors only in server logs
-- [ ] No stack traces exposed to users
-
-### 9. Dependency Security
-
-#### Regular Updates
 ```bash
-# Check for vulnerabilities
-npm audit
-
-# Fix automatically fixable issues
-npm audit fix
-
-# Update dependencies
-npm update
-
-# Check for outdated packages
-npm outdated
+node <skill-dir>/scripts/validate-findings.cjs <output-dir>/findings.json
+node <skill-dir>/scripts/validate-coverage-ledger.cjs <output-dir>/coverage-ledger.json
+node --test <skill-dir>/scripts/*.test.cjs    # validator self-tests
 ```
 
-#### Lock Files
-```bash
-# ALWAYS commit lock files
-git add package-lock.json
+A full audit ends only when both validators pass, or when the run is recorded `incomplete` with its reason and the gap is disclosed.
 
-# Use in CI/CD for reproducible builds
-npm ci  # Instead of npm install
-```
+## Provenance
 
-#### Verification Steps
-- [ ] Dependencies up to date
-- [ ] No known vulnerabilities (npm audit clean)
-- [ ] Lock files committed
-- [ ] Automated dependency update checks enabled
-- [ ] Regular security updates
-
-## Security Testing
-
-### Automated Security Tests
-```typescript
-// Test authentication
-test('requires authentication', async () => {
-  const response = await fetch('/api/protected')
-  expect(response.status).toBe(401)
-})
-
-// Test authorization
-test('requires admin role', async () => {
-  const response = await fetch('/api/admin', {
-    headers: { Authorization: `Bearer ${userToken}` }
-  })
-  expect(response.status).toBe(403)
-})
-
-// Test input validation
-test('rejects invalid input', async () => {
-  const response = await fetch('/api/users', {
-    method: 'POST',
-    body: JSON.stringify({ email: 'not-an-email' })
-  })
-  expect(response.status).toBe(400)
-})
-
-// Test rate limiting
-test('enforces rate limits', async () => {
-  const requests = Array(101).fill(null).map(() =>
-    fetch('/api/endpoint')
-  )
-
-  const responses = await Promise.all(requests)
-  const tooManyRequests = responses.filter(r => r.status === 429)
-
-  expect(tooManyRequests.length).toBeGreaterThan(0)
-})
-```
-
-## Pre-Deployment Security Checklist
-
-Before ANY production deployment:
-
-- [ ] **Secrets**: No hardcoded secrets, all in env vars
-- [ ] **Input Validation**: All user inputs validated
-- [ ] **SQL Injection**: All queries parameterized
-- [ ] **XSS**: User content sanitized
-- [ ] **CSRF**: Protection enabled
-- [ ] **Authentication**: Proper token handling
-- [ ] **Authorization**: Role checks in place
-- [ ] **Rate Limiting**: Enabled on all endpoints
-- [ ] **HTTPS**: Enforced in production
-- [ ] **Security Headers**: CSP, X-Frame-Options configured
-- [ ] **Error Handling**: No sensitive data in errors
-- [ ] **Logging**: No sensitive data logged
-- [ ] **Dependencies**: Up to date, no vulnerabilities
-- [ ] **Row Level Security**: Enabled in Supabase
-- [ ] **CORS**: Properly configured
-- [ ] **File Uploads**: Validated (size, type)
-- [ ] **Wallet Signatures**: Verified (if blockchain)
-
-## Resources
-
-- OWASP Top 10
-- Next.js Security
-- Supabase Security
-- Web Security Academy
-
----
-
-**Remember**: Security is not optional. One vulnerability can compromise the entire platform. When in doubt, err on the side of caution.
+Full audit material (`references/audit/`, `scripts/`) is adapted from Cloudflare's MIT-licensed `security-audit-skill`. See [NOTICE.md](NOTICE.md).
