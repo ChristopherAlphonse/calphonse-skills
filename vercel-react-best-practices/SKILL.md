@@ -1,6 +1,6 @@
 ---
 name: vercel-react-best-practices
-description: React and Next.js performance optimization guidelines from Vercel Engineering. This skill should be used when writing, reviewing, or refactoring React/Next.js code to ensure optimal performance patterns. Triggers on tasks involving React components, Next.js pages, data fetching, bundle optimization, or performance improvements.
+description: React and Next.js performance rules from Vercel Engineering, plus general frontend patterns (component composition, custom hooks, state, forms, error boundaries, animation, accessibility). Use when writing, reviewing, or refactoring React/Next.js code. Triggers on React components, Next.js pages, data fetching, bundle optimization, performance work, forms, or UI state.
 license: MIT
 metadata:
   author: vercel
@@ -150,6 +150,10 @@ Each rule file contains:
 - Incorrect code example with explanation
 - Correct code example with explanation
 - Additional context and references
+
+## Frontend Patterns
+
+For component composition, custom hooks, context + reducer, forms, error boundaries, animation, and accessibility, read `references/frontend-patterns.md`. Match the app's existing patterns before introducing a new one.
 
 ## Full Compiled Document
 

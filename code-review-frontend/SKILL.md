@@ -33,12 +33,12 @@ Sub-skill paths (read when relevant):
 - `$SKILL_DIR/checklist.md` — base review checklist
 - `$SKILL_DIR/references/typescript-react/guide.md` — TypeScript + React 19 reviewer
 - `$SKILL_DIR/references/typescript-react/` — also antipatterns, react19-patterns, checklist
-- `$SKILL_DIR/frontend-patterns/SKILL.md` — React component & state patterns
+- `$SKILL_DIR/../vercel-react-best-practices/references/frontend-patterns.md` — React component & state patterns
 - `$SKILL_DIR/jest-react-testing/SKILL.md` — Jest + RTL testing quality
 - `$SKILL_DIR/jest-react-testing/EXAMPLES.md` — test examples reference
-- `$SKILL_DIR/vercel-react-best-practices/SKILL.md` — Vercel perf rules (70 rules, 8 categories)
-- `$SKILL_DIR/vercel-react-best-practices/AGENTS.md` — full compiled rules doc
-- `$SKILL_DIR/vercel-react-best-practices/rules/` — individual rule files
+- `$SKILL_DIR/../vercel-react-best-practices/SKILL.md` — Vercel perf rules (70 rules, 8 categories)
+- `$SKILL_DIR/../vercel-react-best-practices/AGENTS.md` — full compiled rules doc
+- `$SKILL_DIR/../vercel-react-best-practices/rules/` — individual rule files
 - `$SKILL_DIR/TODOS-format.md` — TODO item format reference
 
 ---
@@ -290,7 +290,7 @@ QUALITY CONTEXT (from main agent's discovery):
 
 YOUR TASK:
 1. Run: git diff origin/<base>
-2. Read: ./frontend-patterns/SKILL.md
+2. Read: ../vercel-react-best-practices/references/frontend-patterns.md
 3. Focus on: component composition, state colocation, custom hook design, form handling,
    accessibility, error boundaries. Skip React 19 hook correctness (typescript-react-reviewer covers that).
 4. Do NOT fix anything. Report findings only.
@@ -306,7 +306,7 @@ REPORT FORMAT (use exactly):
 
 ## [AGENT: frontend-patterns]
 Model: <assigned model>
-Skill: frontend-patterns/SKILL.md
+Skill: vercel-react-best-practices/references/frontend-patterns.md
 
 ### Quality Config Used
 <any relevant config, or "None found">
@@ -394,9 +394,9 @@ QUALITY CONTEXT (from main agent's discovery):
 
 YOUR TASK:
 1. Run: git diff origin/<base>
-2. Read: ./vercel-react-best-practices/SKILL.md
+2. Read: ../vercel-react-best-practices/SKILL.md
 3. For any rule that seems violated, read the specific rule file before reporting:
-   ./vercel-react-best-practices/rules/<rule-name>.md
+   ../vercel-react-best-practices/rules/<rule-name>.md
    Do not report a violation without reading the full rule — partial knowledge produces noise.
 4. Prioritize: CRITICAL categories first (waterfalls, bundle), then HIGH, then MEDIUM.
 5. Do NOT fix anything. Report findings only.
