@@ -5,7 +5,8 @@ description: >
   Policy, nonce-based script protection, and browser security headers. Use when
   adding CSP to a Next.js App Router project, migrating from middleware.ts to
   proxy.ts, or hardening an application against XSS, clickjacking, script
-  injection, form hijacking, and unsafe browser capabilities.
+  injection, form hijacking, and unsafe browser capabilities. Also holds CSP bypass
+  techniques (nonce leakage, trusted-endpoint abuse, exfiltration) for authorized policy testing.
 ---
 
 # SKILL: Next.js Proxy CSP Hardening
@@ -608,4 +609,8 @@ A bad answer using this skill:
 - Omits `form-action`.
 - Omits `frame-ancestors`.
 - Uses Node-only APIs inside `proxy.ts`.
-- Gives offensive CSP bypass steps instead of defensive hardening.
+- Gives offensive CSP bypass steps instead of defensive hardening, unless the user is testing their own policy (see Related).
+
+## Related
+
+- [references/csp-bypass-techniques.md](references/csp-bypass-techniques.md): per-directive bypasses, nonce leakage, trusted-endpoint abuse, exfiltration channels. Read it only to test or review a policy the user owns or is authorized to test. Do not use it to build a policy or to attack a third-party site.

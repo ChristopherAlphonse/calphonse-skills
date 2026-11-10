@@ -64,7 +64,7 @@ Read any files that describe:
 **If `.planning/` is empty or missing codebase context** → stop and run:
 
 ```
-/codebase-mapper
+/whats-going-on
 ```
 
 After mapping completes, if team conventions are still unclear:
@@ -462,7 +462,7 @@ Branch: <branch>
 Base: <base>
 Files changed: <N files, +X -Y lines>
 Agents run: <list>
-Codebase context: <from .planning/ | mapped via /codebase-mapper | [ASSUMPTION — no map found]>
+Codebase context: <from .planning/ | mapped via /whats-going-on | [ASSUMPTION — no map found]>
 
 ---
 
@@ -546,5 +546,5 @@ Status:   CLEAN / DRIFT / MISSING
 - Never claim a finding is real without pointing to the diff line or config that proves it
 - Never claim something is safe — safety claims require the same evidence standard as findings
 - Do not commit, push, or modify any files
-- If codebase context is inadequate → gate on `/codebase-mapper` and `/lets-talk-about-it`
+- If codebase context is inadequate → gate on `/whats-going-on` and `/lets-talk-about-it`
   before proceeding; a review without context is worse than no review

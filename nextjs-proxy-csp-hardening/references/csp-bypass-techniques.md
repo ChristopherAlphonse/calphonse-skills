@@ -1,12 +1,6 @@
----
-name: csp
-description: >-
-  Advanced Content Security Policy bypass techniques. Use when XSS or data
-  exfiltration is blocked by CSP and you need to find policy weaknesses, trusted
-  endpoint abuse, nonce leakage, or exfiltration channels that CSP cannot block.
----
+# CSP Bypass — Advanced Techniques
 
-# SKILL: CSP Bypass — Advanced Techniques
+For authorized testing and for reviewing a policy for weaknesses. Not for building a policy: use `../SKILL.md` for that.
 
 > **AI LOAD INSTRUCTION**: Covers per-directive bypass techniques, nonce/hash abuse, trusted CDN exploitation, data exfiltration despite CSP, and framework-specific bypasses. Base models often suggest `unsafe-inline` bypass without checking if the CSP actually uses it, or miss the critical `base-uri` and `object-src` gaps.
 
@@ -411,4 +405,5 @@ Is CSP present? (Check headers + meta)
 - `csp-evaluator` (Google)
 - Manually craft minimal policies and test bypasses
 - Check for nonce predictability and reuse
+
 

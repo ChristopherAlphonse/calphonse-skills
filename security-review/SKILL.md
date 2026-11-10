@@ -22,6 +22,7 @@ Use `/lets-talk-about-it` as part of this workflow before finalizing security gu
 ## References
 
 - [references/owasp-top-10.md](references/owasp-top-10.md): deep OWASP A01–A10 prevention patterns (IDOR, NoSQL/command injection, MFA, SSRF, logging). Read when a checklist item needs more than the short pattern here.
+- `nextjs-proxy-csp-hardening` skill: use it for CSP, nonces, and security headers in a Next.js app.
 - [references/cloud-infrastructure-security.md](references/cloud-infrastructure-security.md): cloud, IAM, logging/monitoring, and CI/CD security checklist.
 
 ## When to Activate

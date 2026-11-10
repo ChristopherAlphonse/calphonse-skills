@@ -34,7 +34,7 @@ npx skills update -y       # no prompts
 | Skill | Description |
 | --- | --- |
 | [whats-going-on](whats-going-on/SKILL.md) | One-pass codebase intelligence sweep — core use cases, lifecycle, architecture, and where to start reading; includes lifecycle-trace and architecture-document references |
-| [codebase-mapper](codebase-mapper/SKILL.md) | Structured onboarding map of an existing codebase — tech stack, architecture, key flows, conventions, known concerns |
+| [codebase-mapper](codebase-mapper/SKILL.md) | Merged into `whats-going-on` — pointer only |
 | [documentation-writer](documentation-writer/SKILL.md) | Diátaxis documentation expert — tutorials, how-tos, reference, explanation — plus product copy principles |
 | [demo-script](demo-script/SKILL.md) | Short, natural, spoken demo script that explains what changed, shows it working, and ties it to business value |
 | [architecture-review](architecture-review/SKILL.md) | Read-only architecture and distributed-systems review — complexity, bottlenecks, reliability risks, and cost savings, with findings marked VERIFIED / [ASSUMPTION] / [NEEDS MEASUREMENT] |
@@ -77,8 +77,7 @@ npx skills update -y       # no prompts
 | Skill | Description |
 | --- | --- |
 | [security-review](security-review/SKILL.md) | Scoped security checklist and patterns for auth, user input, secrets, API endpoints, and payment flows, with OWASP Top 10 and cloud-infrastructure references |
-| [csp](csp/SKILL.md) | Advanced CSP bypass techniques — policy weaknesses, nonce leakage, trusted-endpoint abuse, exfiltration channels CSP can't block |
-| [nextjs-proxy-csp-hardening](nextjs-proxy-csp-hardening/SKILL.md) | Build and review secure Next.js `proxy.ts` files — CSP, nonce-based script protection, browser security headers, `middleware.ts` migration |
+| [nextjs-proxy-csp-hardening](nextjs-proxy-csp-hardening/SKILL.md) | Build and review secure Next.js `proxy.ts` files — CSP, nonce-based script protection, browser security headers, `middleware.ts` migration; includes a CSP bypass-techniques reference for authorized testing |
 
 ### Frontend
 
@@ -160,4 +159,4 @@ Leave `~/.agents/skills` alone — it belongs to the Skills CLI and its lockfile
 
 Skills come from a mix of sources. Some are original, some are adapted from other repos with small changes.
 
-Some skills cross-reference siblings that live in other collections rather than this repo — the `csp` skill links to an upstream security set. Those links are informational; the skill still works standalone.
+Some skills cross-reference siblings that live in other collections rather than this repo — the CSP bypass reference under `nextjs-proxy-csp-hardening` links to an upstream security set. Those links are informational; the skill still works standalone.
