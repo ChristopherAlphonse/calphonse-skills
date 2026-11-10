@@ -22,7 +22,7 @@ All skills live at the repository root as `{skill-name}/SKILL.md`. `AGENTS.md` i
 | [security-review](security-review/SKILL.md) | Scoped security checklist and patterns for auth, user input, secrets, API endpoints, and payment flows, with OWASP Top 10 and cloud-infrastructure references |
 | [simplify](simplify/SKILL.md) | Restate the last message in plain human language, with no jargon |
 | [spike](spike/SKILL.md) | Throwaway experiments, sized in story points, that answer a feasibility question before committing to a real build; the deliverable is the verdict, not the code |
-| [swe](swe/SKILL.md) | Lazy senior dev mode: smallest change that fully solves the task, and a reply a busy human reads once |
+| [swe](swe/SKILL.md) | Pragmatic dev mode: smallest change that fully solves the task, and a reply a busy human reads once |
 | [typescript-strict-style](typescript-strict-style/SKILL.md) | Strict TS/JS discipline: assertion safety, exhaustive error handling, function size, naming, performance, dependency minimalism |
 | [vercel-react-best-practices](vercel-react-best-practices/SKILL.md) | React and Next.js performance rules from Vercel Engineering, plus general frontend patterns (components, hooks, state, forms, a11y) |
 | [whats-going-on](whats-going-on/SKILL.md) | One-pass codebase intelligence sweep: produces architecture.md, onboard.md (stack, conventions, concerns, use cases), and simplify-onboarding.md |
