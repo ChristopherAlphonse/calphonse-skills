@@ -1,6 +1,6 @@
 ---
 name: whats-going-on
-description: One-pass codebase intelligence sweep. Use when onboarding to a repo or asking "what's going on here?" Produces a concise map of core use cases, lifecycle, architecture, and where to start reading.
+description: One-pass codebase intelligence sweep. Use when onboarding to a repo or asking "what's going on here?" Produces a concise map of core use cases, lifecycle, architecture, and where to start reading. Also covers a standalone lifecycle trace or system architecture document.
 ---
 
 # What's Going On
@@ -60,8 +60,10 @@ Create a concise onboarding map in one pass. Default to reading files yourself; 
 Only write these when the repo is complex enough that separate docs will stay useful:
 
 - `.planning/system/use_cases.md`
-- `.planning/system/lifecycle.md`
-- `.planning/system/architecture.md`
+- `.planning/system/lifecycle.md`: follow [references/lifecycle.md](references/lifecycle.md)
+- `.planning/system/architecture.md`: follow [references/architecture.md](references/architecture.md)
+
+If the user asks only for a lifecycle trace or an architecture document, produce that sidecar directly and skip the main map.
 
 ## Teaching The Map
 

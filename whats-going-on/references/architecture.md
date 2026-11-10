@@ -1,7 +1,6 @@
----
-name: systems-architecture
-description: 'Generates a high-level system architecture document by analyzing lifecycle documentation and identifying major actors, their interactions, and technologies used.'
----
+# Architecture Document
+
+Write to `.planning/system/architecture.md`. Build it from `.planning/system/lifecycle.md` when present (see [lifecycle.md](lifecycle.md)), otherwise from source.
 
 ### **Core Objective**
 
