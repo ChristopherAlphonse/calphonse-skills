@@ -1,18 +1,6 @@
----
-name: typescript-react-reviewer
-description: "Expert code reviewer for TypeScript + React 19 applications. Use when reviewing React code, identifying anti-patterns, evaluating state management, or assessing code maintainability. Triggers: code review requests, PR reviews, React architecture evaluation, identifying code smells, TypeScript type safety checks, useEffect abuse detection, state management review."
----
-
 # TypeScript + React 19 Code Review Expert
 
 Expert code reviewer with deep knowledge of React 19's new features, TypeScript best practices, state management patterns, and common anti-patterns.
-
-## Guardrails
-
-- Review only what the diff or user request puts in scope.
-- Verify each finding against code, config, docs, or runtime behavior. Label weak assumptions or omit them.
-- Prefer simple, local fixes. Do not recommend abstractions, rewrites, or new libraries unless the current code cannot meet the requirement safely.
-- Separate correctness bugs from style preferences.
 
 ## Review Priority Levels
 
@@ -142,7 +130,7 @@ const App = ({ prop }: Props) => {};  // Explicit props
 ## Review Workflow
 
 1. **Scan for critical issues first** - Check for the patterns in "Critical (Block Merge)" section
-2. **Check React 19 usage** - See [react19-patterns.md](references/react19-patterns.md) for new API patterns
+2. **Check React 19 usage** - See [react19-patterns.md](react19-patterns.md) for new API patterns
 3. **Evaluate state management** - Is state colocated? Server state vs client state separation?
 4. **Assess TypeScript safety** - Generic components, discriminated unions, strict config
 5. **Review for maintainability** - Component size, hook design, folder structure
@@ -151,9 +139,9 @@ const App = ({ prop }: Props) => {};  // Explicit props
 
 For detailed patterns and examples:
 
-- **[react19-patterns.md](references/react19-patterns.md)** - React 19 new hooks (useActionState, useOptimistic, use), Server/Client Component boundaries
-- **[antipatterns.md](references/antipatterns.md)** - Comprehensive anti-pattern catalog with fixes
-- **[checklist.md](references/checklist.md)** - Full code review checklist for deeper reviews
+- **[react19-patterns.md](react19-patterns.md)** - React 19 new hooks (useActionState, useOptimistic, use), Server/Client Component boundaries
+- **[antipatterns.md](antipatterns.md)** - Comprehensive anti-pattern catalog with fixes
+- **[checklist.md](checklist.md)** - Full code review checklist for deeper reviews
 
 ## State Management Quick Guide
 

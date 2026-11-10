@@ -51,9 +51,8 @@ npx skills update -y       # no prompts
 
 | Skill | Description |
 | --- | --- |
-| [code-review-frontend](code-review-frontend/SKILL.md) | Multi-agent PR review orchestrator — discovers quality tooling, spawns parallel specialist agents, reports verified findings only, never fixes |
+| [code-review-frontend](code-review-frontend/SKILL.md) | Multi-agent PR review orchestrator — discovers quality tooling, spawns parallel specialist agents (incl. TypeScript + React 19 reviewer), reports verified findings only, never fixes |
 | [qa-review](qa-review/SKILL.md) | Strict maintainability review of the author's changes only — abstraction quality, giant files, spaghetti-condition growth |
-| [typescript-react-reviewer](typescript-react-reviewer/SKILL.md) | Expert code reviewer for TypeScript + React 19 applications — anti-patterns, state management, type safety |
 | [typescript-strict-style](typescript-strict-style/SKILL.md) | Strict TS/JS discipline — assertion safety, exhaustive error handling, function size, naming, performance, dependency minimalism |
 | [pr-body-style](pr-body-style/SKILL.md) | Draft, rewrite, or audit PR bodies — accurate, short, business-focused |
 | [comment-sicko](comment-sicko/SKILL.md) | A deranged comment-hater that savors deletion and condemns workaround code |

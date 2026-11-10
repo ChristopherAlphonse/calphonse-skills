@@ -4,7 +4,8 @@ description: |
   Multi-agent PR review orchestrator. Discovers codebase quality standards first (lint, format, build,
   CI), then spawns specialized agents in parallel to surface real issues in the git diff.
   Agents report findings only — no fixes. Every finding is VERIFIED or tagged [ASSUMPTION].
-  Use when: "review this PR", "code review", "check my diff", "/review"
+  Includes a TypeScript + React 19 reviewer (anti-patterns, state management, type safety, useEffect abuse).
+  Use when: "review this PR", "code review", "check my diff", "/review", "review React code"
 ---
 
 # Multi-Agent Pre-Landing PR Review
@@ -30,8 +31,8 @@ SKILL_DIR=./
 Sub-skill paths (read when relevant):
 
 - `$SKILL_DIR/checklist.md` — base review checklist
-- `$SKILL_DIR/typescript-react-reviewer/SKILL.md` — TypeScript + React 19 reviewer
-- `$SKILL_DIR/typescript-react-reviewer/references/` — antipatterns, react19-patterns, checklist
+- `$SKILL_DIR/references/typescript-react/guide.md` — TypeScript + React 19 reviewer
+- `$SKILL_DIR/references/typescript-react/` — also antipatterns, react19-patterns, checklist
 - `$SKILL_DIR/frontend-patterns/SKILL.md` — React component & state patterns
 - `$SKILL_DIR/jest-react-testing/SKILL.md` — Jest + RTL testing quality
 - `$SKILL_DIR/jest-react-testing/EXAMPLES.md` — test examples reference
@@ -234,10 +235,10 @@ QUALITY CONTEXT (from main agent's discovery):
 YOUR TASK:
 1. Run: git diff origin/<base>
 2. Read in order:
-   ./typescript-react-reviewer/SKILL.md
-   ./typescript-react-reviewer/references/antipatterns.md
-   ./typescript-react-reviewer/references/react19-patterns.md
-   ./typescript-react-reviewer/references/checklist.md
+   ./references/typescript-react/guide.md
+   ./references/typescript-react/antipatterns.md
+   ./references/typescript-react/react19-patterns.md
+   ./references/typescript-react/checklist.md
 3. Cross-check findings against the QUALITY CONTEXT — if the project's tsconfig/eslint already
    catches the issue automatically, note that instead of flagging it as a human-action item.
 4. Do NOT fix anything. Report findings only.
@@ -252,7 +253,7 @@ REPORT FORMAT (use exactly):
 
 ## [AGENT: typescript-react-reviewer]
 Model: <assigned model>
-Skill: typescript-react-reviewer/SKILL.md + references/
+Skill: references/typescript-react/
 
 ### Quality Config Used
 <tsconfig strictness level found, eslint plugins active, or "None found">
