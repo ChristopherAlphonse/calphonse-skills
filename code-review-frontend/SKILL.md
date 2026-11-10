@@ -3,7 +3,7 @@ name: code-review-frontend
 description: |
   Multi-agent PR review orchestrator. Discovers codebase quality standards first (lint, format, build,
   CI), then spawns specialized agents in parallel to surface real issues in the git diff.
-  Agents report findings only — no fixes. Every finding is VERIFIED or tagged [ASSUMPTION].
+  Agents report findings only: no fixes. Every finding is VERIFIED or tagged [ASSUMPTION].
   Includes a TypeScript + React 19 reviewer (anti-patterns, state management, type safety, useEffect abuse).
   Use when: "review this PR", "code review", "check my diff", "/review", "review React code"
 ---
@@ -30,16 +30,16 @@ SKILL_DIR=./
 
 Sub-skill paths (read when relevant):
 
-- `$SKILL_DIR/checklist.md` — base review checklist
-- `$SKILL_DIR/references/typescript-react/guide.md` — TypeScript + React 19 reviewer
-- `$SKILL_DIR/references/typescript-react/` — also antipatterns, react19-patterns, checklist
-- `$SKILL_DIR/../vercel-react-best-practices/references/frontend-patterns.md` — React component & state patterns
-- `$SKILL_DIR/jest-react-testing/SKILL.md` — Jest + RTL testing quality
-- `$SKILL_DIR/jest-react-testing/EXAMPLES.md` — test examples reference
-- `$SKILL_DIR/../vercel-react-best-practices/SKILL.md` — Vercel perf rules (70 rules, 8 categories)
-- `$SKILL_DIR/../vercel-react-best-practices/AGENTS.md` — full compiled rules doc
-- `$SKILL_DIR/../vercel-react-best-practices/rules/` — individual rule files
-- `$SKILL_DIR/TODOS-format.md` — TODO item format reference
+- `$SKILL_DIR/checklist.md`: base review checklist
+- `$SKILL_DIR/references/typescript-react/guide.md`: TypeScript + React 19 reviewer
+- `$SKILL_DIR/references/typescript-react/`: also antipatterns, react19-patterns, checklist
+- `$SKILL_DIR/../vercel-react-best-practices/references/frontend-patterns.md`: React component & state patterns
+- `$SKILL_DIR/jest-react-testing/SKILL.md`: Jest + RTL testing quality
+- `$SKILL_DIR/jest-react-testing/EXAMPLES.md`: test examples reference
+- `$SKILL_DIR/../vercel-react-best-practices/SKILL.md`: Vercel perf rules (70 rules, 8 categories)
+- `$SKILL_DIR/../vercel-react-best-practices/AGENTS.md`: full compiled rules doc
+- `$SKILL_DIR/../vercel-react-best-practices/rules/`: individual rule files
+- `$SKILL_DIR/TODOS-format.md`: TODO item format reference
 
 ---
 
@@ -111,10 +111,10 @@ Read each config file found. Extract:
 - Pre-commit hooks (what runs before every commit)
 - CI quality gates (what must pass in CI)
 
-Record findings as **QUALITY_CONTEXT** — agents will reference this, not invent rules.
+Record findings as **QUALITY_CONTEXT**: agents will reference this, not invent rules.
 
 **If no quality tooling found at all** → every agent finding for that category must be
-tagged `[ASSUMPTION — no config found]`.
+tagged `[ASSUMPTION: no config found]`.
 
 ---
 
@@ -124,7 +124,7 @@ tagged `[ASSUMPTION — no config found]`.
 git branch --show-current
 ```
 
-If on base branch → **"Nothing to review — on base branch."** → stop.
+If on base branch → **"Nothing to review: on base branch."** → stop.
 
 ```bash
 git fetch origin <base> --quiet && git diff origin/<base> --stat
@@ -174,7 +174,7 @@ Spawn all applicable agents in **one message** (parallel execution). Pass each a
 **Always spawn.**
 
 ```
-You are a code security and correctness reviewer. Your job is to find real issues — not invent them.
+You are a code security and correctness reviewer. Your job is to find real issues: not invent them.
 
 QUALITY CONTEXT (from main agent's discovery):
 <paste QUALITY_CONTEXT here>
@@ -185,7 +185,7 @@ YOUR TASK:
 3. Review diff against every checklist category.
 4. Do NOT fix anything. Report findings only.
 
-EVIDENCE RULES (critical — follow exactly):
+EVIDENCE RULES (critical: follow exactly):
 - VERIFIED: You can point to the exact diff line or config line that proves the issue.
 - [ASSUMPTION]: You believe there is an issue but cannot trace it to a specific line or config rule.
   State what you assumed and why. The human will validate.
@@ -199,7 +199,7 @@ Model: <assigned model>
 Skill: checklist.md
 
 ### Quality Config Used
-<list which config files were referenced, or "None found — all findings are assumptions">
+<list which config files were referenced, or "None found: all findings are assumptions">
 
 ### Findings
 
@@ -227,10 +227,10 @@ VERDICT RULES:
 **Spawn when `.ts` or `.tsx` files changed.**
 
 ```
-You are a TypeScript + React 19 code reviewer. Your job is to surface real issues — not invent them.
+You are a TypeScript + React 19 code reviewer. Your job is to surface real issues: not invent them.
 
 QUALITY CONTEXT (from main agent's discovery):
-<paste QUALITY_CONTEXT here — especially tsconfig strictness and eslint rules>
+<paste QUALITY_CONTEXT here: especially tsconfig strictness and eslint rules>
 
 YOUR TASK:
 1. Run: git diff origin/<base>
@@ -239,7 +239,7 @@ YOUR TASK:
    ./references/typescript-react/antipatterns.md
    ./references/typescript-react/react19-patterns.md
    ./references/typescript-react/checklist.md
-3. Cross-check findings against the QUALITY CONTEXT — if the project's tsconfig/eslint already
+3. Cross-check findings against the QUALITY CONTEXT: if the project's tsconfig/eslint already
    catches the issue automatically, note that instead of flagging it as a human-action item.
 4. Do NOT fix anything. Report findings only.
 
@@ -283,7 +283,7 @@ VERDICT RULES:
 **Spawn when React component, hook, context, or UI state files changed.**
 
 ```
-You are a React frontend patterns reviewer. Your job is to surface real issues — not invent them.
+You are a React frontend patterns reviewer. Your job is to surface real issues: not invent them.
 
 QUALITY CONTEXT (from main agent's discovery):
 <paste QUALITY_CONTEXT here>
@@ -330,10 +330,10 @@ BLOCK | WARN | PASS
 **Spawn when test files changed (`.test.*`, `.spec.*`, `__tests__/`).**
 
 ```
-You are a Jest + React Testing Library reviewer. Your job is to surface real issues — not invent them.
+You are a Jest + React Testing Library reviewer. Your job is to surface real issues: not invent them.
 
 QUALITY CONTEXT (from main agent's discovery):
-<paste QUALITY_CONTEXT here — especially jest config, coverage thresholds>
+<paste QUALITY_CONTEXT here: especially jest config, coverage thresholds>
 
 YOUR TASK:
 1. Run: git diff origin/<base>
@@ -341,7 +341,7 @@ YOUR TASK:
    ./jest-react-testing/SKILL.md
    ./jest-react-testing/EXAMPLES.md
 3. Look for the jest config file in the repo (jest.config.*, jest section in package.json).
-   Read it — this tells you the actual test environment and setup. Cross-reference with findings.
+   Read it: this tells you the actual test environment and setup. Cross-reference with findings.
 4. Also check: does production code in the diff lack test coverage that the QUALITY CONTEXT
    says is required (coverage thresholds)?
 5. Do NOT fix anything. Report findings only.
@@ -387,24 +387,24 @@ VERDICT RULES:
 
 ```
 You are a React + Next.js performance reviewer using Vercel engineering best practices.
-Your job is to surface real issues — not invent them.
+Your job is to surface real issues: not invent them.
 
 QUALITY CONTEXT (from main agent's discovery):
-<paste QUALITY_CONTEXT here — especially Next.js config, bundle analyzer setup>
+<paste QUALITY_CONTEXT here: especially Next.js config, bundle analyzer setup>
 
 YOUR TASK:
 1. Run: git diff origin/<base>
 2. Read: ../vercel-react-best-practices/SKILL.md
 3. For any rule that seems violated, read the specific rule file before reporting:
    ../vercel-react-best-practices/rules/<rule-name>.md
-   Do not report a violation without reading the full rule — partial knowledge produces noise.
+   Do not report a violation without reading the full rule: partial knowledge produces noise.
 4. Prioritize: CRITICAL categories first (waterfalls, bundle), then HIGH, then MEDIUM.
 5. Do NOT fix anything. Report findings only.
 
 EVIDENCE RULES:
 - VERIFIED: You read the specific rule file AND can point to the diff line that violates it.
   Cite both the rule file name and the diff line.
-- [ASSUMPTION]: You believe a rule might apply but the diff alone is not enough to confirm —
+- [ASSUMPTION]: You believe a rule might apply but the diff alone is not enough to confirm:
   e.g., you'd need to see the component's parent or the Next.js config. Say what you need.
 - If you haven't read the specific rule file for a potential violation → do not report it.
 
@@ -443,7 +443,7 @@ Wait for all agents. Collect all reports. Count totals by severity and evidence 
 
 ---
 
-## Step 5: Synthesize — Main Agent Review
+## Step 5: Synthesize: Main Agent Review
 
 Read every agent report. Cross-check: if an agent cites `file:line`, verify that line exists
 in the diff. If it doesn't match → drop the finding and note it was unverifiable.
@@ -463,7 +463,7 @@ Branch: <branch>
 Base: <base>
 Files changed: <N files, +X -Y lines>
 Agents run: <list>
-Codebase context: <from .planning/ | mapped via /whats-going-on | [ASSUMPTION — no map found]>
+Codebase context: <from .planning/ | mapped via /whats-going-on | [ASSUMPTION: no map found]>
 
 ---
 
@@ -494,7 +494,7 @@ Tier reflects review depth, not a specific vendor. Deep agents handle broad cros
 
 ---
 
-## CRITICAL — Must Address Before Merge
+## CRITICAL: Must Address Before Merge
 
 ### 1. [CRITICAL · VERIFIED] file:line
 Found by: <agent(s)>
@@ -518,10 +518,10 @@ What to check: <what the developer should look at>
 
 ---
 
-## Assumptions — Needs Human Validation
+## Assumptions: Needs Human Validation
 
 These were flagged but could not be fully verified from the diff alone.
-The developer should check each one — they may be non-issues.
+The developer should check each one: they may be non-issues.
 
 ### 1. [ASSUMPTION] file:line (if known)
 Found by: <agent>
@@ -542,10 +542,10 @@ Status:   CLEAN / DRIFT / MISSING
 ## Important Rules
 
 - Read full diff before reviewing
-- Spawn agents in ONE parallel message — never wait for one before spawning others
-- Pass QUALITY_CONTEXT to every agent — without it, agents make worse assumptions
+- Spawn agents in ONE parallel message: never wait for one before spawning others
+- Pass QUALITY_CONTEXT to every agent: without it, agents make worse assumptions
 - Never claim a finding is real without pointing to the diff line or config that proves it
-- Never claim something is safe — safety claims require the same evidence standard as findings
+- Never claim something is safe: safety claims require the same evidence standard as findings
 - Do not commit, push, or modify any files
 - If codebase context is inadequate → gate on `/whats-going-on` and `/lets-talk-about-it`
   before proceeding; a review without context is worse than no review

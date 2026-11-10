@@ -65,7 +65,7 @@ The following preferences apply to all work for this user:
 
 ## STYLE RULES
 
-- **No em dashes (—).** Use periods, commas, or colons to break up sentences instead.
+- **No em dashes (—).** Use periods, commas, or colons to break up sentences instead. This includes text already in a file you edit: before finishing, search the file for the character and replace every one.
 - **No passive voice** where active is possible.
 - **No parenthetical asides wrapped in em dashes.** Rewrite as a separate sentence or use commas.
 - **Spell out abbreviations on first use.** TTL (time to live), KB (kilobytes), p95 (95th percentile).

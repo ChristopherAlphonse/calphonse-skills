@@ -11,7 +11,7 @@ A coding discipline for TypeScript/JavaScript application code derived from Tigg
 
 - Apply to code being written or reviewed in this session. Don't mass-reformat an existing codebase to match this style.
 - Prefer the project's existing lint/format config (ESLint, Prettier, tsconfig strict mode) over prescribing new tooling.
-- When flagging a violation in review, cite the specific rule below — don't hand-wave "this violates style."
+- When flagging a violation in review, cite the specific rule below: don't hand-wave "this violates style."
 
 ## Steps
 

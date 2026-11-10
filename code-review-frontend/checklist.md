@@ -2,7 +2,7 @@
 
 ## Instructions
 
-Review the `git diff origin/main` output for the issues listed below. Be specific — cite `file:line` and suggest fixes. Skip anything that's fine. Only flag real problems.
+Review the `git diff origin/main` output for the issues listed below. Be specific: cite `file:line` and suggest fixes. Skip anything that's fine. Only flag real problems.
 
 **Two-pass review:**
 
@@ -33,11 +33,11 @@ Be terse. For each issue: one line describing the problem, one line with the fix
 
 ## Review Categories
 
-### Pass 1 — CRITICAL
+### Pass 1: CRITICAL
 
 #### SQL & Data Safety
 
-- String interpolation in SQL (even if values are `.to_i`/`.to_f` — use parameterized queries (Rails: sanitize_sql_array/Arel; Node: prepared statements; Python: parameterized queries))
+- String interpolation in SQL (even if values are `.to_i`/`.to_f`: use parameterized queries (Rails: sanitize_sql_array/Arel; Node: prepared statements; Python: parameterized queries))
 - TOCTOU races: check-then-set patterns that should be atomic `WHERE` + `update_all`
 - Bypassing model validations for direct DB writes (Rails: update_column; Django: QuerySet.update(); Prisma: raw queries)
 - N+1 queries: Missing eager loading (Rails: .includes(); SQLAlchemy: joinedload(); Prisma: include) for associations used in loops/views
@@ -45,8 +45,8 @@ Be terse. For each issue: one line describing the problem, one line with the fix
 #### Race Conditions & Concurrency
 
 - Read-check-write without uniqueness constraint or catch duplicate key error and retry (e.g., `where(hash:).first` then `save!` without handling concurrent insert)
-- find-or-create without unique DB index — concurrent calls can create duplicates
-- Status transitions that don't use atomic `WHERE old_status = ? UPDATE SET new_status` — concurrent updates can skip or double-apply transitions
+- find-or-create without unique DB index: concurrent calls can create duplicates
+- Status transitions that don't use atomic `WHERE old_status = ? UPDATE SET new_status`: concurrent updates can skip or double-apply transitions
 - Unsafe HTML rendering (Rails: .html_safe/raw(); React: dangerouslySetInnerHTML; Vue: v-html; Django: |safe/mark_safe) on user-controlled data (XSS)
 
 #### LLM Output Trust Boundary
@@ -58,22 +58,22 @@ Be terse. For each issue: one line describing the problem, one line with the fix
 
 When the diff introduces a new enum value, status string, tier name, or type constant:
 
-- **Trace it through every consumer.** Read (don't just grep — READ) each file that switches on, filters by, or displays that value. If any consumer doesn't handle the new value, flag it. Common miss: adding a value to the frontend dropdown but the backend model/compute method doesn't persist it.
+- **Trace it through every consumer.** Read (don't just grep: READ) each file that switches on, filters by, or displays that value. If any consumer doesn't handle the new value, flag it. Common miss: adding a value to the frontend dropdown but the backend model/compute method doesn't persist it.
 - **Check allowlists/filter arrays.** Search for arrays or `%w[]` lists containing sibling values (e.g., if adding "revise" to tiers, find every `%w[quick lfg mega]` and verify "revise" is included where needed).
 - **Check `case`/`if-elsif` chains.** If existing code branches on the enum, does the new value fall through to a wrong default?
   To do this: use Grep to find all references to the sibling values (e.g., grep for "lfg" or "mega" to find all tier consumers). Read each match. This step requires reading code OUTSIDE the diff.
 
-### Pass 2 — INFORMATIONAL
+### Pass 2: INFORMATIONAL
 
 #### Conditional Side Effects
 
-- Code paths that branch on a condition but forget to apply a side effect on one branch. Example: item promoted to verified but URL only attached when a secondary condition is true — the other branch promotes without the URL, creating an inconsistent record.
+- Code paths that branch on a condition but forget to apply a side effect on one branch. Example: item promoted to verified but URL only attached when a secondary condition is true: the other branch promotes without the URL, creating an inconsistent record.
 - Log messages that claim an action happened but the action was conditionally skipped. The log should reflect what actually occurred.
 
 #### Magic Numbers & String Coupling
 
-- Bare numeric literals used in multiple files — should be named constants documented together
-- Error message strings used as query filters elsewhere (grep for the string — is anything matching on it?)
+- Bare numeric literals used in multiple files: should be named constants documented together
+- Error message strings used as query filters elsewhere (grep for the string: is anything matching on it?)
 
 #### Dead Code & Consistency
 
@@ -104,19 +104,19 @@ When the diff introduces a new enum value, status string, tier name, or type con
 
 #### Crypto & Entropy
 
-- Truncation of data instead of hashing (last N chars instead of SHA-256) — less entropy, easier collisions
-- `rand()` / `Random.rand` for security-sensitive values — use `SecureRandom` instead
-- Non-constant-time comparisons (`==`) on secrets or tokens — vulnerable to timing attacks
+- Truncation of data instead of hashing (last N chars instead of SHA-256): less entropy, easier collisions
+- `rand()` / `Random.rand` for security-sensitive values: use `SecureRandom` instead
+- Non-constant-time comparisons (`==`) on secrets or tokens: vulnerable to timing attacks
 
 #### Time Window Safety
 
-- Date-key lookups that assume "today" covers 24h — report at 8am PT only sees midnight→8am under today's key
-- Mismatched time windows between related features — one uses hourly buckets, another uses daily keys for the same data
+- Date-key lookups that assume "today" covers 24h: report at 8am PT only sees midnight→8am under today's key
+- Mismatched time windows between related features: one uses hourly buckets, another uses daily keys for the same data
 
 #### Type Coercion at Boundaries
 
-- Values crossing Ruby→JSON→JS boundaries where type could change (numeric vs string) — hash/digest inputs must normalize types
-- Hash/digest inputs that don't call `.to_s` or equivalent before serialization — `{ cores: 8 }` vs `{ cores: "8" }` produce different hashes
+- Values crossing Ruby→JSON→JS boundaries where type could change (numeric vs string): hash/digest inputs must normalize types
+- Hash/digest inputs that don't call `.to_s` or equivalent before serialization: `{ cores: 8 }` vs `{ cores: "8" }` produce different hashes
 
 #### View/Frontend
 
@@ -142,7 +142,7 @@ CRITICAL (highest severity):      INFORMATIONAL (lower severity):
                                    └─ View/Frontend
 
 All findings are actioned via Fix-First Review. Severity determines
-presentation order and classification of AUTO-FIX vs ASK — critical
+presentation order and classification of AUTO-FIX vs ASK: critical
 findings lean toward ASK (they're riskier), informational findings
 lean toward AUTO-FIX (they're more mechanical).
 ```
@@ -175,31 +175,31 @@ the fix, it's ASK.
 
 ---
 
-## Suppressions — DO NOT flag these
+## Suppressions: DO NOT flag these
 
 - "X is redundant with Y" when the redundancy is harmless and aids readability (e.g., `present?` redundant with `length > 20`)
-- "Add a comment explaining why this threshold/constant was chosen" — thresholds change during tuning, comments rot
+- "Add a comment explaining why this threshold/constant was chosen": thresholds change during tuning, comments rot
 - "This assertion could be tighter" when the assertion already covers the behavior
 - Suggesting consistency-only changes (wrapping a value in a conditional to match how another constant is guarded)
 - "Regex doesn't handle edge case X" when the input is constrained and X never occurs in practice
-- "Test exercises multiple guards simultaneously" — that's fine, tests don't need to isolate every guard
-- Eval threshold changes (max_actionable, min scores) — these are tuned empirically and change constantly
+- "Test exercises multiple guards simultaneously": that's fine, tests don't need to isolate every guard
+- Eval threshold changes (max_actionable, min scores): these are tuned empirically and change constantly
 - Harmless no-ops (e.g., `.reject` on an element that's never in the array)
-- ANYTHING already addressed in the diff you're reviewing — read the FULL diff before commenting
+- ANYTHING already addressed in the diff you're reviewing: read the FULL diff before commenting
 
 **Critical findings default toward ASK** (they're inherently riskier).
 **Informational findings default toward AUTO-FIX** (they're more mechanical).
 
 ---
 
-## Suppressions — DO NOT flag these
+## Suppressions: DO NOT flag these
 
 - "X is redundant with Y" when the redundancy is harmless and aids readability (e.g., `present?` redundant with `length > 20`)
-- "Add a comment explaining why this threshold/constant was chosen" — thresholds change during tuning, comments rot
+- "Add a comment explaining why this threshold/constant was chosen": thresholds change during tuning, comments rot
 - "This assertion could be tighter" when the assertion already covers the behavior
 - Suggesting consistency-only changes (wrapping a value in a conditional to match how another constant is guarded)
 - "Regex doesn't handle edge case X" when the input is constrained and X never occurs in practice
-- "Test exercises multiple guards simultaneously" — that's fine, tests don't need to isolate every guard
-- Eval threshold changes (max_actionable, min scores) — these are tuned empirically and change constantly
+- "Test exercises multiple guards simultaneously": that's fine, tests don't need to isolate every guard
+- Eval threshold changes (max_actionable, min scores): these are tuned empirically and change constantly
 - Harmless no-ops (e.g., `.reject` on an element that's never in the array)
-- ANYTHING already addressed in the diff you're reviewing — read the FULL diff before commenting
+- ANYTHING already addressed in the diff you're reviewing: read the FULL diff before commenting

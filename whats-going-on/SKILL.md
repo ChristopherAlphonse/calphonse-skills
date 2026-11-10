@@ -18,11 +18,11 @@ always runs, on its own sub-agent.
 
 ## When Not to Use
 
-- The user wants a feature built, a bug fixed, or a diff reviewed — use the
+- The user wants a feature built, a bug fixed, or a diff reviewed: use the
   relevant implementation/review skill instead.
-- The repo has fewer than ~5 source files — just read it directly.
+- The repo has fewer than ~5 source files: just read it directly.
 - Docs already exist and are current (check `docs/`, `README.md`, `AGENTS.md`,
-  and any steering/context files first) — update those instead of generating
+  and any steering/context files first): update those instead of generating
   a parallel set.
 
 ## Guardrails
@@ -31,7 +31,7 @@ always runs, on its own sub-agent.
 - Prefer evidence over guesses. Cite files for important claims or label assumptions.
 - Read the smallest set of files that explains the system: README, AGENTS.md,
   package/build config, routes/entrypoints, tests, core modules, `.planning/*`
-  if present — these often already document stack and structure; reuse that,
+  if present: these often already document stack and structure; reuse that,
   don't re-derive it.
 - Focus on core use cases, lifecycle, architecture, stack, conventions, and
   concerns. Skip roadmap, refactor advice, and peripheral features.
@@ -42,13 +42,13 @@ always runs, on its own sub-agent.
 ## Workflow
 
 1. **Orient:** Identify repo type, run/build/test commands, main entrypoints, and existing docs (README, AGENTS.md, steering).
-2. **Decide scope:** Small/medium repo (single service, one language) — do steps 3-5 yourself in one pass. Large or multi-module repo (multiple independently-buildable projects, or a monorepo) — fan out sub-agents one per concern area (architecture/flows, stack/integrations, conventions/testing, concerns) against the same repo root, then consolidate their findings yourself.
+2. **Decide scope:** Small/medium repo (single service, one language): do steps 3-5 yourself in one pass. Large or multi-module repo (multiple independently-buildable projects, or a monorepo), fan out sub-agents one per concern area (architecture/flows, stack/integrations, conventions/testing, concerns) against the same repo root, then consolidate their findings yourself.
 3. **Trace architecture and flows:** Identify 5-10 major components only (exclude thin wrappers, utilities, config-only files), and trace 3-5 primary flows end-to-end (entrypoint → validation/business logic → persistence/external call → result). For the full per-flow trace format (user journey diagram, component table, sequence diagram, data structures), follow [references/lifecycle.md](references/lifecycle.md).
-4. **Identify stack, conventions, and concerns:** Stack from manifests/build files (languages, frameworks, runtime, key dependencies, build/run commands). Conventions from code actually in use (naming, error handling, DTO/layering patterns, how to run tests). Concerns from what you observed (hardcoded identifiers, TODO/FIXME density in critical paths, missing tests around key flows, outdated dependencies) — each tied to a file/area.
+4. **Identify stack, conventions, and concerns:** Stack from manifests/build files (languages, frameworks, runtime, key dependencies, build/run commands). Conventions from code actually in use (naming, error handling, DTO/layering patterns, how to run tests). Concerns from what you observed (hardcoded identifiers, TODO/FIXME density in critical paths, missing tests around key flows, outdated dependencies): each tied to a file/area.
 5. **Write the output documents** to `.planning/system/` (create it if needed):
-   - `architecture.md` — the component table, data/control flow for the traced flows, integration points, and new-engineer navigation. Follow [references/architecture.md](references/architecture.md) for the full mandated structure (system overview diagram, component catalog, integration points, navigation guide, selection guidelines).
-   - `onboard.md` — in this order: **Stack**, **Conventions**, **Concerns**, **What's Doing What** (core use cases, each with a one-line description and evidence files).
-   - Only include detail beyond what already exists in README/AGENTS/steering docs — link to those rather than duplicating them.
+   - `architecture.md`: the component table, data/control flow for the traced flows, integration points, and new-engineer navigation. Follow [references/architecture.md](references/architecture.md) for the full mandated structure (system overview diagram, component catalog, integration points, navigation guide, selection guidelines).
+   - `onboard.md`: in this order: **Stack**, **Conventions**, **Concerns**, **What's Doing What** (core use cases, each with a one-line description and evidence files).
+   - Only include detail beyond what already exists in README/AGENTS/steering docs: link to those rather than duplicating them.
 6. **Simplify, always:** After `onboard.md` is written, spawn a sub-agent pinned to a Haiku model to rewrite it in plain language:
    - Check for `.kiro/agents/onboarding-simplifier.md` in the target repo. If missing, create it:
      ```markdown

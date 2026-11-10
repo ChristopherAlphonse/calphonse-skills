@@ -32,7 +32,7 @@ Use high intensity collaborative sessions with design and engineering to create 
 
 ### Center documents on the problem
 
-From "Examples and templates of 1-Pagers and PRDs": "Problem-oriented: They crystallize the problem being solved in a few strong sentences—ideally near the top of the document—to focus the brainpower of every teammate in the same direction."
+From "Examples and templates of 1-Pagers and PRDs": "Problem-oriented: They crystallize the problem being solved in a few strong sentences. ideally near the top of the document. to focus the brainpower of every teammate in the same direction."
 
 A successful PRD starts with a clearly defined problem and specific success metrics to ensure the team aligns on the why before the what.
 
@@ -65,7 +65,7 @@ Use AI tools to generate the majority of technical documentation so product mana
 - **Lenny's 1-Pager Template** (Examples and templates of 1-Pagers and PRDs) - Lenny's personal template used anytime he starts a new project
 - **5 Elements of a Great 1-Pager/PRD** (Examples and templates of 1-Pagers and PRDs) - An evaluation rubric for what makes a product spec effective, used both for writing and reviewing PRDs
 - **AI Prompt: Write a PRD** (Product manager is an unfair role. So work unfairly.) - A ChatGPT prompt template (GPT-4o and up) for drafting a PRD by dictating context via speech-to-text.
-- **Breadboarding and Fat Marker Sketching** (Ryan Singer) - Two collaboration techniques for shaping sessions that are more detailed than wireframes but less polished than Figma — designed to communicate the idea clearly
+- **Breadboarding and Fat Marker Sketching** (Ryan Singer) - Two collaboration techniques for shaping sessions that are more detailed than wireframes but less polished than Figma: designed to communicate the idea clearly
 - **Technical PM Questions for PRDs and Feature Work** (Become a more technical product manager) - Questions PMs should ask when writing PRDs or working on features to demonstrate technical awareness and improve collaboration
 - **Five Attributes of a Strong Problem Statement** (A Three-Step Framework For Solving Problems 👌) - Criteria for evaluating whether a problem statement is well-crafted, used when writing the Problem section of the 1-pager.
 - **PRD Review Checklist (derived from Lenny's critiques)** (Examples and templates of 1-Pagers and PRDs) - A checklist derived from Lenny's evaluation of the four real-world examples, identifying common pitfalls to check for
