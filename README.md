@@ -70,6 +70,7 @@ npx skills update -y       # no prompts
 
 ### Working Style
 
+- [humanizer](humanizer/SKILL.md): Rewrite a first-person work write-up (performance review, self-review) in a warmer, reflective voice without changing the facts; can borrow the style of a sample
 - [simplify](simplify/SKILL.md): Restate the last message in plain human language, with no jargon
 - [swe](swe/SKILL.md): Pragmatic dev mode: smallest change that fully solves the task, and a reply a busy human reads once
 
