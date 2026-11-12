@@ -50,7 +50,7 @@ Reply in plain words. If the user asks to simplify, load the `simplify` skill.
 Posting is visible to other people. Do it only on an explicit request, and say whose account it posts as.
 
 1. Find the MR from the project and branch; confirm the source branch matches the checkout.
-2. A top-level comment holds the whole ranked list, including items with no single line. Use the layout in `references/comment-style.md`.
+2. Post inline comments only. Do not post a top-level summary comment. Items with no single line (scope, unverified risks, missing approvals) stay in your reply to the user.
 3. Inline comments go on lines the MR changed. GitLab rejects any other line.
    - Compute the changed lines first: `git diff -U0 <target>...HEAD -- <file>` and read the `+start,count` of each hunk.
    - If the real defect is in unchanged code, anchor on the nearest changed line that leads to it and name the unchanged function in the comment.

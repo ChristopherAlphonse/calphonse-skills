@@ -1,35 +1,6 @@
 # MR comment style
 
-Two kinds of comment: one top-level summary, and one inline comment per line to fix. Plain words, no preamble, no sign-off.
-
-## Top-level comment
-
-Title, then the verdict in one line, then grouped numbered items.
-
-```text
-## Review findings (TICKET-ID)
-
-No blockers. <test result in one line>. Paths are under `src/`.
-
-### Fix before merge
-1. **<Plain-language name of the problem>.** `path:line` <what that line does>. <Evidence: what was reproduced and how>. Fix: <smallest fix>.
-
-### Should fix
-2. ... (same shape; add "Invisible today because <measured size>" when it only bites at scale)
-
-### Needs a check
-3. ... (say "Not reproduced." and what would confirm it)
-
-### Not checked
-<real cloud runs, plans, dependency scans, the other repo's MR>
-```
-
-Rules:
-
-- Group by urgency, not by source document. Number items continuously across groups so people can refer to "item 4".
-- Every item has: a bold plain-language name, `path:line`, the evidence, and a fix.
-- Put items that have no single line (story criteria, missing approvals, unverified risks) here only.
-- Do not name the review skills or tools that produced the findings.
+Post one inline comment per line to fix. No top-level summary. Plain words, no preamble, no sign-off.
 
 ## Inline comment
 
