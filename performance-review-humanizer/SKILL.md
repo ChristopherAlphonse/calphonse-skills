@@ -21,6 +21,9 @@ Rewrite the user's own write-up in a warmer, reflective voice. Change the voice 
 - Open with the work itself, not a reflective frame. Do not use stock idioms or metaphors ("looking back on this stretch," "the thread running through," "glad of," "give back to the routine").
 - Keep the source's concrete specifics (what broke, which limit, which score, what the critic said). Do not trade a specific for a vague reflection. Critical feedback keeps its content, not just "useful feedback."
 - Keep the numbers the source gives. Cut the ones that only prove effort.
+- Preserve the employee's natural level of confidence. Do not make them sound more humble, more enthusiastic, or more self-promotional than the source supports.
+- Do not undersell accomplishments. Keep their scope, ownership, complexity, and impact when the source supports them.
+- Write like an experienced employee explaining their work to their manager in a thoughtful, straightforward conversation.
 - Close with a plain intention for the next period.
 - Aim for 5-7 paragraphs. Do not pad a thin source to reach that.
 
@@ -39,7 +42,11 @@ Rewrite the user's own write-up in a warmer, reflective voice. Change the voice 
 
 ## Output
 
-- If the user gave a file, save the output in that same folder, next to the source file, unless the user names another path. Name the output exactly `<source-name>-humanized.<ext>` (for example `2026-11-04-1210-humanized.md`), never a made-up name, so it can never overwrite the source. Never overwrite the source.
+Deliver the review, then the notes. Keep them apart.
+
+- The review is ready to paste: no preamble, no explanation, no commentary inside it.
+- If the user gave a file, save the review next to the source file unless the user names another path. Name it exactly `<source-name>-humanized.<ext>` (for example `2026-11-04-1210-humanized.md`). Never overwrite the source. If that name already exists, add `-2`, `-3`, and so on. Never overwrite an existing output either.
 - If the input was pasted text with no file, write no file.
-- Show the result in chat either way.
-- End with one or two lines: phrases that are your wording and need the user's confirmation, and any detail you cut.
+- Show the full review in chat either way.
+- Before delivering, check the review against the source: every accomplishment, number, name, and piece of critical feedback is present, nothing is invented, and in-progress work is still in progress. Fix any gap, then deliver. If a file was written, reread it from disk to confirm it holds the final text.
+- After the review, add at most two lines of notes: a detail you cut, and any phrase where the source gave no clear basis and the user must confirm. Ordinary wording choices are not confirmation items. If there is nothing to flag, write no notes.
