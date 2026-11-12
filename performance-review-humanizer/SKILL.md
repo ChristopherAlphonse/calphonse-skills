@@ -1,6 +1,6 @@
 ---
-name: humanizer
-description: Rewrite a first-person work write-up (performance review, self-review) in a warmer, reflective voice without changing the facts; can borrow the style of a sample. Use when the user asks to "humanize" a draft, make it "sound less robotic", or warm up a review/write-up's tone.
+name: performance-review-humanizer
+description: Rewrite first-person performance reviews and self-assessments to sound natural, warm, and genuinely human. Preserve every fact, accomplishment, metric, and critical feedback while improving voice, flow, and clarity. Avoid corporate jargon, AI-sounding language, exaggeration, and generic reflections. Can use a sample write-up as a style reference without copying it.
 ---
 
 Rewrite the user's own write-up in a warmer, reflective voice. Change the voice and the structure. Never change the facts.
@@ -31,6 +31,11 @@ Rewrite the user's own write-up in a warmer, reflective voice. Change the voice 
 - Drop sections that only the original format needed (values sections, SMART summaries) unless the user asks to keep them.
 - Write the reply following the same plain style: no filler, no puffery.
 - Before output, reread each sentence. If it is clearer in the source, restore the source's wording. The result must read at least as clearly as the source.
+- Make sure accomplishments aren't undersold.
+- Better handle attached files.
+- Make paragraph count flexible.
+- Prevent the output from becoming overly reflective.
+- Clarify when confirmation is actually needed.
 
 ## Output
 
