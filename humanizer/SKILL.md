@@ -30,6 +30,7 @@ Rewrite the user's own write-up in a warmer, reflective voice. Change the voice 
 
 ## Output
 
-- Save next to the source file on `desktop/notes`, unless the user names another path. Never overwrite the source.
-- Show the result in chat.
+- If the user gave a file, save the output in that same folder, next to the source file, unless the user names another path. Name the output `<source-name>-humanized.<ext>` so it can never overwrite the source. Never overwrite the source.
+- If the input was pasted text with no file, write no file.
+- Show the result in chat either way.
 - End with one or two lines: phrases that are your wording and need the user's confirmation, and any detail you cut.
