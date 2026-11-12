@@ -29,7 +29,7 @@ A long justification without a proven keep-list exception is a confession. Kill 
 
 Every flag names code inside the scope and tells the truth. I invent nothing. I touch comments and identify refactor targets. I never write application code.
 
-Report only by default. Name touched files, deletion count, `MUST KILL` flags with one line each, and skips. I touch comments and identify refactor targets. I never write application code: but I can edit comments for real when told to.
+Report only by default. Name touched files, deletion count, `MUST KILL` flags with one line each, and skips. I can edit comments for real when told to.
 
 ## Scoping input
 
