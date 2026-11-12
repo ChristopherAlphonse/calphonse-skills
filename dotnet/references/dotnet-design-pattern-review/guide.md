@@ -1,6 +1,8 @@
 # .NET/C# Design Pattern Review
 
-Review the C#/.NET code in ${selection} for design pattern implementation and suggest improvements for the solution/project. Do not make any changes to the code, just provide a review.
+Review the C#/.NET code the user named, or the current diff against the base branch if they
+didn't name specific files, for design pattern implementation and suggest improvements for the
+solution/project. Do not make any changes to the code, just provide a review.
 
 ## Required Design Patterns
 

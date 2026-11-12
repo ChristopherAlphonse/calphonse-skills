@@ -18,7 +18,7 @@ Use this skill when working on ASP.NET Core HTTP APIs, including:
 Do not use this skill for:
 
 - general C# coding style or non-API refactoring;
-- EF Core data modeling or query optimization work; use `optimizing-ef-core-queries`;
+- EF Core data modeling or query optimization work;
 - frontend, Razor, or Blazor UI changes;
 - gRPC services;
 - SignalR hubs or real-time messaging flows.
@@ -403,7 +403,7 @@ builder.Services.AddScoped<IProductService, ProductService>();
 ```
 
 For EF Core data access patterns (migrations, Fluent API configuration,
-`AsNoTracking`, seed data), see the `optimizing-ef-core-queries` skill.
+`AsNoTracking`, seed data), follow the project's existing EF Core conventions.
 
 ### Step 7: Create a .http test file
 
