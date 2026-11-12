@@ -20,6 +20,7 @@ All skills live at the repository root as `{skill-name}/SKILL.md`. `AGENTS.md` i
 | [prd-mode](prd-mode/SKILL.md) | Turn abstract ideas into actionable project specs that align engineering and design on the problem and success metrics, then convert a PRD into an implementation task list |
 | [prove-it-works](prove-it-works/SKILL.md) | Verify a finished task against the real artifact, not a proxy, self-report, or "it compiles", then write a UAT document so the user can confirm it themselves |
 | [qa-review](qa-review/SKILL.md) | Strict maintainability review of the author's changes only: abstraction quality, giant files, spaghetti-condition growth |
+| [reconcile-reviews](reconcile-reviews/SKILL.md) | Merge several review documents of one PR/MR into a ranked fix list with file and line numbers (agree/differ, evidence-weighted), then optionally post it as inline MR comments |
 | [security-review](security-review/SKILL.md) | Secure-coding checklist, focused security guidance, OWASP scans of source and running apps you own (Semgrep, ZAP), and full evidence-based codebase audits (recon, hunting, independent validation, schema-checked findings and reports), with OWASP Top 10, cloud, and attack-class references |
 | [simplify](simplify/SKILL.md) | Restate the last message in plain human language, with no jargon |
 | [spike](spike/SKILL.md) | Throwaway experiments, sized in story points, that answer a feasibility question before committing to a real build; the deliverable is the verdict, not the code |

@@ -46,6 +46,8 @@ npx skills update -y       # no prompts
 
 - [code-review-frontend](code-review-frontend/SKILL.md): Multi-agent PR review orchestrator: discovers quality tooling, spawns parallel specialist agents (incl. TypeScript + React 19 reviewer), reports verified findings only, never fixes
 - [qa-review](qa-review/SKILL.md): Strict maintainability review of the author's changes only: abstraction quality, giant files, spaghetti-condition growth
+
+- [reconcile-reviews](reconcile-reviews/SKILL.md): Merge several review documents of one PR/MR into a ranked fix list with file and line numbers (agree/differ, evidence-weighted), then optionally post it as inline MR comments
 - [typescript-strict-style](typescript-strict-style/SKILL.md): Strict TS/JS discipline: assertion safety, exhaustive error handling, function size, naming, performance, dependency minimalism
 - [pr-body-style](pr-body-style/SKILL.md): Draft, rewrite, or audit PR bodies: accurate, short, business-focused
 - [comment-sicko](comment-sicko/SKILL.md): A deranged comment-hater that savors deletion and condemns workaround code
