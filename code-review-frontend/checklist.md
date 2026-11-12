@@ -151,7 +151,7 @@ lean toward AUTO-FIX (they're more mechanical).
 
 ## Fix-First Heuristic
 
-This heuristic is referenced by both `/review` and `/ship`. It determines whether
+This heuristic is referenced by `/review`. It determines whether
 the agent auto-fixes a finding or asks the user.
 
 ```
@@ -169,23 +169,6 @@ AUTO-FIX (agent fixes without asking):     ASK (needs human judgment):
 **Rule of thumb:** If the fix is mechanical and a senior engineer would apply it
 without discussion, it's AUTO-FIX. If reasonable engineers could disagree about
 the fix, it's ASK.
-
-**Critical findings default toward ASK** (they're inherently riskier).
-**Informational findings default toward AUTO-FIX** (they're more mechanical).
-
----
-
-## Suppressions: DO NOT flag these
-
-- "X is redundant with Y" when the redundancy is harmless and aids readability (e.g., `present?` redundant with `length > 20`)
-- "Add a comment explaining why this threshold/constant was chosen": thresholds change during tuning, comments rot
-- "This assertion could be tighter" when the assertion already covers the behavior
-- Suggesting consistency-only changes (wrapping a value in a conditional to match how another constant is guarded)
-- "Regex doesn't handle edge case X" when the input is constrained and X never occurs in practice
-- "Test exercises multiple guards simultaneously": that's fine, tests don't need to isolate every guard
-- Eval threshold changes (max_actionable, min scores): these are tuned empirically and change constantly
-- Harmless no-ops (e.g., `.reject` on an element that's never in the array)
-- ANYTHING already addressed in the diff you're reviewing: read the FULL diff before commenting
 
 **Critical findings default toward ASK** (they're inherently riskier).
 **Informational findings default toward AUTO-FIX** (they're more mechanical).

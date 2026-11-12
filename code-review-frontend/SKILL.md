@@ -34,8 +34,6 @@ Sub-skill paths (read when relevant):
 - `$SKILL_DIR/references/typescript-react/guide.md`: TypeScript + React 19 reviewer
 - `$SKILL_DIR/references/typescript-react/`: also antipatterns, react19-patterns, checklist
 - `$SKILL_DIR/../vercel-react-best-practices/references/frontend-patterns.md`: React component & state patterns
-- `$SKILL_DIR/jest-react-testing/SKILL.md`: Jest + RTL testing quality
-- `$SKILL_DIR/jest-react-testing/EXAMPLES.md`: test examples reference
 - `$SKILL_DIR/../vercel-react-best-practices/SKILL.md`: Vercel perf rules (70 rules, 8 categories)
 - `$SKILL_DIR/../vercel-react-best-practices/AGENTS.md`: full compiled rules doc
 - `$SKILL_DIR/../vercel-react-best-practices/rules/`: individual rule files
@@ -82,7 +80,8 @@ context produce noise, not signal.
 ### 0b. Discover Quality Tooling (Source of Truth)
 
 Run these commands to find the project's actual quality standards. These become the ground
-truth that agents cite in findings.
+truth that agents cite in findings. These lookups are independent: run them in parallel,
+not one at a time.
 
 ```bash
 # Lint config
@@ -150,10 +149,9 @@ Based on files in the diff, decide which specialist agents to spawn:
 | Any file (always)                              | `base-checklist`            |
 | `.ts`, `.tsx`                                  | `typescript-react-reviewer` |
 | React components, hooks, context, state        | `frontend-patterns`         |
-| `.test.*`, `.spec.*`, `__tests__/`             | `jest-react-testing`        |
 | Any `.ts`, `.tsx`, `.js`, `.jsx` frontend file | `vercel-perf`               |
 
-Agents are additive. A `.test.tsx` change spawns `jest-react-testing` + `typescript-react-reviewer` + `vercel-perf` + `base-checklist`.
+Agents are additive. A `.test.tsx` change spawns `typescript-react-reviewer` + `vercel-perf` + `base-checklist`.
 
 ---
 
@@ -325,62 +323,6 @@ BLOCK | WARN | PASS
 
 ---
 
-### Agent: jest-react-testing
-
-**Spawn when test files changed (`.test.*`, `.spec.*`, `__tests__/`).**
-
-```
-You are a Jest + React Testing Library reviewer. Your job is to surface real issues: not invent them.
-
-QUALITY CONTEXT (from main agent's discovery):
-<paste QUALITY_CONTEXT here: especially jest config, coverage thresholds>
-
-YOUR TASK:
-1. Run: git diff origin/<base>
-2. Read:
-   ./jest-react-testing/SKILL.md
-   ./jest-react-testing/EXAMPLES.md
-3. Look for the jest config file in the repo (jest.config.*, jest section in package.json).
-   Read it: this tells you the actual test environment and setup. Cross-reference with findings.
-4. Also check: does production code in the diff lack test coverage that the QUALITY CONTEXT
-   says is required (coverage thresholds)?
-5. Do NOT fix anything. Report findings only.
-
-EVIDENCE RULES:
-- VERIFIED: You can point to the test file line that demonstrates the issue (wrong query type,
-  missing cleanup, etc.) OR to a jest config rule that the test violates.
-- [ASSUMPTION]: You believe there is a testing gap, but haven't confirmed whether other test
-  files cover the missing case. State which files you'd need to check.
-
-REPORT FORMAT (use exactly):
-
-## [AGENT: jest-react-testing]
-Model: <assigned model>
-Skill: jest-react-testing/SKILL.md
-
-### Quality Config Used
-<jest config found, coverage thresholds, or "None found">
-
-### Findings
-
-| # | Severity | File:Line | Evidence | Issue | What to Check |
-|---|----------|-----------|----------|-------|---------------|
-
-### Verdict
-BLOCK | WARN | PASS
-
-### Top Finding
-<the single most important finding, or "None">
-
-VERDICT RULES:
-- BLOCK = VERIFIED test that actively gives false confidence (wrong async pattern causing silent pass,
-  test pollution via missing cleanup, testing implementation not behavior)
-- WARN = [ASSUMPTION] gaps, or verified maintainability anti-patterns
-- PASS = no findings
-```
-
----
-
 ### Agent: vercel-perf
 
 **Spawn when any frontend file (`.ts`, `.tsx`, `.js`, `.jsx`) changed.**
@@ -485,7 +427,6 @@ Codebase context: <from .planning/ | mapped via /whats-going-on | [ASSUMPTION: n
 | base-checklist | deep | <assigned model> | BLOCK/WARN/PASS | N | N |
 | typescript-react-reviewer | deep | <assigned model> | BLOCK/WARN/PASS | N | N |
 | frontend-patterns | focused | <assigned model> | BLOCK/WARN/PASS | N | N |
-| jest-react-testing | focused | <assigned model> | BLOCK/WARN/PASS | N | N |
 | vercel-perf | deep | <assigned model> | BLOCK/WARN/PASS | N | N |
 
 Tier reflects review depth, not a specific vendor. Deep agents handle broad cross-cutting analysis; focused agents handle narrow, well-bounded scans. Assign whatever models are available.

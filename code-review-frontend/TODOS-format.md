@@ -1,6 +1,6 @@
 # .planning/tasks/TODOS.md Format Reference
 
-Shared reference for the canonical `.planning/tasks/TODOS.md` format. Referenced by `/ship` and planning review skills to ensure consistent TODO item structure.
+Shared reference for the canonical `.planning/tasks/TODOS.md` format. Referenced by `/review` and planning review skills to ensure consistent TODO item structure.
 
 ---
 
