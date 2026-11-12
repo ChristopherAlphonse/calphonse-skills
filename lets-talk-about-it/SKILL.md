@@ -33,7 +33,7 @@ Return only what the task needs:
 - Scope and non-goals
 - Risks / tradeoffs
 - Verification checklist
-- `CONTEXT.md` or ADR updates, only when a durable domain term or hard-to-reverse decision was actually resolved
+- `CONTEXT.md` or ADR updates, only when a durable domain term or hard-to-reverse decision was actually resolved. Follow [CONTEXT-FORMAT.md](CONTEXT-FORMAT.md) for `CONTEXT.md`/`CONTEXT-MAP.md` and [ADR-FORMAT.md](ADR-FORMAT.md) for ADRs.
 
 ## Feature Handoff
 
