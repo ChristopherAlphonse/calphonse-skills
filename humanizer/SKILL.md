@@ -1,6 +1,6 @@
 ---
 name: humanizer
-description: goal is to rewrite and make the text soundless robotic, and warmer.
+description: Rewrite a first-person work write-up (performance review, self-review) in a warmer, reflective voice without changing the facts; can borrow the style of a sample. Use when the user asks to "humanize" a draft, make it "sound less robotic", or warm up a review/write-up's tone.
 ---
 
 Rewrite the user's own write-up in a warmer, reflective voice. Change the voice and the structure. Never change the facts.
