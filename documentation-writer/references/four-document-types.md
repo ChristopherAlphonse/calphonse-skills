@@ -25,4 +25,4 @@ Rules for each mode:
 
 Do not mix modes. No reference tables inside a tutorial, no hand-holding inside reference, no arguing inside a how-to. Split the content and link.
 
-**Mode versus audience.** Business-first framing (see User Preferences) sets the order of a document for non-technical readers. It does not turn reference into prose. For a stakeholder doc, put a short outcome summary first, then the reference content in its own labeled section, kept dry.
+**Mode versus audience.** Business-first framing (see [User Preferences](user-preferences.md)) sets the order of a document for non-technical readers. It does not turn reference into prose. For a stakeholder doc, put a short outcome summary first, then the reference content in its own labeled section, kept dry.
