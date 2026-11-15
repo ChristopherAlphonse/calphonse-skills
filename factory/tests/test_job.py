@@ -1025,6 +1025,17 @@ class TestServer(Factory):
         self.human("approve", "a")
         self.assertFalse(self.get_jobs()["a"]["can_approve"])
 
+    def test_needs_tells_the_user_what_to_run(self):
+        self.new_spec("a")
+        self.to_ship("b")
+        jobs = self.get_jobs()
+        for jid, action in (("a", "Approve spec"), ("b", "Commit locally")):
+            n = jobs[jid]["needs"]
+            self.assertEqual(n["action"], action)
+            self.assertTrue(n["command"].endswith(" serve") and n["command"].startswith("cd "))
+        self.human("approve", "a")
+        self.assertIsNone(self.get_jobs()["a"]["needs"])
+
     def test_file_endpoint(self):
         self.new_spec("a")
         self.ok("create", "b", "T")

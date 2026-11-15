@@ -753,6 +753,31 @@ def cmd_queue():
         print(f"{action}\t{job['id']}\t{s}\t{hint_for(job)}")
 
 
+def serve_command():
+    return f"cd {shlex.quote(str(ROOT))} && {shlex.quote(str(Path(__file__).resolve()))} serve"
+
+
+def needs_you(job):
+    """What the user must do, and why, for a job that waits on them. None when it does not."""
+    if not waiting_on_human(job):
+        return None
+    s = job["stage"]
+    if s == "spec":
+        action, files = "Approve spec", "spec.md"
+        why = ("The spec is written. The factory will not create the worktree or start building until you approve it. "
+               "Approval is tied to the file: if spec.md changes afterwards, you approve again.")
+        todo = "Read spec.md in this drawer. If it is right, click Approve spec on the board the command below opens."
+    elif s == "ship":
+        action, files = "Commit locally", "pr-body.md and commit.md"
+        why = "The gate passed and the PR body and commit message are written. Nothing is committed until you click."
+        todo = "Read pr-body.md and commit.md in this drawer, then click Commit locally on the board the command below opens."
+    else:
+        action, files = "Unblock", "blocked.md"
+        why = job.get("note") or "The job stopped and cannot continue on its own."
+        todo = "Read blocked.md or the activity log to see why. Then click Unblock to grant more rounds, or leave it parked."
+    return {"action": action, "files": files, "why": why, "todo": todo, "command": serve_command()}
+
+
 def snapshot(job):
     d = jobdir(job["id"])
     rd = d / f"round-{job['round']}"
@@ -760,7 +785,7 @@ def snapshot(job):
     files = sorted(str(p.relative_to(d)) for p in d.rglob("*.md"))
     return {**job, "kind": "review" if job.get("review") else "build", "report": kv(d / "report.md"),
             "gate": kv(rd / CHECKS_FILE).get("GATE"), "reviews": reviews,
-            "files": files, "needs_human": waiting_on_human(job),
+            "files": files, "needs_human": waiting_on_human(job), "needs": needs_you(job),
             "can_approve": not READONLY and job["stage"] == "spec" and waiting_on_human(job),
             "can_commit": not READONLY and job["stage"] == "ship" and waiting_on_human(job)}
 
