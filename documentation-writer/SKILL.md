@@ -31,6 +31,26 @@ You will create documentation across the four Diátaxis quadrants. You must unde
 - **Reference:** Information-oriented, technical descriptions of machinery. A dictionary.
 - **Explanation:** Understanding-oriented, clarifying a particular topic. A discussion.
 
+### Pick the mode first
+
+One document, one mode. Two questions pick it: does the content inform action (doing) or understanding (thinking), and does it serve learning or work? Apply the compass to a whole document or to a single sentence.
+
+| | Learning | Work |
+| --- | --- | --- |
+| **Doing** | Tutorial | How-to guide |
+| **Thinking** | Explanation | Reference |
+
+Rules for each mode:
+
+- **Tutorial:** The learner's success is your job. Open by saying what the learner will build. Make every step produce a visible result, and say what they should see (output, prompt change, log line). Cut explanation to one clause and a link. Write as "we", in commands: "First, do x. Now, do y."
+- **How-to guide:** Solve a problem a person has, not an operation the machine can perform. Assume competence and skip teaching. Action only: no background, no completeness for its own sake. Link those instead. Allow forks: "If you want x, do y." Name the guide by the task: "How to calibrate the radar array", not "Radar array calibration".
+- **Reference:** Describe only. No instruction, persuasion, or opinion. Be dry, complete, and certain. Mirror the structure of the thing described so code and docs navigate together. Generate from code where possible.
+- **Explanation:** One bounded topic, readable away from the product. Each title should tolerate an implicit "About..." in front. Anchor on a real "why" question and give context: design decisions, history, constraints, alternatives. Opinion is allowed here and nowhere else.
+
+Do not mix modes. No reference tables inside a tutorial, no hand-holding inside reference, no arguing inside a how-to. Split the content and link.
+
+**Mode versus audience.** Business-first framing (see User Preferences) sets the order of a document for non-technical readers. It does not turn reference into prose. For a stakeholder doc, put a short outcome summary first, then the reference content in its own labeled section, kept dry.
+
 ## WORKFLOW
 
 **When a destination (a wiki page, ticket, or doc URL) is provided alongside content, publish immediately.** Do not ask clarifying questions first. Read the content, format it appropriately for the destination, and publish.
@@ -70,6 +90,27 @@ The following preferences apply to all work for this user:
 - **No parenthetical asides wrapped in em dashes.** Rewrite as a separate sentence or use commas.
 - **Spell out abbreviations on first use.** TTL (time to live), KB (kilobytes), p95 (95th percentile).
 - **Short column headers.** Table headers should be scannable at a glance. Avoid headers longer than 4 words.
+
+### Vary the rhythm
+
+A doc can follow every rule and still read machine-written: every sentence clipped, no view anywhere, nothing specific.
+
+- Mix sentence lengths on purpose. Short sentences land a point. Longer ones carry a fact with its condition or consequence.
+- Split a sentence that carries two thoughts. Keep a long sentence that carries one.
+- Have a view where the mode allows it. Explanation weighs trade-offs, so say what you make of them. Reference stays dry.
+- Be specific over sterile. Not "schema changes can cause issues" but "a column rename fails the build".
+- Cut every word that does no work, and use the short everyday word: "use", not "utilize".
+- Write the real symbol, file, flag, or command name, not a description of it.
+
+### Worked example
+
+Before:
+
+> Configuration of the proto import ratchet budget script parameters is performed via budget.json. Note that it's important to remember that running with --write, which updates the committed budget to reflect the current count, should only be done when lowering it. If exceeded, CI fails.
+
+After:
+
+> `budget.mjs` reads the committed budget from `budget.json` and counts the files that import protos. If the count exceeds the budget, CI fails. Run `budget.mjs --write` only to lower the budget.
 
 ---
 
