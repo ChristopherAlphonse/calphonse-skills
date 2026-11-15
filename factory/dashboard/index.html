@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Factory Board</title>
+    <link rel="stylesheet" href="/static/dashboard.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Factory Board</h1>
+      <span id="meta">connecting</span>
+      <span class="policy">local only: the factory never pushes or opens a PR/MR, and commits only when you click</span>
+    </header>
+    <main id="board"></main>
+    <aside id="drawer">
+      <button class="x" id="close">close</button>
+      <div id="dhead"></div>
+      <div class="files" id="dfiles"></div>
+      <div id="dbody" class="raw"></div>
+    </aside>
+    <script type="module" src="/static/app.js"></script>
+  </body>
+</html>

@@ -9,7 +9,9 @@ from pathlib import Path
 ROOT = Path(os.environ.get("FACTORY_ROOT", Path.cwd())).resolve()
 STATE = ROOT / ".planning" / "factory"
 JOBS = STATE / "jobs"
-DASH = Path(__file__).resolve().parent.parent / "dashboard.html"
+DASH_DIR = Path(__file__).resolve().parent.parent / "dashboard"
+STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript",
+          "markdown.js": "text/javascript"}
 DEFAULTS = {
     "concurrency": 1, "max_rounds": 3, "checks": "", "base_branch": "main",
 }
@@ -726,7 +728,7 @@ def snapshot(job):
             "can_commit": not READONLY and job["stage"] == "ship" and waiting_on_human(job)}
 
 
-CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; "
+CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 COOKIE = "factory"
 
@@ -782,11 +784,16 @@ class Handler(BaseHTTPRequestHandler):
             if not self.host_ok():
                 return self.send(403, "{}")
             if self.session_ok():
-                return self.send(200, DASH.read_bytes(), "text/html; charset=utf-8")
+                return self.send(200, (DASH_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
             if self.redeem_code(q.get("c", [""])[0]):
                 cookie = f"{COOKIE}={SESSION}; HttpOnly; SameSite=Strict; Path=/"
                 return self.send(303, "", extra={"Location": "/", "Set-Cookie": cookie})
             return self.send(403, "{}")
+        if u.path.startswith("/static/"):
+            name = u.path[len("/static/"):]
+            if not (self.host_ok() and self.session_ok()) or name not in STATIC:
+                return self.send(403, "{}")
+            return self.send(200, (DASH_DIR / name).read_bytes(), STATIC[name])
         if not self.trusted():
             return self.send(403, "{}")
         if u.path == "/api/mode":

@@ -1,0 +1,689 @@
+#!/usr/bin/env python3
+"""Only writer of job.json for review jobs. Refuses illegal stage moves. Serves the board."""
+import fcntl, hashlib, hmac, json, os, re, secrets, select, shlex, shutil, socket, subprocess, sys, tempfile, threading, time
+from datetime import datetime, timezone
+from http.cookies import CookieError, SimpleCookie
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+ROOT = Path(os.environ.get("FACTORY_ROOT", Path.cwd())).resolve()
+STATE = ROOT / ".planning" / "factory-test"
+JOBS = STATE / "jobs"
+DASH_DIR = Path(__file__).resolve().parent.parent / "dashboard"
+STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript",
+          "markdown.js": "text/javascript"}
+DEFAULTS = {"concurrency": 1}
+READONLY = False
+KEY = ""
+SESSION = ""
+CODE = ""
+CODE_EXP = 0.0
+AUTH_LOCK = threading.Lock()
+HASH_FILE = "human.sha256"
+MAX_BODY = 64 * 1024
+CTX = threading.local()
+BRANCH_PREFIX = "factory-test"
+REVIEW_DIR = "reviews"
+BASE_REVIEWERS = ["code", "qa", "test"]
+EXTRA_REVIEWERS = {"security", "architecture"}
+HUMAN_STAGES = {"needs-human"}
+TERMINAL = {"ready", "rejected"}
+TRANSITIONS = {
+    "scope": {"review", "rejected", "needs-human"},
+    "review": {"reconcile", "needs-human"},
+    "reconcile": {"verify", "needs-human"},
+    "verify": {"report", "needs-human"},
+    "report": {"ready", "needs-human"},
+}
+HINT = {
+    "scope": "code-review-frontend step 0 (find lint, type, and test tooling) -> scope.md (STATUS: READY, or reject with rejection.md); add security or architecture reviewers with `job route`",
+    "review": "code (code-review-frontend, plus dotnet for C#), qa (qa-review), test (test-review), and routed extras -> reviews/review-<name>.md; read-only, never edit",
+    "reconcile": "reconcile-reviews -> reconcile.md (STATUS: READY), one ranked list with file and line",
+    "verify": "prove-it-works: rerun every VERIFIED (ran) command and check every cited line -> verified.md (STATUS: READY), drop what does not reproduce",
+    "report": "unslop -> report.md (STATUS: READY, FINDINGS: n, BLOCKERS: n) and comments.md to paste by hand; never post",
+}
+STACK_RULES = [
+    ("typescript-strict-style", {".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"}, set()),
+    ("vercel-react-best-practices", {".tsx", ".jsx"}, {"next.config.js", "next.config.mjs", "next.config.ts"}),
+    ("nextjs-proxy-csp-hardening", set(), {"proxy.ts", "proxy.js", "middleware.ts", "middleware.js"}),
+    ("dotnet", {".cs", ".csproj", ".sln", ".cshtml", ".razor"}, set()),
+    ("aws", {".tf"}, {"cdk.json", "serverless.yml", "serverless.yaml", "samconfig.toml"}),
+]
+
+
+def detect_stack(files):
+    """Pick the stack skills from file suffixes and names, so no agent has to judge it."""
+    suffixes = {Path(f).suffix.lower() for f in files}
+    names = {Path(f).name for f in files}
+    return [skill for skill, sufs, ns in STACK_RULES if suffixes & sufs or names & ns]
+
+
+def hint_for(job):
+    hint = HINT.get(job["stage"], "")
+    stack = job.get("stack") or []
+    return hint + (f" | stack skills: {', '.join(stack)}" if stack and hint else "")
+
+
+def die(msg):
+    print(f"refused: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def need(cond, msg):
+    if not cond:
+        die(msg)
+
+
+def is_human():
+    """True only inside a board request. There is no environment variable or flag a caller can set."""
+    return getattr(CTX, "human", False)
+
+
+def now():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def audit(action, jid="", detail=""):
+    STATE.mkdir(parents=True, exist_ok=True)
+    line = json.dumps({"ts": now(), "actor": "human" if is_human() else "agent",
+                       "action": action, "job": jid, "detail": detail}) + "\n"
+    fd = os.open(STATE / "audit.log", os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    try:
+        os.write(fd, line.encode())
+    finally:
+        os.close(fd)
+
+
+def config():
+    p = STATE / "config.json"
+    return {**DEFAULTS, **(json.loads(p.read_text()) if p.exists() else {})}
+
+
+def jobdir(jid):
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", jid):
+        die(f"bad job id {jid!r}")
+    return JOBS / jid
+
+
+def load(jid):
+    p = jobdir(jid) / "job.json"
+    if not p.exists():
+        die(f"no job {jid}")
+    return json.loads(p.read_text())
+
+
+def save(job):
+    d = jobdir(job["id"])
+    fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
+    with os.fdopen(fd, "w") as f:
+        json.dump(job, f, indent=2)
+    os.replace(tmp, d / "job.json")
+
+
+def kv(path):
+    """KEY: value lines at the top of a file, up to the first blank line."""
+    out = {}
+    if not Path(path).exists():
+        return out
+    for line in Path(path).read_text().splitlines():
+        if not line.strip():
+            if out:
+                break
+            continue
+        m = re.match(r"([A-Z][A-Z_ -]*):\s*(.*)", line)
+        if not m:
+            break
+        out[m.group(1).strip()] = m.group(2).strip()
+    return out
+
+
+GUARD_MSG = "factory-test policy: needs the user's approval on the board"
+HOOK_HEAD = "#!/bin/sh\n"
+HOOK_FN = """human_ok() {
+  [ -n "$FACTORY_HUMAN_KEY" ] || return 1
+  want=$(cat @@HASH@@ 2>/dev/null) || return 1
+  [ -n "$want" ] || return 1
+  got=$(printf %s "$FACTORY_HUMAN_KEY" | { sha256sum 2>/dev/null || shasum -a 256; } | cut -d' ' -f1)
+  [ "$got" = "$want" ]
+}
+"""
+HOOK_PRE_COMMIT = HOOK_HEAD + HOOK_FN + 'human_ok || { echo "@@MSG@@" >&2; exit 1; }\nunset FACTORY_HUMAN_KEY\n'
+HOOK_PRE_PUSH = HOOK_HEAD + HOOK_FN + """in=$(cat)
+if ! human_ok && printf '%s' "$in" | grep -q 'refs/heads/factory-test/'; then echo "@@MSG@@" >&2; exit 1; fi
+unset FACTORY_HUMAN_KEY
+"""
+HOOK_REF_TX = HOOK_HEAD + HOOK_FN + """in=$(cat)
+if [ "$1" = "prepared" ] && ! human_ok; then
+  printf '%s\\n' "$in" | while read old new ref; do
+    case "$ref" in refs/heads/factory-test/*) if [ "$new" != "0000000000000000000000000000000000000000" ]; then exit 1; fi;; esac
+  done
+  rc=$?
+  [ $rc -eq 0 ] || { echo "@@MSG@@" >&2; exit $rc; }
+fi
+unset FACTORY_HUMAN_KEY
+"""
+
+
+def git(args, cwd, env=None):
+    env = dict(os.environ if env is None else env)
+    env.pop("FACTORY_HUMAN_KEY", None)
+    if is_human() and KEY:
+        env["FACTORY_HUMAN_KEY"] = KEY
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, env=env)
+
+
+def git_files(args, cwd):
+    return [f for f in git(args, cwd).stdout.split("\0") if f]
+
+
+def resolve_review(base_ref, head_ref):
+    for ref in (base_ref, head_ref):
+        need(ref and not ref.startswith("-"), f"bad ref {ref!r}")
+
+    def rev(ref):
+        r = git(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"], ROOT)
+        need(r.returncode == 0, f"unknown ref {ref}")
+        return r.stdout.strip()
+
+    head, base = rev(head_ref), rev(base_ref)
+    mb = git(["merge-base", base, head], ROOT)
+    need(mb.returncode == 0, "the refs share no history")
+    merge_base = mb.stdout.strip()
+    need(git(["diff", "--quiet", merge_base, head], ROOT).returncode == 1, "nothing to review: the diff is empty")
+    return {"base_ref": base_ref, "head_ref": head_ref, "base": merge_base, "head": head}
+
+
+def review_files(review):
+    return git_files(["diff", "--name-only", "-z", review["base"], review["head"]], ROOT)
+
+
+def hooks_digest(hdir):
+    h = hashlib.sha256()
+    for f in sorted(Path(hdir).iterdir()):
+        h.update(f.name.encode())
+        h.update(f.read_bytes())
+    return h.hexdigest()
+
+
+def install_hooks(job):
+    """Per-worktree hooks: block commits and pushes on the review branch unless the user acts,
+    and chain to the repo's own hooks so its policy checks still run."""
+    wt = job["worktree"]
+    common = git(["rev-parse", "--git-common-dir"], ROOT).stdout.strip()
+    orig_cfg = git(["config", "core.hooksPath"], ROOT).stdout.strip()
+    orig = str((ROOT / (orig_cfg or Path(common) / "hooks")).resolve())
+    hdir = STATE / "hooks" / job["id"]
+    hdir.mkdir(parents=True, exist_ok=True)
+    hashfile = shlex.quote(str(STATE / HASH_FILE))
+    guarded = {n: t.replace("@@MSG@@", GUARD_MSG).replace("@@HASH@@", hashfile) for n, t in
+               (("pre-commit", HOOK_PRE_COMMIT), ("pre-push", HOOK_PRE_PUSH),
+                ("reference-transaction", HOOK_REF_TX))}
+    names = {f.name for f in Path(orig).glob("*") if f.is_file() and os.access(f, os.X_OK)} if Path(orig).is_dir() else set()
+    for name in names | set(guarded):
+        body = guarded.get(name, HOOK_HEAD)
+        target = shlex.quote(f"{orig}/{name}")
+        if name in names and name in ("reference-transaction", "pre-push"):
+            body += f"printf '%s\\n' \"$in\" | {target} \"$@\"\n"
+        elif name in names:
+            body += f'exec {target} "$@"\n'
+        (hdir / name).write_text(body)
+        (hdir / name).chmod(0o755)
+    need(git(["config", "extensions.worktreeConfig", "true"], ROOT).returncode == 0, "cannot enable worktree config")
+    r = git(["config", "--worktree", "core.hooksPath", str(hdir)], wt)
+    need(r.returncode == 0, f"hook install failed: {r.stderr.strip()}")
+    job["hooks_path"], job["hooks_sha"] = str(hdir), hooks_digest(hdir)
+
+
+def make_worktree(job):
+    wt = ROOT / ".worktrees" / job["id"]
+    branch = f"{BRANCH_PREFIX}/{job['id']}"
+    r = git(["worktree", "add", str(wt), "-b", branch, job["review"]["head"]], ROOT)
+    need(r.returncode == 0, f"worktree failed: {r.stderr.strip()}")
+    job["worktree"], job["branch"] = str(wt), branch
+    job["tip"] = git(["rev-parse", "HEAD"], wt).stdout.strip()
+    try:
+        install_hooks(job)
+    except BaseException:
+        git(["worktree", "remove", "--force", str(wt)], ROOT)
+        git(["branch", "-D", branch], ROOT)
+        raise
+
+
+def cmd_create(jid, title, base_ref, head_ref):
+    review = resolve_review(base_ref, head_ref)
+    d = jobdir(jid)
+    need(not d.exists(), f"{jid} exists")
+    d.mkdir(parents=True)
+    job = {
+        "id": jid, "title": title, "stage": "scope", "reviewers": list(BASE_REVIEWERS),
+        "review": review, "stack": detect_stack(review_files(review)),
+        "branch": None, "worktree": None, "tip": None,
+        "started": now(), "ended": None, "note": "",
+    }
+    try:
+        make_worktree(job)
+    except BaseException:
+        shutil.rmtree(d)
+        raise
+    save(job)
+    audit("create", jid, f"{base_ref}..{head_ref}")
+    print(jid)
+    announce_board()
+
+
+def audit_lines():
+    p = STATE / "audit.log"
+    return [json.loads(l) for l in p.read_text().splitlines() if l.strip()] if p.exists() else []
+
+
+def audited_stage(jid):
+    """What the audit log says the job's stage is, to cross-check job.json against."""
+    stage = None
+    for e in audit_lines():
+        if e.get("job") != jid:
+            continue
+        a = e["action"]
+        if a == "create":
+            stage = "scope"
+        elif a == "advance":
+            stage = e["detail"].split(" -> ")[1]
+        elif a == "unblock":
+            m = re.search(r"-> (\S+)", e["detail"])
+            stage = m.group(1) if m else "scope"
+        elif a == "violation":
+            stage = "needs-human"
+    return stage
+
+
+def integrity_problems(job):
+    """Detect tampering the OS cannot prevent when the agent shares the user's file permissions."""
+    probs, stage = [], audited_stage(job["id"])
+    if stage != job["stage"]:
+        probs.append(f"job.json says {job['stage']} but the audit log says {stage}")
+    wt = job["worktree"]
+    if not wt or not Path(wt).exists():
+        return probs
+    if git(["symbolic-ref", "HEAD"], wt).stdout.strip() != f"refs/heads/{job['branch']}":
+        probs.append("worktree is not on its review branch")
+    tip = git(["rev-parse", "HEAD"], wt).stdout.strip()
+    if tip != job["tip"]:
+        probs.append(f"branch moved outside the factory: {job['tip'][:7]} -> {tip[:7]}")
+    edited = git_files(["diff", "--name-only", "-z", "HEAD"], wt)
+    if edited:
+        probs.append("a reviewer edited tracked files: " + ", ".join(edited[:5]))
+    if git(["config", "--worktree", "core.hooksPath"], wt).stdout.strip() != job["hooks_path"]:
+        probs.append("core.hooksPath was changed")
+    try:
+        if hooks_digest(job["hooks_path"]) != job["hooks_sha"]:
+            probs.append("hook files were changed")
+    except OSError:
+        probs.append("hook files are missing")
+    return probs
+
+
+def enforce(job):
+    """Fail closed: any mismatch parks the job on the user and stops the caller."""
+    if job["stage"] in TERMINAL | HUMAN_STAGES:
+        return
+    probs = integrity_problems(job)
+    if not probs:
+        return
+    job["parked_from"] = job["stage"]
+    job["stage"], job["note"] = "needs-human", "; ".join(probs)
+    save(job)
+    audit("violation", job["id"], job["note"])
+    die(f"{job['id']} parked on the user: {job['note']}")
+
+
+def justify(job, cur, to):
+    """Check the files that justify cur -> to."""
+    d = jobdir(job["id"])
+    if to == "needs-human":
+        need(kv(d / "blocked.md").get("STATUS") == "BLOCKED", "blocked.md needs STATUS: BLOCKED")
+    elif cur == "scope" and to == "review":
+        need(kv(d / "scope.md").get("STATUS") == "READY", "scope.md needs STATUS: READY")
+    elif cur == "scope" and to == "rejected":
+        need((d / "rejection.md").exists(), "rejection.md missing")
+    elif cur == "review":
+        missing = [r for r in job["reviewers"]
+                   if kv(d / REVIEW_DIR / f"review-{r}.md").get("VERDICT") not in ("PASS", "CHANGES")]
+        need(not missing, f"missing reviews: {', '.join(missing)}")
+    elif cur == "reconcile":
+        need(kv(d / "reconcile.md").get("STATUS") == "READY", "reconcile.md needs STATUS: READY")
+    elif cur == "verify":
+        need(kv(d / "verified.md").get("STATUS") == "READY", "verified.md needs STATUS: READY")
+    elif cur == "report":
+        r = kv(d / "report.md")
+        need(r.get("STATUS") == "READY" and r.get("FINDINGS", "").isdigit(), "report.md needs STATUS: READY and FINDINGS: <n>")
+
+
+def cmd_advance(jid, to):
+    job = load(jid)
+    enforce(job)
+    cur = job["stage"]
+    need(cur not in TERMINAL | HUMAN_STAGES, f"{jid} is {cur}, only the user can move it")
+    need(to in TRANSITIONS.get(cur, ()), f"{cur} -> {to} is not a legal move")
+    justify(job, cur, to)
+    if to == "needs-human":
+        job["parked_from"] = cur
+    job["stage"] = to
+    if to in TERMINAL:
+        job["ended"] = now()
+    save(job)
+    audit("advance", jid, f"{cur} -> {to}")
+    print(f"{jid}: {cur} -> {to}")
+
+
+def cmd_route(jid, extras):
+    job = load(jid)
+    names = [e for e in extras.split(",") if e]
+    bad = set(names) - EXTRA_REVIEWERS
+    need(not bad, f"unknown reviewers {sorted(bad)}")
+    job["reviewers"] = BASE_REVIEWERS + sorted(names)
+    save(job)
+    audit("route", jid, ",".join(job["reviewers"]))
+    print(",".join(job["reviewers"]))
+
+
+ACTIVITY_KEEP = 30
+
+
+def cmd_note(jid, text):
+    """Record what the agent is doing right now, so the board can show it between stage changes."""
+    need(text.strip(), "note text is empty")
+    job = load(jid)
+    log = job.get("activity", []) + [{"ts": now(), "text": text.strip()[:200]}]
+    job["activity"] = log[-ACTIVITY_KEEP:]
+    save(job)
+    audit("note", jid, text.strip()[:200])
+
+
+def human_only():
+    need(is_human(), "this is a human action, use the board")
+
+
+def cmd_unblock(jid):
+    human_only()
+    job = load(jid)
+    need(job["stage"] == "needs-human", f"{jid} is at {job['stage']}")
+    job["stage"] = job.get("parked_from") or "scope"
+    job["note"] = ""
+    r = git(["reset", "--hard", job["review"]["head"]], job["worktree"])
+    need(r.returncode == 0, f"could not restore the reviewed commit: {r.stderr.strip()[-300:]}")
+    install_hooks(job)
+    job["tip"] = git(["rev-parse", "HEAD"], job["worktree"]).stdout.strip()
+    save(job)
+    audit("unblock", jid, f"-> {job['stage']}")
+
+
+def all_jobs():
+    return [json.loads(p.read_text()) for p in sorted(JOBS.glob("*/job.json"))] if JOBS.exists() else []
+
+
+def cmd_queue():
+    announce_board()
+    cap, running = config()["concurrency"], 0
+    for job in all_jobs():
+        if job["stage"] not in TERMINAL | HUMAN_STAGES and integrity_problems(job):
+            try:
+                enforce(job)
+            except SystemExit:
+                job = load(job["id"])
+        s = job["stage"]
+        if s in TERMINAL:
+            action = "done"
+        elif s in HUMAN_STAGES:
+            action = "hold"
+        elif running < cap:
+            action, running = "run", running + 1
+        else:
+            action = "wait"
+        print(f"{action}\t{job['id']}\t{s}\t{hint_for(job)}")
+
+
+def snapshot(job):
+    d = jobdir(job["id"])
+    reviews = {r: kv(d / REVIEW_DIR / f"review-{r}.md").get("VERDICT") for r in job["reviewers"]}
+    waiting = job["stage"] in HUMAN_STAGES
+    return {**job, "report": kv(d / "report.md"), "reviews": reviews,
+            "files": sorted(str(p.relative_to(d)) for p in d.rglob("*.md")),
+            "needs_human": waiting, "can_unblock": waiting and not READONLY}
+
+
+CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
+       "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+COOKIE = "factory-test"
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def send(self, code, body, ctype="application/json", extra=None):
+        data = body if isinstance(body, bytes) else body.encode()
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        if ctype.startswith("text/html"):
+            self.send_header("Content-Security-Policy", CSP)
+        for k, v in (extra or {}).items():
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(data)
+
+    def host_ok(self):
+        return self.headers.get("Host", "") in (f"127.0.0.1:{self.server.server_port}",
+                                                f"localhost:{self.server.server_port}")
+
+    def session_ok(self):
+        try:
+            got = SimpleCookie(self.headers.get("Cookie", "")).get(COOKIE)
+        except CookieError:
+            return False
+        return bool(got and SESSION) and hmac.compare_digest(got.value.encode(), SESSION.encode())
+
+    def trusted(self):
+        """Loopback Host, the session cookie, and a custom header a cross-site page cannot send."""
+        return self.host_ok() and self.session_ok() and self.headers.get("X-Factory") == "1"
+
+    def redeem_code(self, supplied):
+        global CODE
+        with AUTH_LOCK:
+            good = bool(supplied and CODE) and time.time() < CODE_EXP and \
+                hmac.compare_digest(supplied.encode(), CODE.encode())
+            if good and not READONLY:
+                CODE = ""
+            return good
+
+    def do_GET(self):
+        from urllib.parse import urlparse, parse_qs
+        u = urlparse(self.path)
+        q = parse_qs(u.query)
+        if u.path == "/":
+            if not self.host_ok():
+                return self.send(403, "{}")
+            if self.session_ok():
+                return self.send(200, (DASH_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
+            if self.redeem_code(q.get("c", [""])[0]):
+                cookie = f"{COOKIE}={SESSION}; HttpOnly; SameSite=Strict; Path=/"
+                return self.send(303, "", extra={"Location": "/", "Set-Cookie": cookie})
+            return self.send(403, "{}")
+        if u.path.startswith("/static/"):
+            name = u.path[len("/static/"):]
+            if not (self.host_ok() and self.session_ok()) or name not in STATIC:
+                return self.send(403, "{}")
+            return self.send(200, (DASH_DIR / name).read_bytes(), STATIC[name])
+        if not self.trusted():
+            return self.send(403, "{}")
+        if u.path == "/api/mode":
+            return self.send(200, json.dumps({"readonly": READONLY}))
+        if u.path == "/api/jobs":
+            return self.send(200, json.dumps([snapshot(j) for j in all_jobs()]))
+        if u.path == "/api/file":
+            jid, name = q.get("job", [""])[0], q.get("name", [""])[0]
+            if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", jid):
+                return self.send(404, "{}")
+            try:
+                p = (jobdir(jid) / name).resolve()
+                if jobdir(jid).resolve() not in p.parents or p.suffix != ".md" or not p.is_file():
+                    return self.send(404, "{}")
+                return self.send(200, p.read_text(), "text/plain; charset=utf-8")
+            except (ValueError, OSError):
+                return self.send(404, "{}")
+        self.send(404, "{}")
+
+    def do_POST(self):
+        if READONLY or not self.trusted():
+            return self.send(403, "{}")
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return self.send(400, "{}")
+        if not 0 <= n <= MAX_BODY:
+            return self.send(413, "{}")
+        try:
+            body = json.loads(self.rfile.read(n) or b"{}")
+            jid = body["id"]
+        except (ValueError, KeyError, TypeError):
+            return self.send(400, "{}")
+        if self.path != "/api/unblock":
+            return self.send(404, "{}")
+        CTX.human = True
+        try:
+            cmd_unblock(jid)
+        except SystemExit:
+            return self.send(409, "{}")
+        finally:
+            CTX.human = False
+        self.send(200, "{}")
+
+
+def cmd_serve(port):
+    """The only place human actions run. The key and session live in this process's memory only."""
+    global KEY, SESSION, CODE, CODE_EXP
+    need(sys.stdin.isatty() and sys.stdout.isatty(),
+         "serve needs an interactive terminal: the board belongs to the user, not to an agent")
+    KEY, SESSION, CODE = (secrets.token_urlsafe(n) for n in (32, 32, 24))
+    CODE_EXP = time.time() + 300
+    STATE.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=STATE)
+    with os.fdopen(fd, "w") as f:
+        f.write(hashlib.sha256(KEY.encode()).hexdigest() + "\n")
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, STATE / HASH_FILE)
+    srv = ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
+    print(f"board: 127.0.0.1:{srv.server_port}/?c={CODE}  (opens once, valid 5 minutes)", flush=True)
+    audit("serve", "", f"port {srv.server_port}")
+    srv.serve_forever()
+
+
+WATCH_FILE = "watch.json"
+WATCH_FIRST_PORT = 8766
+WATCH_PORT_TRIES = 11
+
+
+def bind_watch(port):
+    if port != "auto":
+        return ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
+    for p in range(WATCH_FIRST_PORT, WATCH_FIRST_PORT + WATCH_PORT_TRIES):
+        try:
+            return ThreadingHTTPServer(("127.0.0.1", p), Handler)
+        except OSError:
+            continue
+    die(f"no free port from {WATCH_FIRST_PORT} to {WATCH_FIRST_PORT + WATCH_PORT_TRIES - 1}")
+
+
+def cmd_watch(port):
+    """Read-only board. It holds no key and has no action routes, so an agent may start it."""
+    global READONLY, SESSION, CODE, CODE_EXP
+    READONLY = True
+    SESSION, CODE = secrets.token_urlsafe(32), secrets.token_urlsafe(24)
+    CODE_EXP = float("inf")
+    srv = bind_watch(port)
+    print(f"watch: 127.0.0.1:{srv.server_port}/?c={CODE}  (read-only, valid until this process stops)", flush=True)
+    audit("watch", "", f"port {srv.server_port}")
+    srv.serve_forever()
+
+
+def port_listening(port):
+    with socket.socket() as sock:
+        sock.settimeout(0.3)
+        return sock.connect_ex(("127.0.0.1", int(port))) == 0
+
+
+def pid_alive(pid):
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def ensure_watcher():
+    """Return the link of a running read-only board for this project, starting one if needed.
+
+    The board outlives the command that started it. It never starts the board with the buttons.
+    """
+    if os.environ.get("FACTORY_NO_WATCH") == "1" or config().get("auto_watch") is False:
+        return None
+    STATE.mkdir(parents=True, exist_ok=True)
+    with open(STATE / "watch.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            info = json.loads((STATE / WATCH_FILE).read_text())
+        except (OSError, ValueError):
+            info = {}
+        if info.get("url") and pid_alive(info.get("pid")) and port_listening(info.get("port", 0)):
+            return info["url"]
+        child = subprocess.Popen(
+            [sys.executable, "-I", str(Path(__file__).resolve()), "watch", "auto"], cwd=str(ROOT),
+            env={**os.environ, "FACTORY_ROOT": str(ROOT)}, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, start_new_session=True, text=True)
+        ready, _, _ = select.select([child.stdout], [], [], 10)
+        line = child.stdout.readline() if ready else ""
+        m = re.match(r"watch: (127\.0\.0\.1:(\d+)/\?c=\S+)", line)
+        child.stdout.close()
+        if not m:
+            child.kill()
+            child.wait()
+            return None
+        fd, tmp = tempfile.mkstemp(dir=STATE)
+        with os.fdopen(fd, "w") as f:
+            json.dump({"pid": child.pid, "port": int(m.group(2)), "url": m.group(1)}, f)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, STATE / WATCH_FILE)
+        return m.group(1)
+
+
+def announce_board():
+    url = ensure_watcher()
+    if url:
+        print(f"board: {url}", file=sys.stderr)
+
+
+def cmd_board():
+    url = ensure_watcher()
+    need(url, "auto_watch is off, or the read-only board could not start. Run `job watch` yourself")
+    print(url)
+
+
+HUMAN_ONLY = {"unblock"}
+COMMANDS = {
+    "create": (cmd_create, 4), "advance": (cmd_advance, 2), "route": (cmd_route, 2), "note": (cmd_note, 2),
+    "queue": (cmd_queue, 0), "board": (cmd_board, 0), "watch": (cmd_watch, 1), "serve": (cmd_serve, 1),
+}
+
+if __name__ == "__main__":
+    name, args = (sys.argv[1] if len(sys.argv) > 1 else ""), sys.argv[2:]
+    if name in HUMAN_ONLY:
+        die(f"{name} is a human action: use the board")
+    if name not in COMMANDS:
+        die(f"usage: job {'|'.join(COMMANDS)}")
+    fn, arity = COMMANDS[name]
+    if name in ("serve", "watch") and not args:
+        args = ["8765" if name == "serve" else str(WATCH_FIRST_PORT)]
+    need(len(args) == arity, f"{name} takes {arity} args" + (": <id> <title> <base> <head>" if name == "create" else ""))
+    fn(*args)
