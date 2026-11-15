@@ -1,0 +1,8 @@
+{
+  "permissions": [
+    { "action": "shell", "resource": "git commit*", "effect": "deny" },
+    { "action": "shell", "resource": "git push*", "effect": "deny" },
+    { "action": "shell", "resource": "gh pr create*", "effect": "deny" },
+    { "action": "shell", "resource": "glab mr create*", "effect": "deny" }
+  ]
+}
