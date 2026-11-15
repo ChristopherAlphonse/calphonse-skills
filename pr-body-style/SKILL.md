@@ -27,6 +27,7 @@ Write PR bodies that are short, business-focused, and accurate to the actual cod
 - Keep the description to 1 short paragraph plus 2-4 bullets when bullets help scanning.
 - Mention technical details only when they clarify behavior, reviewer risk, compatibility, CI impact, or deployment impact.
 - Avoid method-by-method or file-by-file narration unless the user explicitly asks for implementation detail.
+- Check the wording against the [unslop](../unslop/SKILL.md) skill.
 - Keep wording plain and direct. Prefer "Moves retry handling into the shared HTTP client" over deep root-cause prose.
 - Make every claim match the actual diff and current check status. Verify locally or on the git host when the status may have changed.
 - Keep "How to Test" concrete and minimal: commands run, user-visible checks, or CI status.
