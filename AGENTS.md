@@ -13,7 +13,7 @@ All skills live at the repository root as `{skill-name}/SKILL.md`. `AGENTS.md` i
 | [demo-script](demo-script/SKILL.md) | Short, natural, spoken demo script that explains what changed, shows it working, and ties it to business value |
 | [documentation-writer](documentation-writer/SKILL.md) | Diátaxis documentation expert: tutorials, how-tos, reference, explanation, plus product copy principles |
 | [dotnet](dotnet/SKILL.md) | Index and router for C#/.NET work: ASP.NET Core Web API endpoints, DTOs, error handling middleware, OpenAPI/Swagger, and design pattern reviews (Command, Factory, Repository, Provider, DI, SOLID) |
-| [humanizer](humanizer/SKILL.md) | Rewrite a first-person work write-up (performance review, self-review) in a warmer, reflective voice without changing the facts; can borrow the style of a sample |
+| [performance-review-humanizer](performance-review-humanizer/SKILL.md) | Rewrite a first-person work write-up (performance review, self-review) in a warmer, reflective voice without changing the facts; can borrow the style of a sample |
 | [lets-talk-about-it](lets-talk-about-it/SKILL.md) | One-pass interrogation plus coding guardrails: explicit assumptions, simplicity, surgical edits, verifiable success criteria; also guides a feature discussion and hands it off as a copy-ready prompt for an implementation session |
 | [nextjs-proxy-csp-hardening](nextjs-proxy-csp-hardening/SKILL.md) | Build and review secure Next.js `proxy.ts` files: CSP, nonce-based script protection, browser security headers, `middleware.ts` migration; includes a CSP bypass-techniques reference for authorized testing |
 | [pr-body-style](pr-body-style/SKILL.md) | Draft, rewrite, or audit PR bodies: accurate, short, business-focused |
@@ -26,6 +26,7 @@ All skills live at the repository root as `{skill-name}/SKILL.md`. `AGENTS.md` i
 | [spike](spike/SKILL.md) | Throwaway experiments, sized in story points, that answer a feasibility question before committing to a real build; the deliverable is the verdict, not the code |
 | [swe](swe/SKILL.md) | Pragmatic dev mode: smallest change that fully solves the task, and a reply a busy human reads once |
 | [typescript-strict-style](typescript-strict-style/SKILL.md) | Strict TS/JS discipline: assertion safety, exhaustive error handling, function size, naming, performance, dependency minimalism |
+| [unslop](unslop/SKILL.md) | Cut AI tells from any writing, with stable rule numbers other skills cite |
 | [vercel-react-best-practices](vercel-react-best-practices/SKILL.md) | React and Next.js performance rules from Vercel Engineering, plus general frontend patterns (components, hooks, state, forms, a11y) |
 | [whats-going-on](whats-going-on/SKILL.md) | One-pass codebase intelligence sweep: produces architecture.md, onboard.md (stack, conventions, concerns, use cases), and simplify-onboarding.md |
 
