@@ -179,7 +179,9 @@ class Factory(unittest.TestCase):
         os.close(slave)
         p.master = master
         self.procs.append(p)
-        threading.Timer(120, p.kill).start()
+        t = threading.Timer(120, p.kill)
+        t.daemon = True
+        t.start()
         buf = ""
         while "\n" not in buf:
             ready, _, _ = select.select([master], [], [], 20)
@@ -198,6 +200,7 @@ class Factory(unittest.TestCase):
             p.wait()
             os.close(p.master)
             p.stderr.close()
+        self.procs, self.port = [], None
 
     def http_full(self, method, path, cookie=True, xfactory=True, host=None, body=None, raw=None):
         conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=15)
@@ -236,8 +239,9 @@ class Factory(unittest.TestCase):
 
     def human_refused(self, action, jid):
         self.board()
-        st, _ = self.http("POST", f"/api/{action}", body={"id": jid})
+        st, out = self.http("POST", f"/api/{action}", body={"id": jid})
         self.assertEqual(st, 409, f"board unexpectedly accepted {action} {jid}")
+        return out
 
 
 class TestIds(Factory):
@@ -689,15 +693,16 @@ class TestPolicy(Factory):
         self.assertIn("feature.py", self.git("show", "--name-only", "--format=", "factory/j").stdout)
 
     def test_repo_precommit_hook_blocks_human_commit(self):
+        ran = self.base / "policy-ran"
         hook = self.root / ".git" / "hooks" / "pre-commit"
-        hook.write_text("#!/bin/sh\necho repo-policy >&2\nexit 1\n")
+        hook.write_text(f"#!/bin/sh\ntouch '{ran}'\nexit 1\n")
         hook.chmod(0o755)
         self.to_ship("j")
         before = self.commits("j")
-        r = self.human_refused("commit", "j")
+        self.human_refused("commit", "j")
+        self.assertTrue(ran.exists(), "the repo's own hook never ran")
         self.assertEqual(self.commits("j"), before)
         self.assertIsNone(self.js("j")["commit"])
-        self.assertIn("repo-policy", r.stdout + r.stderr)
 
     def test_repo_precommit_hook_exit_zero_runs_and_allows(self):
         ran = self.base / "hook-ran"
@@ -1015,7 +1020,7 @@ class TestServer(Factory):
         self.wf("a", "notes.txt", "t\n")
         st, body = self.http("GET", "/api/file?job=a&name=spec.md")
         self.assertEqual((st, body), (200, b"# spec\n"))
-        self.assertEqual(self.http("GET", "/api/file?job=a&name=spec.md", token=False)[0], 403)
+        self.assertEqual(self.http("GET", "/api/file?job=a&name=spec.md", cookie=False)[0], 403)
         self.assertEqual(self.http("GET", "/api/file?job=b&name=secret.md")[0], 200)
         self.assertEqual(self.http("GET", "/api/file?job=a&name=../b/secret.md")[0], 404)
         self.assertEqual(self.http("GET", "/api/file?job=a&name=..%2Fb%2Fsecret.md")[0], 404)
@@ -1105,9 +1110,10 @@ class TestHumanGate(Factory):
         self.to_build("j")
         (self.wt("j") / "a.txt").write_text("x\n")
         self.git("add", "a.txt", cwd=self.wt("j"))
-        self.assertFalse((self.state / "human.sha256").exists())
-        r = self.git("commit", "-m", "x", cwd=self.wt("j"), extra_env={"FACTORY_HUMAN_KEY": ""}, check=False)
-        self.assertNotEqual(r.returncode, 0)
+        self.stop_servers()
+        for key in ("", "guess"):
+            r = self.git("commit", "-m", "x", cwd=self.wt("j"), extra_env={"FACTORY_HUMAN_KEY": key}, check=False)
+            self.assertNotEqual(r.returncode, 0, f"commit succeeded with key {key!r} and no board running")
 
     def test_spec_edit_after_approval_blocks_build(self):
         self.new_spec("j")
@@ -1118,25 +1124,27 @@ class TestHumanGate(Factory):
         self.wf("j", "spec.md", "# spec\n")
         self.adv("j", "build")
 
-    def test_agent_commit_with_hooks_bypassed_is_caught_by_gate_and_commit(self):
+    def test_agent_commit_with_hooks_bypassed_parks_the_job(self):
         self.to_gate("j")
         wt = self.wt("j")
         (wt / ".github").mkdir()
         (wt / ".github" / "w.yml").write_text("evil\n")
         self.git("add", "-A", cwd=wt)
         r = self.git("-c", "core.hooksPath=/dev/null", "commit", "-m", "sneak", cwd=wt, check=False)
-        self.assertEqual(r.returncode, 0, r.stderr)
-        text = self.run_gate("j")
-        self.assertRegex(text, r"(?m)^GATE: FAIL$")
-        self.assertRegex(text, r"(?m)^REASON:")
+        self.assertEqual(r.returncode, 0, "premise: the hook layer alone can be bypassed")
+        out = self.no("gate", "j")
+        self.assertIn("branch moved outside the factory", out.stdout + out.stderr)
+        self.assertEqual(self.stage("j"), "needs-human")
+        self.assertNotIn("GATE: PASS", self.checks("j"))
 
-    def test_protected_change_committed_by_agent_is_still_a_protected_hit(self):
+    def test_protected_change_committed_by_agent_never_passes_the_gate(self):
         self.to_gate("j")
         wt = self.wt("j")
         (wt / "CODEOWNERS").write_text("* @evil\n")
         self.git("add", "-A", cwd=wt)
         self.git("-c", "core.hooksPath=/dev/null", "commit", "-m", "sneak", cwd=wt)
-        self.assertRegex(self.run_gate("j"), r"(?m)^GATE: FAIL$")
+        self.no("gate", "j")
+        self.assertEqual(self.stage("j"), "needs-human")
 
     def test_human_commit_refused_when_branch_has_foreign_commit(self):
         self.to_ship("j")
@@ -1145,12 +1153,16 @@ class TestHumanGate(Factory):
         self.human_refused("commit", "j")
         self.assertIsNone(self.js("j")["commit"])
 
-    def test_commit_restores_tampered_hooks_before_committing(self):
+    def test_tampered_hooks_park_the_job_and_unblock_restores_them(self):
         self.to_ship("j")
         hook = self.state / "hooks" / "j" / "pre-commit"
         hook.write_text("#!/bin/sh\nexit 0\n")
-        self.human("commit", "j")
+        self.human_refused("commit", "j")
+        self.assertEqual(self.stage("j"), "needs-human")
+        self.assertIn("hook files were changed", self.js("j")["note"])
+        self.human("unblock", "j")
         self.assertIn("human_ok", hook.read_text())
+        self.assertEqual(self.stage("j"), "build")
 
     def test_repo_hook_does_not_see_the_key(self):
         seen = self.base / "seen"
