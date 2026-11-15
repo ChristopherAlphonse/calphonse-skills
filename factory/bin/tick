@@ -68,6 +68,47 @@ def name(prefix):
     return " ".join(prefix)
 
 
+def read_policy_line(path, raw, rule, out):
+    """Apply one non-blank policy line to `out`; return the rule now being read."""
+    line = raw.strip()
+    if line.startswith("- capability:"):
+        if line.split(":", 1)[1].strip() != "shell":
+            die(f"{path.name}: only shell rules are supported, got {line!r}")
+        return {"effect": None, "match": False}
+    if rule is None:
+        die(f"{path.name}: unexpected line {raw!r}")
+    if line.startswith("effect:"):
+        rule["effect"] = line.split(":", 1)[1].strip()
+        if rule["effect"] not in out:
+            die(f"{path.name}: effect must be deny, ask, or allow, got {rule['effect']!r}")
+    elif line == "match:":
+        rule["match"] = True
+    elif line.startswith("- ") and rule["match"] and rule["effect"]:
+        out[rule["effect"]].append(line[2:].strip())
+    else:
+        die(f"{path.name}: cannot read line {raw!r}")
+    return rule
+
+
+def policy_rule_start(path, line):
+    if line.split(":", 1)[1].strip() != "shell":
+        die(f"{path.name}: only shell rules are supported, got {line!r}")
+    return {"effect": None, "match": False}
+
+
+def read_rule_line(path, out, rule, line, raw):
+    if line.startswith("effect:"):
+        rule["effect"] = line.split(":", 1)[1].strip()
+        if rule["effect"] not in out:
+            die(f"{path.name}: effect must be deny, ask, or allow, got {rule['effect']!r}")
+    elif line == "match:":
+        rule["match"] = True
+    elif line.startswith("- ") and rule["match"] and rule["effect"]:
+        out[rule["effect"]].append(line[2:].strip())
+    else:
+        die(f"{path.name}: cannot read line {raw!r}")
+
+
 def load_policy(path=POLICY_FILE, strict=True):
     out = {"deny": [], "ask": [], "allow": []}
     rule = None
@@ -76,21 +117,11 @@ def load_policy(path=POLICY_FILE, strict=True):
         if not line or line.startswith("#") or line == "rules:":
             continue
         if line.startswith("- capability:"):
-            if line.split(":", 1)[1].strip() != "shell":
-                die(f"{path.name}: only shell rules are supported, got {line!r}")
-            rule = {"effect": None, "match": False}
+            rule = policy_rule_start(path, line)
         elif rule is None:
             die(f"{path.name}: unexpected line {raw!r}")
-        elif line.startswith("effect:"):
-            rule["effect"] = line.split(":", 1)[1].strip()
-            if rule["effect"] not in out:
-                die(f"{path.name}: effect must be deny, ask, or allow, got {rule['effect']!r}")
-        elif line == "match:":
-            rule["match"] = True
-        elif line.startswith("- ") and rule["match"] and rule["effect"]:
-            out[rule["effect"]].append(line[2:].strip())
         else:
-            die(f"{path.name}: cannot read line {raw!r}")
+            read_rule_line(path, out, rule, line, raw)
     if strict and not all(out.values()):
         die(f"{path.name}: needs at least one deny, ask, and allow pattern")
     return out
@@ -156,50 +187,64 @@ def covers(wanted, have):
     return [p for p in wanted if p not in have]
 
 
+def dict_at(d, key):
+    v = d.get(key)
+    return v if isinstance(v, dict) else {}
+
+
+def claude_gaps(pol):
+    deny, ask = set(), set()
+    for f in ("settings.json", "settings.local.json"):
+        perms = read_json(ROOT / ".claude" / f).get("permissions", {})
+        deny |= set(perms.get("deny", []))
+        ask |= set(perms.get("ask", []))
+    gaps = [p for p in pol["deny"] if f"Bash({p})" not in deny]
+    gaps += [p for p in pol["ask"] if f"Bash({p})" not in deny | ask]
+    gaps += [f"write {g}" for g in NO_WRITE if f"Edit({g})" not in deny]
+    hooks_now = read_json(ROOT / ".claude" / "settings.json").get("hooks")
+    return gaps + guard_gaps("claude", hooks_now)
+
+
+def opencode_gaps(pol):
+    cfg = {}
+    for f in ("opencode.jsonc", "opencode.json"):
+        if (ROOT / f).exists():
+            cfg = read_json(ROOT / f, jsonc=True)
+            break
+    rules = {(r.get("action"), r.get("resource"), r.get("effect")) for r in cfg.get("permissions", [])}
+    legacy_cfg = dict_at(cfg, "permission")
+    legacy = dict_at(legacy_cfg, "bash")
+    legacy_edit = dict_at(legacy_cfg, "edit")
+
+    def effect(p):
+        return {e for e in ("deny", "ask") if ("shell", p, e) in rules or legacy.get(p) == e}
+    gaps = [p for p in pol["deny"] if "deny" not in effect(p)]
+    gaps += [p for p in pol["ask"] if not effect(p)]
+    gaps += [f"write {g}" for g in NO_WRITE if ("edit", g, "deny") not in rules and legacy_edit.get(g) != "deny"]
+    return gaps + guard_gaps("opencode", None)
+
+
+def kiro_gaps(pol):
+    cfg = read_json(ROOT / ".kiro" / "agents" / f"{SKILL}.json")
+    rules = cfg.get("permissions", {}).get("rules", [])
+
+    def matched(capability, effect):
+        return {m for r in rules if r.get("capability") == capability and r.get("effect") == effect for m in r.get("match", [])}
+    deny, ask = matched("shell", "deny"), matched("shell", "ask")
+    gaps = [p for p in pol["deny"] if p not in deny]
+    gaps += [p for p in pol["ask"] if p not in deny | ask]
+    gaps += [f"write {g}" for g in NO_WRITE if g not in matched("fs_write", "deny")]
+    gaps += guard_gaps("kiro", cfg.get("hooks"))
+    if cfg.get("allowedTools"):
+        gaps.append("agent must not carry allowedTools, which widen the rules")
+    return gaps
+
+
 def policy_gaps(harness):
     pol = shell_policy(harness)
-    if harness == "claude":
-        deny, ask = set(), set()
-        for f in ("settings.json", "settings.local.json"):
-            perms = read_json(ROOT / ".claude" / f).get("permissions", {})
-            deny |= set(perms.get("deny", []))
-            ask |= set(perms.get("ask", []))
-        gaps = [p for p in pol["deny"] if f"Bash({p})" not in deny]
-        gaps += [p for p in pol["ask"] if f"Bash({p})" not in deny | ask]
-        gaps += [f"write {g}" for g in NO_WRITE if f"Edit({g})" not in deny]
-        hooks_now = read_json(ROOT / ".claude" / "settings.json").get("hooks")
-        return gaps + guard_gaps("claude", hooks_now)
-    if harness == "opencode":
-        cfg = {}
-        for f in ("opencode.jsonc", "opencode.json"):
-            if (ROOT / f).exists():
-                cfg = read_json(ROOT / f, jsonc=True)
-                break
-        rules = {(r.get("action"), r.get("resource"), r.get("effect")) for r in cfg.get("permissions", [])}
-        legacy_cfg = cfg.get("permission") if isinstance(cfg.get("permission"), dict) else {}
-        legacy = legacy_cfg.get("bash", {}) if isinstance(legacy_cfg.get("bash"), dict) else {}
-        legacy_edit = legacy_cfg.get("edit", {}) if isinstance(legacy_cfg.get("edit"), dict) else {}
-
-        def effect(p):
-            return {e for e in ("deny", "ask") if ("shell", p, e) in rules or legacy.get(p) == e}
-        gaps = [p for p in pol["deny"] if "deny" not in effect(p)]
-        gaps += [p for p in pol["ask"] if not effect(p)]
-        gaps += [f"write {g}" for g in NO_WRITE if ("edit", g, "deny") not in rules and legacy_edit.get(g) != "deny"]
-        return gaps + guard_gaps("opencode", None)
-    if harness == "kiro":
-        cfg = read_json(ROOT / ".kiro" / "agents" / f"{SKILL}.json")
-        rules = cfg.get("permissions", {}).get("rules", [])
-
-        def matched(capability, effect):
-            return {m for r in rules if r.get("capability") == capability and r.get("effect") == effect for m in r.get("match", [])}
-        deny, ask = matched("shell", "deny"), matched("shell", "ask")
-        gaps = [p for p in pol["deny"] if p not in deny]
-        gaps += [p for p in pol["ask"] if p not in deny | ask]
-        gaps += [f"write {g}" for g in NO_WRITE if g not in matched("fs_write", "deny")]
-        gaps += guard_gaps("kiro", cfg.get("hooks"))
-        if cfg.get("allowedTools"):
-            gaps.append("agent must not carry allowedTools, which widen the rules")
-        return gaps
+    check = {"claude": claude_gaps, "opencode": opencode_gaps, "kiro": kiro_gaps}.get(harness)
+    if check:
+        return check(pol)
     die(f"unknown harness {harness!r}, expected one of {', '.join(COMMANDS)}")
 
 

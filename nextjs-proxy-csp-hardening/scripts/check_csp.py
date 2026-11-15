@@ -119,48 +119,50 @@ def extract_nonces(policy: str) -> set[str]:
     return set(re.findall(r"'nonce-([^']+)'", policy))
 
 
-def check(headers: dict[str, str], body: str) -> list[tuple[str, str]]:
-    """Return a list of (severity, message) findings."""
-    findings: list[tuple[str, str]] = []
+Finding = tuple[str, str]
 
-    header_policy = headers.get("content-security-policy")
-    report_only = headers.get("content-security-policy-report-only")
-    meta_policy = find_meta_csp(body)
 
+def _presence_findings(header_policy: str | None, report_only: str | None, meta_policy: str | None) -> list[Finding]:
+    findings: list[Finding] = []
     if report_only and not header_policy:
         findings.append((
             "FAIL",
             "Only Content-Security-Policy-Report-Only is set — nothing is enforced.",
         ))
-
     if not header_policy and not meta_policy:
         findings.append(("FAIL", "No enforced CSP found (header or meta tag)."))
-        return findings
-
-    if header_policy and meta_policy:
+    elif header_policy and meta_policy:
         findings.append((
             "INFO",
             "Both header and meta CSP present — browsers enforce the intersection (most restrictive).",
         ))
+    return findings
 
-    policy = header_policy or meta_policy
-    directives = parse_policy(policy)
 
-    for directive in NO_FALLBACK_DIRECTIVES:
-        if directive not in directives:
-            findings.append((
-                "FAIL",
-                f"Missing `{directive}` — no fallback to default-src, exploitable by default.",
-            ))
+def _directive_findings(directives: dict[str, list[str]]) -> list[Finding]:
+    findings: list[Finding] = [
+        (
+            "FAIL",
+            f"Missing `{directive}` — no fallback to default-src, exploitable by default.",
+        )
+        for directive in NO_FALLBACK_DIRECTIVES
+        if directive not in directives
+    ]
 
     if "object-src" not in directives and "default-src" not in directives:
         findings.append(("FAIL", "Missing `object-src` with no `default-src` fallback either."))
 
     script_src = directives.get("script-src") or directives.get("default-src") or []
-    for keyword, why in RISKY_KEYWORDS.items():
-        if keyword in script_src:
-            findings.append(("FAIL", f"`script-src` allows {keyword} — {why}"))
+    findings.extend(
+        ("FAIL", f"`script-src` allows {keyword} — {why}")
+        for keyword, why in RISKY_KEYWORDS.items()
+        if keyword in script_src
+    )
+    return findings
 
+
+def _meta_and_nonce_findings(policy: str, meta_policy: str | None) -> list[Finding]:
+    findings: list[Finding] = []
     if meta_policy and "frame-ancestors" in parse_policy(meta_policy):
         findings.append((
             "INFO",
@@ -174,7 +176,22 @@ def check(headers: dict[str, str], body: str) -> list[tuple[str, str]]:
             f"Nonce(s) found: {', '.join(sorted(nonces))}. Re-run this script against a second "
             "request and diff the nonce to check for reuse.",
         ))
+    return findings
 
+
+def check(headers: dict[str, str], body: str) -> list[Finding]:
+    """Return a list of (severity, message) findings."""
+    header_policy = headers.get("content-security-policy")
+    report_only = headers.get("content-security-policy-report-only")
+    meta_policy = find_meta_csp(body)
+
+    findings = _presence_findings(header_policy, report_only, meta_policy)
+    policy = header_policy or meta_policy
+    if not policy:
+        return findings
+
+    findings += _directive_findings(parse_policy(policy))
+    findings += _meta_and_nonce_findings(policy, meta_policy)
     return findings
 
 

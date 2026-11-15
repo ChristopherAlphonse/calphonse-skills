@@ -498,24 +498,40 @@ class Handler(BaseHTTPRequestHandler):
                 CODE = ""
             return good
 
+    def get_root(self, q):
+        if not self.host_ok():
+            return self.send(403, "{}")
+        if self.session_ok():
+            return self.send(200, (DASH_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if self.redeem_code(q.get("c", [""])[0]):
+            cookie = f"{COOKIE}={SESSION}; HttpOnly; SameSite=Strict; Path=/"
+            return self.send(303, "", extra={"Location": "/", "Set-Cookie": cookie})
+        return self.send(403, "{}")
+
+    def get_static(self, name):
+        if not (self.host_ok() and self.session_ok()) or name not in STATIC:
+            return self.send(403, "{}")
+        return self.send(200, (DASH_DIR / name).read_bytes(), STATIC[name])
+
+    def get_file(self, jid, name):
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", jid):
+            return self.send(404, "{}")
+        try:
+            p = (jobdir(jid) / name).resolve()
+            if jobdir(jid).resolve() not in p.parents or p.suffix != ".md" or not p.is_file():
+                return self.send(404, "{}")
+            return self.send(200, p.read_text(), "text/plain; charset=utf-8")
+        except (ValueError, OSError):
+            return self.send(404, "{}")
+
     def do_GET(self):
         from urllib.parse import urlparse, parse_qs
         u = urlparse(self.path)
         q = parse_qs(u.query)
         if u.path == "/":
-            if not self.host_ok():
-                return self.send(403, "{}")
-            if self.session_ok():
-                return self.send(200, (DASH_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
-            if self.redeem_code(q.get("c", [""])[0]):
-                cookie = f"{COOKIE}={SESSION}; HttpOnly; SameSite=Strict; Path=/"
-                return self.send(303, "", extra={"Location": "/", "Set-Cookie": cookie})
-            return self.send(403, "{}")
+            return self.get_root(q)
         if u.path.startswith("/static/"):
-            name = u.path[len("/static/"):]
-            if not (self.host_ok() and self.session_ok()) or name not in STATIC:
-                return self.send(403, "{}")
-            return self.send(200, (DASH_DIR / name).read_bytes(), STATIC[name])
+            return self.get_static(u.path[len("/static/"):])
         if not self.trusted():
             return self.send(403, "{}")
         if u.path == "/api/mode":
@@ -523,16 +539,7 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/jobs":
             return self.send(200, json.dumps([snapshot(j) for j in all_jobs()]))
         if u.path == "/api/file":
-            jid, name = q.get("job", [""])[0], q.get("name", [""])[0]
-            if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", jid):
-                return self.send(404, "{}")
-            try:
-                p = (jobdir(jid) / name).resolve()
-                if jobdir(jid).resolve() not in p.parents or p.suffix != ".md" or not p.is_file():
-                    return self.send(404, "{}")
-                return self.send(200, p.read_text(), "text/plain; charset=utf-8")
-            except (ValueError, OSError):
-                return self.send(404, "{}")
+            return self.get_file(q.get("job", [""])[0], q.get("name", [""])[0])
         self.send(404, "{}")
 
     def do_POST(self):
