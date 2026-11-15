@@ -118,6 +118,7 @@ class TestPorts(AutoWatch):
     def test_a_busy_first_port_moves_to_the_next_free_one(self):
         blocker = socket.socket()
         self.addCleanup(blocker.close)
+        blocker.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             blocker.bind(("127.0.0.1", 8766))
             blocker.listen(1)
