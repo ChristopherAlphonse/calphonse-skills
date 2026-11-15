@@ -1,0 +1,319 @@
+#!/usr/bin/env python3
+"""Run one factory-review pass headlessly in any supported harness, only if its deny policy is installed.
+
+  tick <harness> [--dry-run]   check policy, then run one pass
+  tick check <harness>         exit 0 when the project's policy covers policy.yaml and every blocked command
+  tick install <harness>       write the harness's policy into the project, never overwriting
+  tick print <harness>         print the policy to merge by hand
+  tick list                    print the blocked command prefixes, one per line
+
+The baseline rules (deny, ask, allow) live in ../policy.yaml. Every harness gets them, plus the stricter
+denies below. Deny beats ask, and ask beats allow. An unattended pass cannot answer an ask, so an ask
+stops the command until a human runs it.
+"""
+import json, os, re, shlex, shutil, subprocess, sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(os.environ.get("FACTORY_ROOT", Path.cwd())).resolve()
+SKILL = "factory-review"
+POLICY_DIR = Path(__file__).resolve().parent.parent
+POLICY_FILE = POLICY_DIR / "policy.yaml"
+POLICY_EXTRA = []  # more rule files this skill loads
+# Flags that make a tool rewrite files. A skill that must not change the code it reads asks before them,
+# and ask beats the broad allow rules such as `eslint *`.
+REWRITE_ASK = ["*--fix*", "*--write*", "*--apply*", "*--autocorrect*", "*--auto-correct*",
+              "*--updateSnapshot*", "*--update-snapshots*", "*--snapshot-update*"]
+PROMPT = ("Use the factory-review skill and run one pass (factory-review run). Wait for every reviewer you spawn. "
+          "Never edit the code under review. Never commit, push, merge, post a comment, or create a PR or MR. Stop after the pass.")
+GIT_WRITES = ["commit", "push", "merge", "cherry-pick", "revert", "rebase", "am",
+              "commit-tree", "update-ref", "symbolic-ref", "config", "fast-import"]
+GIT_GLOBALS = ["-c", "-C", "--git-dir", "--work-tree", "--namespace"]
+BLOCKED = ([("git", g) for g in GIT_WRITES] + [("git", g) for g in GIT_GLOBALS]
+           + [("gh",), ("glab",), ("curl",), ("wget",), ("sh", "-c"), ("bash", "-c"), ("zsh", "-c")])
+# Kiro denies by glob over each command, so wrappers that hide a blocked command need their own entries.
+KIRO_WRAPPERS = ["env", "xargs", "eval", "exec", "nohup", "sudo", "command", "builtin"]
+# `git --no-pager commit` and every other global option hide the verb, so match the verb anywhere after `git`.
+KIRO_GIT_ANYWHERE = [m for g in GIT_WRITES for m in (f"git * {g}", f"git * {g} *")]
+KIRO_TOOLS = ["read", "write", "shell", "grep", "glob", "subagent"]
+NO_WRITE = ["**/.kiro/**", "**/.claude/**", "**/.git/**", "**/.planning/**/job.json", "**/.planning/**/audit.log",
+            "**/.planning/**/config.json", "**/.worktrees/**"]
+# Claude Code and OpenCode enforce this allow list. Kiro does not: it allows unnamed workspace writes (measured).
+WRITE_ONLY = ["**/.planning/factory-review/**"]
+KIRO_DESCRIPTION = "Code review orchestrator. Runs one pass of the factory-review skill and never edits code, commits, pushes, or posts to a forge."
+KIRO_PROMPT = "Use the factory-review skill. Run one pass and stop. Never edit the code under review. Never commit, push, merge, post a comment, or create a PR or MR."
+COMMANDS = {
+    "claude": lambda p: ["claude", "-p", p],
+    "opencode": lambda p: ["opencode", "run", p],
+    "kiro": lambda p: ["kiro-cli", "chat", "--v3", "--no-interactive", "--agent", "factory-review", p],
+}
+
+
+def die(msg, code=2):
+    print(f"refused: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def strip_jsonc(text):
+    return json.loads(re.sub(r'^\s*//.*$', "", text, flags=re.M))
+
+
+def read_json(path, jsonc=False):
+    try:
+        text = Path(path).read_text()
+        return strip_jsonc(text) if jsonc else json.loads(text)
+    except (OSError, ValueError):
+        return {}
+
+
+def name(prefix):
+    return " ".join(prefix)
+
+
+def load_policy(path=POLICY_FILE, strict=True):
+    out = {"deny": [], "ask": [], "allow": []}
+    rule = None
+    for raw in Path(path).read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line == "rules:":
+            continue
+        if line.startswith("- capability:"):
+            if line.split(":", 1)[1].strip() != "shell":
+                die(f"{path.name}: only shell rules are supported, got {line!r}")
+            rule = {"effect": None, "match": False}
+        elif rule is None:
+            die(f"{path.name}: unexpected line {raw!r}")
+        elif line.startswith("effect:"):
+            rule["effect"] = line.split(":", 1)[1].strip()
+            if rule["effect"] not in out:
+                die(f"{path.name}: effect must be deny, ask, or allow, got {rule['effect']!r}")
+        elif line == "match:":
+            rule["match"] = True
+        elif line.startswith("- ") and rule["match"] and rule["effect"]:
+            out[rule["effect"]].append(line[2:].strip())
+        else:
+            die(f"{path.name}: cannot read line {raw!r}")
+    if strict and not all(out.values()):
+        die(f"{path.name}: needs at least one deny, ask, and allow pattern")
+    return out
+
+
+def uniq(items):
+    return list(dict.fromkeys(items))
+
+
+def shell_policy(harness):
+    base = load_policy()
+    for extra in POLICY_EXTRA:
+        more = load_policy(POLICY_DIR / extra, strict=False)
+        base = {k: base[k] + more[k] for k in base}
+    base["ask"] = base["ask"] + REWRITE_ASK
+    stricter = [f"{name(b)} *" for b in BLOCKED]
+    if harness == "kiro":
+        stricter += [f"{w} *" for w in KIRO_WRAPPERS]
+        stricter += KIRO_GIT_ANYWHERE
+    deny, ask = uniq(base["deny"] + stricter), uniq(base["ask"])
+    allow = [a for a in base["allow"] + [f"*/{SKILL}/bin/job *"] + project_allow() if a not in deny + ask]
+    return {"deny": deny, "ask": ask, "allow": uniq(allow)}
+
+
+def project_allow():
+    """Commands this project allowed on top of policy.yaml: `allow` patterns and the `checks` command.
+
+    The file is in NO_WRITE, so an agent cannot widen its own rules. A deny or ask still wins.
+    """
+    path = ROOT / ".planning" / SKILL / "config.json"
+    cfg = read_json(path) if path.exists() else {}
+    extra = cfg.get("allow", [])
+    if not (isinstance(extra, list) and all(isinstance(x, str) and x.strip() for x in extra)):
+        die(f"{path}: `allow` must be a list of non-empty strings")
+    checks = cfg.get("checks", "")
+    if not isinstance(checks, str):
+        die(f"{path}: `checks` must be a string")
+    parts = [c.strip() for c in re.split(r"&&|;", checks) if c.strip()]  # a harness checks each part of a chain
+    return uniq([x.strip() for x in extra] + ([checks.strip()] if checks.strip() else []) + parts)
+
+
+def claude_rules(kind):
+    pol = shell_policy("claude")[kind]
+    rules = [f"Bash({p})" for p in pol]
+    if kind == "deny":
+        for g in GIT_WRITES:
+            rules += [f"Bash(git * {g} *)", f"Bash(git * {g})"]
+        rules += [f"Edit({g})" for g in NO_WRITE]
+    if kind == "allow":
+        rules += [f"Edit({g})" for g in WRITE_ONLY] if WRITE_ONLY else ["Edit"]
+    return uniq(rules)
+
+
+def opencode_rules():
+    pol = shell_policy("opencode")
+    rules = [{"action": "shell", "resource": p, "effect": e} for e in ("allow", "ask", "deny") for p in pol[e]]
+    rules += [{"action": "edit", "resource": g, "effect": "allow"} for g in (WRITE_ONLY or ["**"])]
+    rules += [{"action": "edit", "resource": g, "effect": "deny"} for g in NO_WRITE]
+    return rules
+
+
+def covers(wanted, have):
+    return [p for p in wanted if p not in have]
+
+
+def policy_gaps(harness):
+    pol = shell_policy(harness)
+    if harness == "claude":
+        deny, ask = set(), set()
+        for f in ("settings.json", "settings.local.json"):
+            perms = read_json(ROOT / ".claude" / f).get("permissions", {})
+            deny |= set(perms.get("deny", []))
+            ask |= set(perms.get("ask", []))
+        gaps = [p for p in pol["deny"] if f"Bash({p})" not in deny]
+        gaps += [p for p in pol["ask"] if f"Bash({p})" not in deny | ask]
+        return gaps + [f"write {g}" for g in NO_WRITE if f"Edit({g})" not in deny]
+    if harness == "opencode":
+        cfg = {}
+        for f in ("opencode.jsonc", "opencode.json"):
+            if (ROOT / f).exists():
+                cfg = read_json(ROOT / f, jsonc=True)
+                break
+        rules = {(r.get("action"), r.get("resource"), r.get("effect")) for r in cfg.get("permissions", [])}
+        legacy_cfg = cfg.get("permission") if isinstance(cfg.get("permission"), dict) else {}
+        legacy = legacy_cfg.get("bash", {}) if isinstance(legacy_cfg.get("bash"), dict) else {}
+        legacy_edit = legacy_cfg.get("edit", {}) if isinstance(legacy_cfg.get("edit"), dict) else {}
+
+        def effect(p):
+            return {e for e in ("deny", "ask") if ("shell", p, e) in rules or legacy.get(p) == e}
+        gaps = [p for p in pol["deny"] if "deny" not in effect(p)]
+        gaps += [p for p in pol["ask"] if not effect(p)]
+        return gaps + [f"write {g}" for g in NO_WRITE if ("edit", g, "deny") not in rules and legacy_edit.get(g) != "deny"]
+    if harness == "kiro":
+        cfg = read_json(ROOT / ".kiro" / "agents" / f"{SKILL}.json")
+        rules = cfg.get("permissions", {}).get("rules", [])
+
+        def matched(capability, effect):
+            return {m for r in rules if r.get("capability") == capability and r.get("effect") == effect for m in r.get("match", [])}
+        deny, ask = matched("shell", "deny"), matched("shell", "ask")
+        gaps = [p for p in pol["deny"] if p not in deny]
+        gaps += [p for p in pol["ask"] if p not in deny | ask]
+        gaps += [f"write {g}" for g in NO_WRITE if g not in matched("fs_write", "deny")]
+        guard_files, guard_hooks = kiro_guard_files()
+        if cfg.get("hooks") != guard_hooks:
+            gaps.append(f"the {SKILL} agent must carry exactly the kiro-guard hook")
+        for rel, text in guard_files.items():
+            try:
+                current = (ROOT / rel).read_text()
+            except OSError:
+                current = None
+            if current != text:
+                gaps.append(f"{rel} is missing or differs from `tick print kiro`")
+        if cfg.get("allowedTools"):
+            gaps.append("agent must not carry allowedTools, which widen the rules")
+        return gaps
+    die(f"unknown harness {harness!r}, expected one of {', '.join(COMMANDS)}")
+
+
+def kiro_guard_files():
+    """The PreToolUse hook that enforces the whole policy even under --trust-all-tools, which approves every ask."""
+    pol = shell_policy("kiro")
+    rules = {**pol, "no_write": NO_WRITE, "write_only": WRITE_ONLY or []}
+    hooks = f".kiro/hooks/{SKILL}-guard"
+    script = (Path(__file__).resolve().parent / "kiro-guard").read_text()
+    command = f"python3 {shlex.quote(str(ROOT / (hooks + '.py')))} {shlex.quote(str(ROOT / (hooks + '.json')))}"
+    return ({f"{hooks}.py": script, f"{hooks}.json": json.dumps(rules, indent=2) + "\n"},
+            {"preToolUse": [{"matcher": "*", "command": command}]})
+
+
+def policy_files(harness):
+    if harness == "claude":
+        perms = {kind: claude_rules(kind) for kind in ("deny", "ask", "allow")}
+        return {".claude/settings.json": json.dumps({"permissions": perms}, indent=2) + "\n"}
+    if harness == "opencode":
+        return {"opencode.jsonc": json.dumps({"permissions": opencode_rules()}, indent=2) + "\n"}
+    if harness == "kiro":
+        pol = shell_policy("kiro")
+        guard_files, guard_hooks = kiro_guard_files()
+        agent = {
+            "name": SKILL,
+            "description": KIRO_DESCRIPTION,
+            "prompt": KIRO_PROMPT,
+            "tools": KIRO_TOOLS,
+            "resources": ["skill://.kiro/skills/*/SKILL.md"],
+            "hooks": guard_hooks,
+            "permissions": {"rules": [
+                {"capability": "fs_read", "effect": "allow"},
+                {"capability": "fs_write", "effect": "allow", **({"match": WRITE_ONLY} if WRITE_ONLY else {})},
+                {"capability": "shell", "effect": "allow", "match": pol["allow"]},
+                {"capability": "shell", "effect": "ask", "match": pol["ask"]},
+                {"capability": "fs_write", "effect": "deny", "match": NO_WRITE},
+                {"capability": "shell", "effect": "deny", "match": pol["deny"]},
+            ]},
+        }
+        return {f".kiro/agents/{SKILL}.json": json.dumps(agent, indent=2) + "\n", **guard_files}
+    die(f"unknown harness {harness!r}, expected one of {', '.join(COMMANDS)}")
+
+
+def log(harness, detail):
+    state = ROOT / ".planning" / "factory-review"
+    state.mkdir(parents=True, exist_ok=True)
+    line = json.dumps({"ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "actor": "tick",
+                       "action": "tick", "job": "", "detail": f"{harness}: {detail}"}) + "\n"
+    fd = os.open(state / "audit.log", os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    try:
+        os.write(fd, line.encode())
+    finally:
+        os.close(fd)
+
+
+def cmd_install(harness):
+    files = policy_files(harness)
+    clashes = [f for f in files if (ROOT / f).exists()]
+    if clashes:
+        die(f"already exists, merge the output of `tick print {harness}` by hand: " + ", ".join(clashes))
+    for rel, text in files.items():
+        dest = ROOT / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(text)
+        print(f"installed {rel}")
+
+
+def cmd_print(harness):
+    for rel, text in policy_files(harness).items():
+        print(f"# {rel}\n{text}", end="")
+
+
+def cmd_check(harness, quiet=False):
+    gaps = policy_gaps(harness)
+    if gaps:
+        die(f"{harness} policy does not cover: {', '.join(gaps)}. Run `tick install {harness}` or merge the rules.")
+    if not quiet:
+        print(f"{harness}: policy ok")
+
+
+def cmd_run(harness, dry):
+    cmd_check(harness, quiet=True)
+    argv = COMMANDS[harness](PROMPT)
+    if dry:
+        print(json.dumps(argv))
+        return
+    need = argv[0]
+    if not shutil.which(need):
+        die(f"{need} is not on PATH")
+    log(harness, "start")
+    code = subprocess.run(argv, cwd=ROOT).returncode
+    log(harness, f"exit {code}")
+    sys.exit(code)
+
+
+if __name__ == "__main__":
+    a = sys.argv[1:]
+    if len(a) == 2 and a[0] == "install":
+        cmd_install(a[1])
+    elif len(a) == 2 and a[0] == "check":
+        cmd_check(a[1])
+    elif len(a) == 2 and a[0] == "print":
+        cmd_print(a[1])
+    elif a == ["list"]:
+        print("\n".join(name(b) for b in BLOCKED))
+    elif len(a) in (1, 2) and a[0] in COMMANDS and (len(a) == 1 or a[1] == "--dry-run"):
+        cmd_run(a[0], len(a) == 2)
+    else:
+        die("usage: tick <claude|opencode|kiro> [--dry-run] | check|install|print <h> | list")

@@ -32,6 +32,15 @@ class TestWatch(Watch):
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("interactive terminal", r.stderr)
 
+    def test_static_assets_need_a_session_and_are_whitelisted(self):
+        self.start_watch()
+        self.assertEqual(self.http_full("GET", "/static/app.js", cookie=False)[0], 403)
+        self.assertEqual(self.http_full("GET", "/static/../bin/job")[0], 403)
+        self.assertEqual(self.http_full("GET", "/static/nope.js")[0], 403)
+        status, _, headers = self.http_full("GET", "/static/app.js", xfactory=False)
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Content-Type"], "text/javascript")
+
     def test_login_rules(self):
         self.start_watch()
         self.assertEqual(self.http_full("GET", "/", cookie=False)[0], 403)

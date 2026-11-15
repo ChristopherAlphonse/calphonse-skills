@@ -1,0 +1,284 @@
+:root {
+  --bg: #f6f7f9;
+  --col: #eceef2;
+  --card: #fff;
+  --ink: #1b1f27;
+  --mute: #667085;
+  --line: #d9dde5;
+  --ok: #1a7f4b;
+  --bad: #c0362c;
+  --warn: #a96a00;
+  --you: #6b3fd4;
+  --acc: #2a5bd7;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1115;
+    --col: #171a21;
+    --card: #1e222b;
+    --ink: #e6e9ef;
+    --mute: #8b93a3;
+    --line: #2c313c;
+    --ok: #4cc38a;
+    --bad: #ff7b72;
+    --warn: #e0a53a;
+    --you: #b497ff;
+    --acc: #7aa2ff;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1115;
+  --col: #171a21;
+  --card: #1e222b;
+  --ink: #e6e9ef;
+  --mute: #8b93a3;
+  --line: #2c313c;
+  --ok: #4cc38a;
+  --bad: #ff7b72;
+  --warn: #e0a53a;
+  --you: #b497ff;
+  --acc: #7aa2ff;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font:
+    14px/1.4 system-ui,
+    sans-serif;
+}
+header {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+h1 {
+  font-size: 16px;
+  margin: 0;
+}
+#meta {
+  color: var(--mute);
+  font-size: 12px;
+}
+.policy {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--you);
+}
+#board {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  align-items: flex-start;
+}
+.col {
+  background: var(--col);
+  border-radius: 8px;
+  min-width: 210px;
+  flex: 1 0 210px;
+  padding: 8px;
+}
+.col h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--mute);
+  margin: 2px 4px 8px;
+  display: flex;
+  justify-content: space-between;
+}
+.col.you h2 {
+  color: var(--you);
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.card.hold {
+  border-color: var(--you);
+  box-shadow: 0 0 0 1px var(--you);
+}
+.card .t {
+  font-weight: 600;
+}
+.card .id {
+  color: var(--mute);
+  font-size: 11px;
+}
+.row {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.chip {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  color: var(--mute);
+}
+.chip.PASS {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+.chip.FAIL,
+.chip.CHANGES {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+.bar {
+  height: 4px;
+  background: var(--line);
+  border-radius: 2px;
+  margin-top: 7px;
+  overflow: hidden;
+}
+.bar i {
+  display: block;
+  height: 100%;
+  background: var(--acc);
+}
+button {
+  font: inherit;
+  border: 1px solid var(--you);
+  background: transparent;
+  color: var(--you);
+  border-radius: 5px;
+  padding: 3px 9px;
+  cursor: pointer;
+  margin-top: 7px;
+}
+button:hover {
+  background: var(--you);
+  color: #fff;
+}
+#drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(920px, 100%);
+  background: var(--card);
+  border-left: 1px solid var(--line);
+  padding: 14px;
+  overflow: auto;
+  display: none;
+}
+#drawer.open {
+  display: block;
+}
+#dbody {
+  word-break: break-word;
+}
+#dbody.raw {
+  white-space: pre-wrap;
+  background: var(--col);
+  padding: 10px;
+  border-radius: 6px;
+  font:
+    12px/1.4 ui-monospace,
+    monospace;
+}
+#dbody.md {
+  font-size: 13px;
+  line-height: 1.5;
+}
+#dbody.md h1,
+#dbody.md h2,
+#dbody.md h3,
+#dbody.md h4 {
+  margin: 14px 0 6px;
+  line-height: 1.25;
+}
+#dbody.md h1 {
+  font-size: 18px;
+}
+#dbody.md h2 {
+  font-size: 15px;
+}
+#dbody.md h3,
+#dbody.md h4 {
+  font-size: 13px;
+}
+#dbody.md p,
+#dbody.md ul,
+#dbody.md ol,
+#dbody.md blockquote,
+#dbody.md table {
+  margin: 0 0 10px;
+}
+#dbody.md ul,
+#dbody.md ol {
+  padding-left: 22px;
+}
+#dbody.md code {
+  background: var(--col);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font:
+    12px ui-monospace,
+    monospace;
+}
+#dbody.md pre {
+  background: var(--col);
+  padding: 10px;
+  border-radius: 6px;
+  overflow: auto;
+  margin: 0 0 10px;
+}
+#dbody.md pre code {
+  padding: 0;
+  background: none;
+}
+#dbody.md blockquote {
+  border-left: 3px solid var(--line);
+  padding-left: 10px;
+  color: var(--mute);
+}
+#dbody.md a {
+  color: var(--acc);
+}
+#dbody.md hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+#dbody.md .tw {
+  overflow-x: auto;
+}
+#dbody.md table {
+  border-collapse: collapse;
+}
+#dbody.md th,
+#dbody.md td {
+  border: 1px solid var(--line);
+  padding: 3px 8px;
+  text-align: left;
+}
+#drawer .files {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+#drawer .files .chip {
+  cursor: pointer;
+}
+#drawer .files .chip.on {
+  color: var(--acc);
+  border-color: var(--acc);
+}
+.x {
+  float: right;
+  margin: 0;
+}

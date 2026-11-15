@@ -52,7 +52,7 @@ npx skills update -y       # no prompts
 - [pr-body-style](pr-body-style/SKILL.md): Draft, rewrite, or audit PR bodies: accurate, short, business-focused
 - [comment-sicko](comment-sicko/SKILL.md): A deranged comment-hater that savors deletion and condemns workaround code
 - [prove-it-works](prove-it-works/SKILL.md): Verify a finished task against the real artifact, not a proxy, self-report, or "it compiles", then write a UAT document so the user can confirm it themselves
-- [factory-test](factory-test/SKILL.md): Separate workflow that reviews a branch with the review and QA skills: scope, parallel reviewers, reconcile, verify by rerunning the evidence, then a report with paste-ready comments. Read-only, and it picks stack skills by codebase
+- [factory-review](factory-review/SKILL.md): Code review counterpart of factory (same layout, own engine) that reviews a branch with the review and QA skills: scope, parallel reviewers, reconcile, verify by rerunning the evidence, then a report with paste-ready comments. Read-only, and it picks stack skills by codebase
 
 ### Cloud
 

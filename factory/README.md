@@ -4,7 +4,7 @@ The factory takes a feature from idea to a reviewed, committed change on a local
 
 It never pushes and never opens a PR or MR. The only commit is the one you make by clicking a button on the board.
 
-To review an existing branch, use the separate `factory-test` skill. It runs on the same engine and board and never writes code.
+To review an existing branch, use the separate `factory-review` skill. It has the same layout, its own engine and board, and never writes code.
 
 `SKILL.md` is the contract an agent follows. This file explains how the pieces fit.
 
@@ -17,8 +17,8 @@ To review an existing branch, use the separate `factory-test` skill. It runs on 
    { "checks": "npm test" }
    ```
 
-   Other keys: `concurrency` (default 1), `max_rounds` (default 3), `base_branch` (default `main`), and extra `protected_paths`.
-3. Install the deny rules for your harness: `bin/tick install claude`.
+   Other keys: `concurrency` (default 1), `max_rounds` (default 3), `base_branch` (default `main`), extra `protected_paths`, and `allow` (extra shell patterns the agents may run unattended, such as `make verify*`; your `checks` command is allowed already). Test, lint, format-check, and quality tools for the common stacks are allowed by `policy.yaml`. Formatters that rewrite files are in `policy.build.yaml`, which only this skill loads.
+3. Install the policy for your harness: `bin/tick install claude`. It comes from `policy.yaml`.
 4. Start a job in Claude Code with `/factory <feature idea>`.
 5. Open the board in your own terminal with `bin/job serve`, then open the address it prints.
 6. Keep passes going with `/loop 5m /factory run`, or schedule `bin/tick claude` with cron.
@@ -165,12 +165,12 @@ flowchart TD
 
 | Layer | What it does | Strength |
 | --- | --- | --- |
-| Deny rules from `bin/tick` | stop the agent running commit, push, merge, rebase, cherry-pick, revert, am, commit-tree, update-ref, symbolic-ref, config, fast-import, git global options (`-c`, `-C`), `gh`, `glab`, `curl`, `wget`, and `sh -c` | Measured on Claude Code: 24 of 24 attack spellings blocked, each succeeding in a no-policy control. A script that shells out is not covered |
+| Policy from `bin/tick` (`policy.yaml` plus a stricter deny list, and file-write limits) | stop the agent running commit, push, merge, rebase, cherry-pick, revert, am, commit-tree, update-ref, symbolic-ref, config, fast-import, git global options (`-c`, `-C`), `gh`, `glab`, `curl`, `wget`, and `sh -c` | Measured on Claude Code: 24 of 24 attack spellings blocked, each succeeding in a no-policy control. A script that shells out is not covered |
 | Integrity checks in `bin/job` | detect a moved branch tip, changed hooks, a commit on a remote ref, a detached HEAD, or `job.json` that disagrees with the audit log | Detects, does not prevent. Parks the job on you |
 | Git hooks in each worktree | refuse commits and pushes without the board's key, and chain to the repo's own hooks | A speed bump. `git -c core.hooksPath=/dev/null` and `push --no-verify` get past them |
 | Board key and session | keep approve, commit, and unblock out of the CLI | Stops an agent using the CLI. A process running as you could open its own terminal |
 | Protected paths | fail the gate when the diff touches CI config, CODEOWNERS, `.env`, hook config, and similar | Hard, for jobs the factory runs |
-| `bin/tick` | refuses a headless pass unless the deny rules are installed | Hard, for the runs it starts |
+| `bin/tick` | refuses a headless pass unless the policy is installed | Hard, for the runs it starts |
 | Branch protection on your remote | the only layer outside the agent's reach | Turn it on for every repo the factory touches |
 
 ## Files
@@ -179,7 +179,7 @@ State lives in the project, never in this repo.
 
 | Path | Holds |
 | --- | --- |
-| `.planning/factory/config.json` | `checks`, `concurrency`, `max_rounds`, `base_branch`, `protected_paths` |
+| `.planning/factory/config.json` | `checks`, `concurrency`, `max_rounds`, `base_branch`, `protected_paths`, `allow` |
 | `.planning/factory/jobs/<id>/job.json` | the job's state, written only by `bin/job` |
 | `.planning/factory/jobs/<id>/*.md` | the stage files from the table above |
 | `.planning/factory/audit.log` | one JSON line per state change, with the actor (`agent`, `human`, or `tick`) |
@@ -191,7 +191,7 @@ State lives in the project, never in this repo.
 | Command | Does |
 | --- | --- |
 | `bin/job create <id> "<title>"` | start a build job at shape |
-| `bin/job create <id> "<title>" --review BASE HEAD` | start a review job at scope (the `factory-test` skill uses this) |
+| `bin/job create <id> "<title>" --review BASE HEAD` | start a review job at scope. Left over from before the split: `factory-review` has its own engine and no longer uses it |
 | `bin/job stack <id>` | recompute the stack skills for a job |
 | `bin/job queue` | list jobs as `action id stage hint` |
 | `bin/job advance <id> <stage>` | move a job if the evidence allows it |
@@ -201,12 +201,12 @@ State lives in the project, never in this repo.
 | `bin/job note <id> "<text>"` | record what the agent is doing now; the card shows the latest note |
 | `bin/job serve [port]` | start the board with the approve, commit, and unblock buttons (needs your terminal, default port 8765) |
 | `bin/job watch [port]` | start a read-only board to follow along (no terminal needed, no buttons, default port 8766) |
-| `bin/tick <harness> [--dry-run]` | run one headless pass if the deny rules are installed |
-| `bin/tick install`, `check`, `print`, `list` | install, verify, show, or list the deny rules |
+| `bin/tick <harness> [--dry-run]` | run one headless pass if the policy is installed |
+| `bin/tick install`, `check`, `print`, `list` | install, verify, show, or list the policy |
 
 ## Harnesses
 
-Claude Code is the supported harness. OpenCode and Kiro adapters exist and are untested. Codex support was removed.
+Claude Code is the primary harness. Claude Code and Kiro are measured with `tests/probe_harness.py`. OpenCode is not fully measured. On Kiro (v3 engine, `kiro-cli` 3.3.0) 23 of 23 conclusive attacks were blocked under `--trust-all-tools`, each succeeding in the no-policy control. `config_hooks` was inconclusive because the model refused it in the control. The two known limits (a script file, `python3 -c`) get through, as on Claude Code. File-tool writes to `.kiro/**`, `.git/**`, `job.json`, `audit.log` and `config.json` were also refused. `deny` rules survive `--trust-all-tools`, but `ask` rules do not: with the flag, Kiro approved `git add` that it refused without it. Only `deny` is a guarantee, so never start the agent with `--trust-all-tools` or `--trust-tools` outside the probe, and keep anything that needs a human in the deny list. `TICK` passes neither flag.
 
 Measure a harness before trusting it with `tests/probe_harness.py <harness>`. It runs each attack with and without the policy in a scratch repo and reports BLOCKED, GAP, or INCONCLUSIVE. A canary check refuses to attack until the harness is proven to be inside the scratch repo.
 
@@ -218,8 +218,19 @@ python3 -m unittest discover -s factory/tests
 
 123 tests, one skipped for a non-loopback bind. The run takes about two minutes. `test_job.py` covers the stages and the board, `test_integrity.py` replays the bypasses a red-team agent found, and `test_tick.py` covers the deny rules.
 
+## Notes on the allow list
+
+The allow list is a set of command patterns. It cannot see what a command does inside. Read these before you rely on it.
+
+- **Scripts that fix files.** A lint or format script in `package.json` that internally runs `--fix` is invisible to the policy, because the policy only sees `npm run lint`. For a build job this is allowed to change files, so nothing parks the job. The gate and the reviewers see the result.
+- **`rubocop -A`.** `bundle exec rubocop*` is allowed as written, so builders can autocorrect with `-A` or the long flags.
+- **`dotnet build` and `dotnet test`.** Both restore packages, so they can use the network. They are allowed because they do not work otherwise.
+
 ## Limits
 
 - An agent that runs as your user can still edit files and run git. The factory makes that visible and stops the ordinary paths. Branch protection on the remote is the real guarantee.
+- Running tests runs the project's code. The policy sees the test command, not what the tests do inside it. A review of a branch you do not trust is therefore code execution on your machine. The worktree hooks and the integrity checks catch a commit or an edit to tracked files, not a network call or a write outside the worktree.
+- The ask rules are enforced by the harness, and no human is there to answer one in an unattended pass. That is the intent. Only Claude Code's handling is known to me from its documentation. Kiro refuses an `ask` in a headless run, but approves it under `--trust-all-tools`. OpenCode's handling is unmeasured.
+- A command the allow list permits can still write a file through shell redirection (`echo x > file`). The file-write rules cover the harness's edit tools, not the shell. The integrity checks catch a commit, a moved branch, or changed hooks, and park the job. They detect, they do not prevent.
 - The gate is only as good as your `checks` command. Make sure it fails when no tests run.
 - The stage skills run as full skills in real use. Testing so far used shortened versions to check the factory's contract.

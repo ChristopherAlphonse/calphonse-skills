@@ -1,0 +1,290 @@
+# Precedence: deny, then ask, then allow; a command no rule names needs a human. `*` matches any text, spaces included.
+rules:
+  - capability: shell
+    effect: deny
+    match:
+      - git push*
+      - git -C * push*
+      - aws s3 rm*
+      - curl -X POST*
+  # Backstop: ask beats allow, so the `git -C *` allow patterns cannot pass mutating verbs.
+  - capability: shell
+    effect: ask
+    match:
+      - git add*
+      - git -C * add*
+      - git am*
+      - git -C * am*
+      - git apply*
+      - git -C * apply*
+      - git checkout*
+      - git -C * checkout*
+      - git cherry-pick*
+      - git -C * cherry-pick*
+      - git clean*
+      - git -C * clean*
+      - git clone*
+      - git -C * clone*
+      - git commit*
+      - git -C * commit*
+      - git config*
+      - git -C * config*
+      - git fetch*
+      - git -C * fetch*
+      - git gc*
+      - git -C * gc*
+      - git init*
+      - git -C * init*
+      - git merge*
+      - git -C * merge*
+      - git mv*
+      - git -C * mv*
+      - git prune*
+      - git -C * prune*
+      - git pull*
+      - git -C * pull*
+      - git rebase*
+      - git -C * rebase*
+      - git remote add*
+      - git -C * remote add*
+      - git remote remove*
+      - git -C * remote remove*
+      - git remote rename*
+      - git -C * remote rename*
+      - git remote rm*
+      - git -C * remote rm*
+      - git remote set*
+      - git -C * remote set*
+      - git reset*
+      - git -C * reset*
+      - git restore*
+      - git -C * restore*
+      - git revert*
+      - git -C * revert*
+      - git rm*
+      - git -C * rm*
+      - git stash*
+      - git -C * stash*
+      - git submodule*
+      - git -C * submodule*
+      - git switch*
+      - git -C * switch*
+      - git update-ref*
+      - git -C * update-ref*
+      - git worktree*
+      - git -C * worktree*
+  - capability: shell
+    effect: allow
+    match:
+      - basename *
+      - bat *
+      - cat *
+      - cd *
+      - command -v *
+      - cut *
+      - date
+      - date *
+      - df *
+      - diff *
+      - dirname *
+      - du *
+      - echo
+      - echo *
+      - env
+      - fd *
+      - file *
+      - find
+      - find *
+      - grep *
+      - head *
+      - hostname
+      - id
+      - id *
+      - jq *
+      - journalctl *
+      - ls
+      - ls *
+      - printenv
+      - printenv *
+      - printf
+      - printf *
+      - pwd
+      - realpath *
+      - rg *
+      # sed: only the `-n 'N,Mp'` print form.
+      - sed -n '*,*p'*
+      - sort *
+      - stat *
+      - tail *
+      - tr *
+      - tree
+      - tree *
+      - type *
+      - uname
+      - uname *
+      - uniq *
+      - uptime
+      - wc
+      - wc *
+      - which *
+      - whoami
+      - git branch
+      - git branch *
+      - git describe *
+      - git diff
+      - git diff *
+      - git log
+      - git log *
+      - git ls-files *
+      - git ls-remote *
+      - git remote -v *
+      - git rev-parse *
+      - git show *
+      - git status
+      - git status *
+      - git tag *
+      - git -C * branch
+      - git -C * branch *
+      - git -C * describe *
+      - git -C * diff
+      - git -C * diff *
+      - git -C * log
+      - git -C * log *
+      - git -C * ls-files *
+      - git -C * ls-remote *
+      - git -C * remote -v *
+      - git -C * rev-parse *
+      - git -C * show *
+      - git -C * status
+      - git -C * status *
+      - git -C * tag *
+      - npm list *
+      - pip list *
+      - pip show *
+      - brew list *
+      - brew search *
+  # --- Factory additions: run the project's own tests, linters, formatters in check mode, and quality tools ---
+  # These run the repo's code but never install, publish, deploy, or upload. They are what lets a builder
+  # or reviewer produce evidence unattended. Formatters that rewrite files are in policy.build.yaml, which
+  # only the build skill loads. A project adds its own commands with `allow` in config.json.
+  - capability: shell
+    effect: allow
+    match:
+      # JavaScript and TypeScript
+      - npm test
+      - npm test *
+      - npm run test*
+      - npm run lint*
+      - npm run typecheck*
+      - npm run type-check*
+      - npm run check*
+      - npm run format:check*
+      - npm run format-check*
+      - npm run coverage*
+      - yarn test*
+      - yarn lint*
+      - yarn typecheck*
+      - yarn check*
+      - yarn format:check*
+      - pnpm test*
+      - pnpm lint*
+      - pnpm typecheck*
+      - pnpm run test*
+      - pnpm run lint*
+      - pnpm run typecheck*
+      - pnpm run check*
+      - pnpm run format:check*
+      - bun test*
+      - tsc --noEmit*
+      - npx tsc --noEmit*
+      - eslint *
+      - npx eslint *
+      - prettier --check *
+      - prettier --list-different *
+      - npx prettier --check *
+      - biome check *
+      - biome ci*
+      - npx biome check *
+      - npx biome ci*
+      - stylelint *
+      - npx stylelint *
+      - vitest *
+      - npx vitest *
+      - jest *
+      - npx jest *
+      - playwright test*
+      - npx playwright test*
+      # Python
+      - pytest
+      - pytest *
+      - python -m pytest*
+      - python3 -m pytest*
+      - python -m unittest*
+      - python3 -m unittest*
+      - coverage run*
+      - coverage report*
+      - ruff check*
+      - ruff format --check*
+      - ruff format --diff*
+      - black --check *
+      - black --diff *
+      - isort --check*
+      - isort --diff*
+      - flake8 *
+      - pylint *
+      - mypy *
+      - python -m mypy*
+      - python3 -m mypy*
+      - pyright*
+      - bandit *
+      - radon *
+      - vulture *
+      # .NET
+      - dotnet test*
+      - dotnet build*
+      - dotnet format --verify-no-changes*
+      - dotnet format * --verify-no-changes*
+      # Go
+      - go test*
+      - go vet*
+      - go build*
+      - gofmt -l *
+      - gofmt -d *
+      - golangci-lint run*
+      - staticcheck *
+      # Rust
+      - cargo test*
+      - cargo check*
+      - cargo clippy*
+      - cargo build*
+      - cargo fmt --check*
+      - cargo fmt -- --check*
+      # Java, Kotlin, and Ruby
+      - mvn test*
+      - mvn -q test*
+      - mvn verify*
+      - mvn checkstyle:check*
+      - mvn spotless:check*
+      - gradle test*
+      - gradle check*
+      - ./gradlew test*
+      - ./gradlew check*
+      - ./gradlew spotlessCheck*
+      - bundle exec rspec*
+      - bundle exec rubocop*
+      # Shell, Terraform, Docker, YAML, Markdown, and workflows
+      - shellcheck *
+      - shfmt -d *
+      - shfmt -l *
+      - terraform fmt -check*
+      - terraform validate*
+      - tflint*
+      - hadolint *
+      - yamllint *
+      - markdownlint *
+      - actionlint*
+      # Make targets
+      - make test*
+      - make lint*
+      - make check*
+      - make verify*
