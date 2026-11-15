@@ -52,6 +52,7 @@ npx skills update -y       # no prompts
 - [pr-body-style](pr-body-style/SKILL.md): Draft, rewrite, or audit PR bodies: accurate, short, business-focused
 - [comment-sicko](comment-sicko/SKILL.md): A deranged comment-hater that savors deletion and condemns workaround code
 - [prove-it-works](prove-it-works/SKILL.md): Verify a finished task against the real artifact, not a proxy, self-report, or "it compiles", then write a UAT document so the user can confirm it themselves
+- [factory-test](factory-test/SKILL.md): Separate workflow that reviews a branch with the review and QA skills: scope, parallel reviewers, reconcile, verify by rerunning the evidence, then a report with paste-ready comments. Read-only, and it picks stack skills by codebase
 
 ### Cloud
 
@@ -75,6 +76,7 @@ npx skills update -y       # no prompts
 - [humanizer](humanizer/SKILL.md): Rewrite a first-person work write-up (performance review, self-review) in a warmer, reflective voice without changing the facts; can borrow the style of a sample
 - [simplify](simplify/SKILL.md): Restate the last message in plain human language, with no jargon
 - [swe](swe/SKILL.md): Pragmatic dev mode: smallest change that fully solves the task, and a reply a busy human reads once
+- [factory](factory/SKILL.md): Build a feature from idea to a reviewed local commit through staged skills, a scripted state machine, and a kanban board. Never commits without your click and never pushes or opens a PR
 
 ## Philosophy
 

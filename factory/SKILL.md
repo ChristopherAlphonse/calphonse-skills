@@ -1,6 +1,6 @@
 ---
 name: factory
-description: Run work through the other skills in this repo as stages, with a kanban board, a scripted state machine, and a headless tick. Two workflows. Build takes a feature from idea to a reviewed local commit (shape, spec, build, review, polish, prove, ship). Review takes an existing branch or diff and produces a verified, ranked review (scope, review, reconcile, verify, report). Skills for the codebase are chosen automatically (TypeScript and React get typescript-strict-style and vercel-react-best-practices, C# gets dotnet). Built and measured for Claude Code. Use when the user wants a whole feature driven end to end, a code review run through their review skills, a software factory, a pipeline, or the board. Never commits, pushes, posts review comments, or opens a PR or MR on its own.
+description: Take a feature from idea to a reviewed local commit by chaining the other skills in this repo as stages (shape, spec, build, review, polish, prove, ship), with a kanban board, a scripted state machine, and a headless tick. Picks skills for the codebase automatically (TypeScript and React get typescript-strict-style and vercel-react-best-practices, C# gets dotnet). Built and measured for Claude Code. Use when the user wants a whole feature driven end to end, a software factory, a pipeline, or the board. Never commits without the user's click and never pushes or opens a PR or MR. To review an existing branch, use factory-test instead.
 ---
 
 # Factory
@@ -11,32 +11,9 @@ You are the orchestrator. You do no stage work yourself. For each stage you spaw
 
 ## Workflows
 
-A job has a kind. `JOB create <id> "<title>"` makes a build job. `JOB create <id> "<title>" --review BASE HEAD` makes a review job for the changes between two local refs. The factory never reaches a forge, so fetch the PR or MR branch yourself first.
+This skill runs the **build** workflow: a feature idea becomes a local commit and a PR body. `JOB create <id> "<title>"` makes a build job.
 
-| | Build | Review |
-| --- | --- | --- |
-| Input | a feature idea | two local refs, for example `main` and `pr-42` |
-| Worktree | a new branch off `base_branch` | a branch at the exact reviewed commit |
-| Stages | shape, spec, build, gate, review, polish, gate, prove, ship, ready | scope, review, reconcile, verify, report, ready |
-| Writes code | yes, uncommitted | never. A tracked file that changes parks the job on you |
-| Your clicks | Approve spec, Commit locally | none. Unblock only after a park |
-| Output | a local commit and a PR body | `report.md` and `comments.md` to paste by hand |
-
-## Review workflow
-
-Everything under Enterprise policy applies. Reviewers read, run, and report. They never edit, commit, or post.
-
-| Stage | Skill | Writes | Advance when |
-| --- | --- | --- | --- |
-| scope | `code-review-frontend` step 0 (find the repo's lint, type, and test tooling), `whats-going-on` if `.planning/` has no map | `scope.md` with `STATUS: READY`, or `rejection.md` for a diff not worth reviewing | to `review`, or `rejected` |
-| review | `code`: `code-review-frontend` for TS and React, plus `dotnet` for C# files. `qa`: `qa-review`. `test`: `test-review`. Extras with `JOB route`: `security-review`, `architecture-review` | `round-1/review-<name>.md` with `VERDICT: PASS` or `CHANGES`, findings with file and line | every reviewer has a verdict |
-| reconcile | `reconcile-reviews` | `reconcile.md` with `STATUS: READY`, one ranked list | to `verify` |
-| verify | `prove-it-works`, applied to the findings: rerun every `VERIFIED (ran)` command and open every cited line. Drop what does not reproduce | `verified.md` with `STATUS: READY` | to `report` |
-| report | `unslop`, then `pr-body-style` tone for the summary | `report.md` with `STATUS: READY`, `FINDINGS: n`, `BLOCKERS: n`, and `comments.md` | to `ready` |
-
-Run the reviewers in parallel and wait for all of them. Pass each reviewer the base and head commits from `job.json`, the worktree path, and the stack skills from the queue hint. A reviewer that cannot proceed writes `blocked.md` with `STATUS: BLOCKED`, and `JOB advance` then parks the job.
-
-`ready` on a review job means the report is written. Posting comments to the MR is the user's own step. `reconcile-reviews` can post inline comments, and the factory never uses that path.
+To review an existing branch or PR, use the `factory-test` skill. It is a separate workflow that runs on the same engine and the same board, and it never writes code. The engine's `JOB create <id> "<title>" --review BASE HEAD` belongs to it.
 
 ## Enterprise policy
 
@@ -112,7 +89,7 @@ Stack skills are chosen by `bin/job`, not by you. It reads the file names and wr
 | `.cs`, `.csproj`, `.sln`, `.cshtml`, `.razor` | `dotnet` |
 | `.tf`, `cdk.json`, `serverless.yml`, `samconfig.toml` | `aws` |
 
-For a build job the files are the whole repo. For a review job they are only the files in the diff. If `.planning/` has no codebase map, run `whats-going-on` before Shape.
+For a build job the files are the whole repo. Review jobs (see `factory-test`) use only the files in the diff. If `.planning/` has no codebase map, run `whats-going-on` before Shape.
 
 ### Reviewers
 
@@ -123,6 +100,7 @@ For a build job the files are the whole repo. For a review job they are only the
 1. `JOB queue`. Each row is `action  id  stage  hint`. Act only on `run` rows. `hold` means the job waits on the user. `wait` means over the concurrency cap. `done` is finished.
 2. For each `run` row, spawn the stage's subagent with the hint as its brief. When the stage's file is already on disk, call `JOB advance` instead of spawning.
 3. After an agent returns, call `JOB advance <id> <next>` with the target the file justifies. If it refuses, read the message, send the stage back once with the problem named, and after a second refusal have the builder write `STATUS: BLOCKED`.
+   While working a job, run `JOB note <id> "<what you are doing>"` when you start a stage and at each meaningful step (a short phrase, under 200 characters). The board shows the latest note on the card, which is the only live view of work between stage changes.
 4. Report the rows touched, any `hold` rows and what they wait on, and the board address.
 
 At the start of the first pass, start `JOB watch` in the background (`nohup JOB watch 8766 > watch.log &`) and give the user the link it prints. Do not use `JOB serve`: only the user starts that.
