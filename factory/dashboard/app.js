@@ -32,6 +32,10 @@ const setMeta = (text) => {
   $("meta").textContent = text;
 };
 const clock = () => new Date().toLocaleTimeString();
+const metaText = () => {
+  const waiting = state.jobs.filter((j) => j.needs_human).length;
+  return `${state.jobs.length} jobs${waiting ? `, ${waiting} waiting on you` : ""}, updated ${clock()}`;
+};
 const openJob = () => state.jobs.find((j) => j.id === state.openId);
 
 async function post(path, body) {
@@ -88,11 +92,13 @@ function statusRows(j) {
 }
 
 function card(j) {
-  const c = el("div", `card${j.needs_human ? " hold" : ""}`);
+  const c = el("div", `card${j.needs_human ? " hold" : ""}${j.stage === "rejected" ? " rejected" : ""}`);
+  c.tabIndex = 0;
   c.append(el("div", "t", j.title), el("div", "id", j.id), ...statusRows(j));
 
   const last = j.activity?.at(-1);
-  if (last && j.stage !== "ready") c.append(el("div", "id", `now: ${last.text}`));
+  if (j.needs) c.append(el("div", "id", `waiting on you: ${j.needs.action.toLowerCase()}. Click for how.`));
+  else if (last && j.stage !== "ready") c.append(el("div", "id", `now: ${last.text}`));
 
   const [done, total] = j.progress;
   if (total) c.append(...progressBar(done, total));
@@ -102,6 +108,12 @@ function card(j) {
   if (j.stage === "needs-human") c.append(actionButton("Unblock, grant more rounds", "/api/unblock", j));
 
   c.onclick = () => showDrawer(j.id);
+  c.onkeydown = (e) => {
+    if (e.target === c && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      showDrawer(j.id);
+    }
+  };
   return c;
 }
 
@@ -110,7 +122,7 @@ function isRelevant(col, mine) {
 }
 
 function column(col, mine) {
-  const section = el("section", `col${col.you ? " you" : ""}`);
+  const section = el("section", `col${col.you ? " you" : ""}${col.always ? " end" : ""}${mine.length ? " busy" : ""}`);
   const h = el("h2");
   h.append(el("span", "", col.label), el("span", "", String(mine.length)));
   section.append(h, ...mine.map(card));
@@ -120,13 +132,12 @@ function column(col, mine) {
 function render() {
   const columns = [];
   for (const col of COLUMNS) {
-    const mine = state.jobs.filter((j) => col.stages.includes(j.stage));
+    const mine = state.jobs.filter((j) => (col.you ? j.needs_human : col.stages.includes(j.stage) && !j.needs_human));
     if (isRelevant(col, mine)) columns.push(column(col, mine));
   }
   $("board").replaceChildren(...columns);
 
-  const waiting = state.jobs.filter((j) => j.needs_human).length;
-  setMeta(`${state.jobs.length} jobs${waiting ? `, ${waiting} waiting on you` : ""}, updated ${clock()}`);
+  setMeta(metaText());
   if (state.openId) renderDrawerHead();
 }
 
@@ -145,7 +156,7 @@ async function fetchJobs() {
     if (!res.ok) throw new Error(`status ${res.status}`);
     const text = await res.text();
     if (text === state.lastSig) {
-      setMeta(`${state.jobs.length} jobs, updated ${clock()}`);
+      setMeta(metaText());
       return;
     }
     state.lastSig = text;
@@ -162,6 +173,26 @@ async function pollLoop() {
   setTimeout(pollLoop, POLL_MS);
 }
 
+function needsPanel(n) {
+  const box = el("div", "needs");
+  const copy = el("button", "", "Copy");
+  copy.onclick = () => {
+    navigator.clipboard.writeText(n.command).then(() => {
+      copy.textContent = "Copied";
+    });
+  };
+  const cmd = el("div", "cmd");
+  cmd.append(el("code", "", n.command), copy);
+  box.append(
+    el("h4", "", `Needs you: ${n.action}`),
+    el("p", "", n.why),
+    el("p", "", n.todo),
+    cmd,
+    el("p", "id", "Run it in your own terminal. It prints a one-time link with the buttons. This read-only page cannot approve."),
+  );
+  return box;
+}
+
 function renderDrawerHead() {
   const j = openJob();
   if (!j) return;
@@ -169,6 +200,7 @@ function renderDrawerHead() {
     el("h3", "", j.title),
     el("div", "id", `${j.id} at ${j.stage}${j.branch ? `, ${j.branch}` : ""}`),
   );
+  $("dneeds").replaceChildren(...(j.needs ? [needsPanel(j.needs)] : []));
   $("dfiles").replaceChildren(
     ...j.files.map((f) => {
       const c = chip(f, f === state.openFile ? "on" : "");
@@ -237,11 +269,48 @@ async function applyMode() {
     const mode = await (await api("/api/mode")).json();
     if (mode.readonly) {
       document.querySelector(".policy").textContent =
-        "read-only view: no approve, commit, or unblock here. Those stay in the terminal board";
+        "Read-only view. Approve, commit, and unblock stay in the terminal board.";
     }
   } catch {
   }
 }
+
+const DRAWER_MIN = 320;
+const DRAWER_KEY = "factory.drawerWidth";
+
+function setDrawerWidth(px, save) {
+  const w = Math.round(Math.min(Math.max(px, DRAWER_MIN), window.innerWidth));
+  document.documentElement.style.setProperty("--drawer-w", w + "px");
+  if (save) localStorage.setItem(DRAWER_KEY, w);
+  return w;
+}
+
+const grip = $("grip");
+grip.onpointerdown = (e) => {
+  grip.setPointerCapture(e.pointerId);
+  grip.classList.add("drag");
+};
+grip.onpointermove = (e) => {
+  if (grip.hasPointerCapture(e.pointerId)) setDrawerWidth(window.innerWidth - e.clientX);
+};
+grip.onpointerup = (e) => {
+  grip.classList.remove("drag");
+  setDrawerWidth(window.innerWidth - e.clientX, true);
+};
+grip.onkeydown = (e) => {
+  const dir = { ArrowLeft: 1, ArrowRight: -1 }[e.key];
+  if (!dir) return;
+  e.preventDefault();
+  setDrawerWidth($("drawer").offsetWidth + dir * 40, true);
+};
+function resetDrawerWidth() {
+  localStorage.removeItem(DRAWER_KEY);
+  document.documentElement.style.removeProperty("--drawer-w");
+}
+grip.ondblclick = resetDrawerWidth;
+$("reset").onclick = resetDrawerWidth;
+const saved = Number(localStorage.getItem(DRAWER_KEY));
+if (saved) setDrawerWidth(saved);
 
 $("close").onclick = closeDrawer;
 document.addEventListener("visibilitychange", () => {

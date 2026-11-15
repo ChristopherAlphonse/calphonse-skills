@@ -13,6 +13,12 @@ You are the orchestrator. You do no stage work yourself. For each stage you spaw
 
 Before any other tool call, including `JOB create` and `JOB queue`, run `JOB board`. It starts the read-only board if none is running and prints its link as `127.0.0.1:PORT/?c=CODE`. Then write that link to the user as a message of its own, as `http://127.0.0.1:PORT/?c=CODE` with the code included, and only then continue. The point is that the user watches the work happen, so the link must reach them before the first stage starts, never in the final report. Do not spawn a subagent, read the repo, or plan first. Repeat the link in every report that ends a pass. The board keeps running between passes and the link stays the same while it does. If `JOB board` refuses, say so in that first message and give `JOB watch` as the fallback. Do not use `JOB serve`: only the user starts that.
 
+## Waiting on the user
+
+Whenever a job waits on the user (spec approval, **Commit locally**, **Unblock**), end the message with the command that opens the board with the buttons, in its own code block, with absolute paths and without being asked: `cd <project root> && <absolute path of JOB> serve`. `JOB advance`, `JOB create`, and `JOB queue` print it on stderr as well; copy it from there. Say that the read-only link has no buttons and this board does. Never run the command yourself: `serve` prints its one-time link in the user's terminal.
+
+Then do not end your turn. Run `JOB wait` (90 seconds by default, `JOB wait 110` to choose). It prints `RESUME: <ids> ...` the moment the user clicks, and then you run `JOB queue` and carry on. It prints `STILL WAITING` and exits 3 on timeout: run it again, and keep going until it prints `RESUME`, the user answers in chat, or the user says to stop. The board cannot message you, so this is how a click reaches you. A scheduled `TICK` pass picks the click up the same way on its next run.
+
 ## Workflows
 
 This skill runs the **build** workflow: a feature idea becomes a local commit and a PR body. `JOB create <id> "<title>"` makes a build job.
@@ -112,7 +118,7 @@ For a build job the files are the whole repo. Review jobs (see `factory-review`)
 
 ## Loop
 
-A pass finds nothing to run, or only `hold` rows, and ends. To repeat passes, schedule `TICK <harness>` with cron or launchd every few minutes. In Claude Code, `/loop 5m /factory run` does the same interactively. Everything is files, so any pass resumes every job from its stage, in any harness.
+A pass finds nothing to run, or only `hold` rows, and ends. To continue automatically after the user's click, the user starts `TICK loop <harness> [seconds]` in a terminal (default 15 seconds). It reads `JOB queue` and runs a pass whenever a row says `run`, so approving a spec, committing, or unblocking starts the next pass with no chat message. It never approves anything, runs one loop per project, and stops retrying a state that changed no job file in two passes (`stalled`, visible on the board). `--once` does a single check. Alternatively schedule `TICK <harness>` with cron or launchd every few minutes. In Claude Code, `/loop 5m /factory run` does the same interactively. Everything is files, so any pass resumes every job from its stage, in any harness.
 
 ## Board
 

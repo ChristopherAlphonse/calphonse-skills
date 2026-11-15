@@ -168,7 +168,7 @@ button:hover {
   top: 0;
   right: 0;
   bottom: 0;
-  width: min(920px, 100%);
+  width: min(var(--drawer-w, 920px), 100%);
   background: var(--card);
   border-left: 1px solid var(--line);
   padding: 14px;
@@ -177,6 +177,27 @@ button:hover {
 }
 #drawer.open {
   display: block;
+}
+#grip {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: min(var(--drawer-w, 920px), 100%);
+  width: 10px;
+  margin-right: -5px;
+  cursor: col-resize;
+  touch-action: none;
+  display: none;
+  z-index: 1;
+}
+#drawer.open + #grip {
+  display: block;
+}
+#grip:hover,
+#grip:focus-visible,
+#grip.drag {
+  background: color-mix(in srgb, var(--acc) 40%, transparent);
+  outline: none;
 }
 #dbody {
   word-break: break-word;
@@ -280,5 +301,45 @@ button:hover {
 }
 .x {
   float: right;
-  margin: 0;
+  margin: 0 0 0 6px;
+}
+
+@media (max-width: 600px) {
+  #grip {
+    display: none !important;
+  }
+}
+
+/* Needs-you panel in the drawer */
+#dneeds .needs {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-left: 4px solid var(--you);
+  background: var(--col);
+  font-size: 14px;
+  line-height: 1.5;
+}
+#dneeds h4 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+#dneeds p {
+  margin: 6px 0;
+}
+#dneeds .cmd {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+#dneeds .cmd code {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  background: var(--card);
+  border: 1px solid var(--line);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px;
 }

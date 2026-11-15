@@ -593,6 +593,7 @@ def cmd_advance(jid, to):
     save(job)
     audit("advance", jid, f"{cur} -> {real}")
     print(f"{jid}: {cur} -> {real}" + (" (round limit hit)" if real != to else ""))
+    announce_serve()
 
 
 def cmd_gate(jid):
@@ -752,6 +753,49 @@ def cmd_queue():
         print(f"{action}\t{job['id']}\t{s}\t{hint_for(job)}")
 
 
+def serve_command():
+    return f"cd {shlex.quote(str(ROOT))} && {shlex.quote(str(Path(__file__).resolve()))} serve"
+
+
+def needs_you(job):
+    """What the user must do, and why, for a job that waits on them. None when it does not."""
+    if not waiting_on_human(job):
+        return None
+    s = job["stage"]
+    if s == "spec":
+        action, files = "Approve spec", "spec.md"
+        why = ("The spec is written. The factory will not create the worktree or start building until you approve it. "
+               "Approval is tied to the file: if spec.md changes afterwards, you approve again.")
+        todo = "Read spec.md in this drawer. If it is right, click Approve spec on the board the command below opens."
+    elif s == "ship":
+        action, files = "Commit locally", "pr-body.md and commit.md"
+        why = "The gate passed and the PR body and commit message are written. Nothing is committed until you click."
+        todo = "Read pr-body.md and commit.md in this drawer, then click Commit locally on the board the command below opens."
+    else:
+        action, files = "Unblock", "blocked.md"
+        why = job.get("note") or "The job stopped and cannot continue on its own."
+        todo = "Read blocked.md or the activity log to see why. Then click Unblock to grant more rounds, or leave it parked."
+    return {"action": action, "files": files, "why": why, "todo": todo, "command": serve_command()}
+
+
+def cmd_wait(seconds):
+    """Block until a job that waits on the user no longer does, so an agent can resume without being told."""
+    need(seconds.isdigit() and 0 < int(seconds) <= 3600, "wait takes a number of seconds, 1 to 3600")
+    held = sorted(j["id"] for j in all_jobs() if waiting_on_human(j))
+    if not held:
+        print("nothing waits on you. Run `JOB queue`.")
+        return
+    deadline = time.time() + int(seconds)
+    while time.time() < deadline:
+        time.sleep(min(2, max(0, deadline - time.time())))
+        freed = [i for i in held if not waiting_on_human(load(i))]
+        if freed:
+            print(f"RESUME: {', '.join(freed)} no longer wait on the user. Run `JOB queue` and continue.")
+            return
+    print(f"STILL WAITING on {', '.join(held)}. Run `JOB wait` again. Do not end your turn.")
+    sys.exit(3)
+
+
 def snapshot(job):
     d = jobdir(job["id"])
     rd = d / f"round-{job['round']}"
@@ -759,7 +803,7 @@ def snapshot(job):
     files = sorted(str(p.relative_to(d)) for p in d.rglob("*.md"))
     return {**job, "kind": "review" if job.get("review") else "build", "report": kv(d / "report.md"),
             "gate": kv(rd / CHECKS_FILE).get("GATE"), "reviews": reviews,
-            "files": files, "needs_human": waiting_on_human(job),
+            "files": files, "needs_human": waiting_on_human(job), "needs": needs_you(job),
             "can_approve": not READONLY and job["stage"] == "spec" and waiting_on_human(job),
             "can_commit": not READONLY and job["stage"] == "ship" and waiting_on_human(job)}
 
@@ -982,10 +1026,18 @@ def ensure_watcher():
         return m.group(1)
 
 
+def announce_serve():
+    """Tell the user the exact command to run when a job waits on them, so they never have to ask for it."""
+    if any(waiting_on_human(j) for j in all_jobs()):
+        print(f"waiting on you. To approve, commit, or unblock, run this in your terminal:\n"
+              f"  cd {shlex.quote(str(ROOT))} && {shlex.quote(str(Path(__file__).resolve()))} serve", file=sys.stderr)
+
+
 def announce_board():
     url = ensure_watcher()
     if url:
         print(f"board: {url}", file=sys.stderr)
+    announce_serve()
 
 
 def cmd_board():
@@ -999,7 +1051,7 @@ HUMAN_ONLY = {"approve", "commit", "unblock"}
 
 COMMANDS = {
     "create": (cmd_create, None), "advance": (cmd_advance, 2), "gate": (cmd_gate, 1), "stack": (cmd_stack, 1), "watch": (cmd_watch, 1), "board": (cmd_board, 0),
-    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_serve, 1),
+    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_serve, 1), "wait": (cmd_wait, 1),
 }
 
 if __name__ == "__main__":
@@ -1009,8 +1061,9 @@ if __name__ == "__main__":
     if name not in COMMANDS:
         die(f"usage: job {'|'.join(COMMANDS)}")
     fn, arity = COMMANDS[name]
-    if name in ("serve", "watch") and not args:
-        args = ["8765" if name == "serve" else str(WATCH_FIRST_PORT)]
+    if name in ("serve", "watch", "wait") and not args:
+        args = {"serve": "8765", "watch": str(WATCH_FIRST_PORT), "wait": "90"}[name]
+        args = [args]
     if name == "create":
         need(len(args) in (2, 5), "create takes <id> <title> [--review BASE HEAD]")
     else:

@@ -377,6 +377,7 @@ def cmd_advance(jid, to):
     save(job)
     audit("advance", jid, f"{cur} -> {to}")
     print(f"{jid}: {cur} -> {to}")
+    announce_serve()
 
 
 def cmd_route(jid, extras):
@@ -446,13 +447,25 @@ def cmd_queue():
         print(f"{action}\t{job['id']}\t{s}\t{hint_for(job)}")
 
 
+def needs_you(job):
+    """What the user must do, and why, for a parked job. None when it is not parked."""
+    if job["stage"] not in HUMAN_STAGES:
+        return None
+    cmd = f"cd {shlex.quote(str(ROOT))} && {shlex.quote(str(Path(__file__).resolve()))} serve"
+    return {"action": "Unblock", "files": "blocked.md",
+            "why": job.get("note") or "The review stopped and cannot continue on its own. It may be blocked, or the worktree was touched.",
+            "todo": (f"Read blocked.md or the activity log to see why. Then click Unblock on the board the command below opens. "
+                     f"It resets the worktree to the reviewed commit and resumes at {job.get('parked_from') or 'scope'}."),
+            "command": cmd}
+
+
 def snapshot(job):
     d = jobdir(job["id"])
     reviews = {r: kv(d / REVIEW_DIR / f"review-{r}.md").get("VERDICT") for r in job["reviewers"]}
     waiting = job["stage"] in HUMAN_STAGES
     return {**job, "report": kv(d / "report.md"), "reviews": reviews,
             "files": sorted(str(p.relative_to(d)) for p in d.rglob("*.md")),
-            "needs_human": waiting, "can_unblock": waiting and not READONLY}
+            "needs_human": waiting, "needs": needs_you(job), "can_unblock": waiting and not READONLY}
 
 
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
@@ -587,7 +600,7 @@ def cmd_serve(port):
     os.chmod(tmp, 0o600)
     os.replace(tmp, STATE / HASH_FILE)
     srv = ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
-    print(f"board: 127.0.0.1:{srv.server_port}/?c={CODE}  (opens once, valid 5 minutes)", flush=True)
+    print(f"board: http://127.0.0.1:{srv.server_port}/?c={CODE}  (opens once, valid 5 minutes)", flush=True)
     audit("serve", "", f"port {srv.server_port}")
     # Bound to 127.0.0.1 only, so TLS adds nothing on loopback.
     srv.serve_forever()  # NOSONAR
@@ -672,10 +685,18 @@ def ensure_watcher():
         return m.group(1)
 
 
+def announce_serve():
+    """Tell the user the exact command to run when a job waits on them, so they never have to ask for it."""
+    if any(j["stage"] in HUMAN_STAGES for j in all_jobs()):
+        print(f"waiting on you. To unblock, run this in your terminal:\n"
+              f"  cd {shlex.quote(str(ROOT))} && {shlex.quote(str(Path(__file__).resolve()))} serve", file=sys.stderr)
+
+
 def announce_board():
     url = ensure_watcher()
     if url:
         print(f"board: {url}", file=sys.stderr)
+    announce_serve()
 
 
 def cmd_board():

@@ -13,6 +13,16 @@ description: >
 
 Write PR bodies that are short, business-focused, and accurate to the actual code change. Assume reviewers can read the diff; the PR body should explain the outcome, validation, and any non-obvious context.
 
+## Finding the target
+
+Never ask the user what to write the body for when the answer can be found. Work it out in this order and proceed:
+
+1. A PR/MR URL, branch, or draft body in the message or conversation.
+2. Otherwise the current branch of the repo in the working directory (or the repo the conversation has been about): diff against the default branch, and read the open PR/MR for it if one exists.
+3. If the branch has no diff against the default branch, say so in one line and stop.
+
+Ask only when two or more candidates remain after this (for example, several repos with unrelated changes), and then name the candidates in the question. Do not offer a menu of input types.
+
 ## Guardrails
 
 - Make every claim match the actual diff and current check status.
@@ -29,7 +39,8 @@ Write PR bodies that are short, business-focused, and accurate to the actual cod
 - Avoid method-by-method or file-by-file narration unless the user explicitly asks for implementation detail.
 - Check the wording against the [unslop](../unslop/SKILL.md) skill.
 - Keep wording plain and direct. Prefer "Moves retry handling into the shared HTTP client" over deep root-cause prose.
-- Make every claim match the actual diff and current check status. Verify locally or on the git host when the status may have changed.
+- Make every claim match the actual diff and current check status. Read the git host's CI status when a PR exists. Never run a test suite or build to write the body: it takes minutes and costs credits. If CI status is unavailable, write "Not run" under How to Test and say so in the reply.
+- Writing a body is a read-only, quick task: read `git diff --stat` and the diff of the changed source files, then write. Do not run long commands. Finish in one or two tool calls after reading.
 - Keep "How to Test" concrete and minimal: commands run, user-visible checks, or CI status.
 - Use "Additional Information" only for high-signal context, risks, retained compatibility shims, or follow-up notes. Keep it empty or one sentence when possible.
 

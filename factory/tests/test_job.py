@@ -1025,6 +1025,38 @@ class TestServer(Factory):
         self.human("approve", "a")
         self.assertFalse(self.get_jobs()["a"]["can_approve"])
 
+    def test_needs_tells_the_user_what_to_run(self):
+        self.new_spec("a")
+        self.to_ship("b")
+        jobs = self.get_jobs()
+        for jid, action in (("a", "Approve spec"), ("b", "Commit locally")):
+            n = jobs[jid]["needs"]
+            self.assertEqual(n["action"], action)
+            self.assertTrue(n["command"].endswith(" serve") and n["command"].startswith("cd "))
+        self.human("approve", "a")
+        self.assertIsNone(self.get_jobs()["a"]["needs"])
+
+    def test_wait_returns_when_the_user_approves(self):
+        self.new_spec("a")
+        waiter = subprocess.Popen([sys.executable, "-I", str(JOB), "wait", "30"], cwd=str(self.base), env=self.env,
+                                  stdout=subprocess.PIPE, text=True)
+        time.sleep(1)
+        self.assertIsNone(waiter.poll())
+        self.human("approve", "a")
+        out, _ = waiter.communicate(timeout=15)
+        self.assertEqual(waiter.returncode, 0)
+        self.assertIn("RESUME: a", out)
+
+    def test_wait_times_out_and_idles(self):
+        self.new_spec("a")
+        r = self.run_job("wait", 1)
+        self.assertEqual((r.returncode, "STILL WAITING on a" in r.stdout), (3, True))
+        self.human("approve", "a")
+        r = self.run_job("wait", 1)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("nothing waits on you", r.stdout)
+        self.no("wait", "0")
+
     def test_file_endpoint(self):
         self.new_spec("a")
         self.ok("create", "b", "T")

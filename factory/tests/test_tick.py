@@ -120,6 +120,58 @@ class TickTests(unittest.TestCase):
         self.assertTrue(all(l["actor"] == "tick" for l in lines))
 
 
+class LoopTests(unittest.TestCase):
+    """The loop runs a pass when `job queue` has a run row, and stops retrying a job that makes no progress."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(dir=SCRATCH)
+        self.root = Path(self.tmp.name)
+        job = Path(TICK).parent / "job"
+        env = {**os.environ, "FACTORY_ROOT": str(self.root), "FACTORY_NO_WATCH": "1"}
+        for args in (["create", "j", "T"],):
+            r = subprocess.run([sys.executable, "-I", str(job), *args], capture_output=True, text=True, env=env, cwd=self.root)
+            self.assertEqual(r.returncode, 0, r.stderr)
+        run(self.root, "install", "claude")
+        self.stub = self.root / "stubbin"
+        self.stub.mkdir()
+        self.hits = self.root / "hits"
+        (self.stub / "claude").write_text(f"#!/bin/sh\necho x >> {self.hits}\n")
+        (self.stub / "claude").chmod(0o755)
+        self.env = {"PATH": f"{self.stub}:{os.environ['PATH']}"}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_once_runs_a_pass_for_a_runnable_job(self):
+        r = run(self.root, "loop", "claude", "--once", extra_env=self.env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("pass for j", r.stdout)
+        self.assertEqual(self.hits.read_text().count("x"), 1)
+
+    def test_stall_stops_retrying_and_progress_resets_it(self):
+        old = os.environ.get("FACTORY_ROOT"), os.environ.get("PATH")
+        os.environ.update(FACTORY_ROOT=str(self.root), **self.env)
+        try:
+            tick = tick_module()
+            stalls, out = {}, []
+            for _ in range(tick.STALL_LIMIT + 2):
+                out.append(tick.loop_step("claude", stalls))
+            self.assertEqual(self.hits.read_text().count("x"), tick.STALL_LIMIT)
+            self.assertTrue(out[-1].startswith("stalled: j"))
+            job = self.root / ".planning" / "factory" / "jobs" / "j" / "job.json"
+            data = json.loads(job.read_text())
+            data["note"] = "progress"
+            job.write_text(json.dumps(data))
+            self.assertTrue(tick.loop_step("claude", stalls).startswith("pass for j"))
+        finally:
+            for k, v in zip(("FACTORY_ROOT", "PATH"), old):
+                os.environ[k] = v if v is not None else ""
+
+    def test_bad_arguments_refused(self):
+        for bad in (["loop", "claude", "0"], ["loop", "claude", "x"], ["loop", "bash"], ["loop", "claude", "--once", "--once"]):
+            self.assertEqual(run(self.root, *bad, extra_env=self.env).returncode, 2, bad)
+
+
 def tick_module():
     loader = importlib.machinery.SourceFileLoader("tick_under_test", str(TICK))
     mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
