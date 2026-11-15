@@ -27,6 +27,8 @@ BLOCKED = ([("git", g) for g in GIT_WRITES] + [("git", g) for g in GIT_GLOBALS]
            + [("gh",), ("glab",), ("curl",), ("wget",), ("sh", "-c"), ("bash", "-c"), ("zsh", "-c")])
 # Kiro denies by glob over each command, so wrappers that hide a blocked command need their own entries.
 KIRO_WRAPPERS = ["env", "xargs", "eval", "exec", "nohup", "sudo", "command", "builtin"]
+# `git --no-pager commit` and every other global option hide the verb, so match the verb anywhere after `git`.
+KIRO_GIT_ANYWHERE = [m for g in GIT_WRITES for m in (f"git * {g}", f"git * {g} *")]
 KIRO_TOOLS = ["read", "write", "shell", "grep", "glob", "subagent"]
 NO_WRITE = ["**/.kiro/**", "**/.claude/**", "**/.git/**", "**/.planning/**/job.json", "**/.planning/**/audit.log",
             "**/.planning/**/config.json"]
@@ -62,11 +64,6 @@ def name(prefix):
 
 
 def load_policy(path=POLICY_FILE):
-    """Read policy.yaml into {"deny": [...], "ask": [...], "allow": [...]} of shell patterns.
-
-    Only the shape the file uses is understood: a list of rules, each with `capability: shell`, an
-    `effect`, and a `match` list. Anything else is refused, so a typo cannot silently drop a rule.
-    """
     out = {"deny": [], "ask": [], "allow": []}
     rule = None
     for raw in Path(path).read_text().splitlines():
@@ -99,7 +96,6 @@ def uniq(items):
 
 
 def shell_policy(harness):
-    """The shell patterns the harness must enforce: policy.yaml plus the factory's own stricter rules."""
     base = load_policy()
     stricter = [f"{name(b)} *" for b in BLOCKED]
     if harness == "kiro":
@@ -125,7 +121,7 @@ def opencode_rules():
     rules = [{"action": "shell", "resource": p, "effect": e} for e in ("allow", "ask", "deny") for p in pol[e]]
     rules += [{"action": "edit", "resource": g, "effect": "allow"} for g in (WRITE_ONLY or ["**"])]
     rules += [{"action": "edit", "resource": g, "effect": "deny"} for g in NO_WRITE]
-    return rules  # least to most strict, so a last-match-wins reader also lets deny win
+    return rules
 
 
 def covers(wanted, have):
@@ -133,7 +129,6 @@ def covers(wanted, have):
 
 
 def policy_gaps(harness):
-    """Return what the project's policy for this harness fails to deny or ask for."""
     pol = shell_policy(harness)
     if harness == "claude":
         deny, ask = set(), set()
@@ -177,7 +172,6 @@ def policy_gaps(harness):
 
 
 def policy_files(harness):
-    """Generate the policy for a harness as {relative path: text}."""
     if harness == "claude":
         perms = {kind: claude_rules(kind) for kind in ("deny", "ask", "allow")}
         return {".claude/settings.json": json.dumps({"permissions": perms}, indent=2) + "\n"}

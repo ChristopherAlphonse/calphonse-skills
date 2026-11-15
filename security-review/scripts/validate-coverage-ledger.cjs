@@ -9,7 +9,6 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { TextDecoder } = require("node:util");
 
-// Conservative bounds apply before JSON.parse and again to the parsed document.
 const LIMITS = Object.freeze({
   inputBytes: 5 * 1024 * 1024,
   units: 10000,
@@ -677,7 +676,6 @@ function collectUnitErrors(unit, index) {
     try {
       expectedId = canonicalCoverageId(unit.canonical_refs);
     } catch {
-      // The specific reference errors above are more useful.
     }
   }
   if (!isVisibleText(unit.coverage_id, 65536)) {

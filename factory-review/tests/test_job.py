@@ -1,4 +1,3 @@
-"""Behavior tests for bin/job: creating a review, moving it through its stages, and the read-only guarantees."""
 import json
 import unittest
 

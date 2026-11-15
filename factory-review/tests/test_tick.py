@@ -127,7 +127,6 @@ def tick_module():
 
 
 def enforced(root, harness):
-    """What an installed policy enforces, as {"deny": set, "ask": set, "allow": set} of shell patterns."""
     out = {"deny": set(), "ask": set(), "allow": set()}
     if harness == "claude":
         perms = json.loads((root / ".claude" / "settings.json").read_text())["permissions"]
