@@ -35,6 +35,7 @@ Audit this entire repository and its deployed architecture. The goal is to make 
 - Do not introduce new services, queues, caches, databases, or abstractions without a measurable justification.
 - Do not recommend rewrites based on architectural fashion.
 - Distinguish verified problems from hypotheses that require profiling or load testing.
+- A `VERIFIED` finding names its proof: a `file:line` for what the code does, or the command and its output for what the system does. Run read-only checks yourself (`EXPLAIN`, query counts, an existing benchmark, a log search) before you mark something `[NEEDS MEASUREMENT]`. Mark it only when the check needs access you do not have, and say what access.
 - Do not modify code or infrastructure during the initial audit.
 
 ## Deliverables

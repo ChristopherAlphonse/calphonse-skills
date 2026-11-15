@@ -20,6 +20,18 @@ the diff, a config file, or declared as an [ASSUMPTION]. This skill does not fix
 - If evidence is weak, label the assumption or omit the finding.
 - Prefer findings with a concrete repro, failing test, config violation, or line-level reasoning.
 
+## Evidence tiers
+
+Every finding states how it was proved. Get each CRITICAL and HIGH finding as far down this list as is cheap, and say where it stopped.
+
+| Tier | Meaning |
+| --- | --- |
+| `[ASSUMPTION]` | Believed, not traced to a line or config. |
+| `VERIFIED (read)` | Traced to an exact diff line, config line, or library source line. |
+| `VERIFIED (ran)` | A command or script against the real code showed the failure. The finding quotes the command and its output. |
+
+A read-only command settles many findings: `tsc --noEmit`, the project's lint command, an existing test file, or a short script in a temp directory. Run it instead of arguing from the diff. Never modify tracked files to get a repro. If a finding could not be run, say why in the evidence column.
+
 ---
 
 ## Skill Directory
@@ -389,6 +401,8 @@ Wait for all agents. Collect all reports. Count totals by severity and evidence 
 
 Read every agent report. Cross-check: if an agent cites `file:line`, verify that line exists
 in the diff. If it doesn't match → drop the finding and note it was unverifiable.
+
+**Rerun every `VERIFIED (ran)` command.** Keep the finding only when the output matches what the agent reported. Otherwise drop it and note it was not reproducible.
 
 **De-duplicate:** Same file:line flagged by multiple agents → merge into one finding, list
 all agents that caught it.
