@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Only writer of job.json. Refuses illegal stage moves. Serves the board."""
-import fnmatch, hashlib, hmac, json, os, re, secrets, shlex, shutil, subprocess, sys, tempfile, threading, time
+import fcntl, fnmatch, hashlib, hmac, json, os, re, secrets, select, shlex, shutil, socket, subprocess, sys, tempfile, threading, time
 from datetime import datetime, timezone
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -226,6 +226,7 @@ def cmd_create(jid, title, *opts):
     save(job)
     audit("create-review" if review else "create", jid, f"{review['base_ref']}..{review['head_ref']}" if review else title)
     print(jid)
+    announce_board()
 
 
 def cmd_stack(jid):
@@ -693,6 +694,7 @@ def waiting_on_human(job):
 
 
 def cmd_queue():
+    announce_board()
     cap, running = config()["concurrency"], 0
     for job in all_jobs():
         if job["stage"] not in TERMINAL | HUMAN_STAGES and integrity_problems(job):
@@ -852,23 +854,101 @@ def cmd_serve(port):
     srv.serve_forever()
 
 
+WATCH_FILE = "watch.json"
+WATCH_FIRST_PORT = 8766
+WATCH_PORT_TRIES = 11
+
+
+def bind_watch(port):
+    if port != "auto":
+        return ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
+    for p in range(WATCH_FIRST_PORT, WATCH_FIRST_PORT + WATCH_PORT_TRIES):
+        try:
+            return ThreadingHTTPServer(("127.0.0.1", p), Handler)
+        except OSError:
+            continue
+    die(f"no free port from {WATCH_FIRST_PORT} to {WATCH_FIRST_PORT + WATCH_PORT_TRIES - 1}")
+
+
 def cmd_watch(port):
     """Read-only board. It holds no key and has no action routes, so an agent may start it."""
     global READONLY, SESSION, CODE, CODE_EXP
     READONLY = True
     SESSION, CODE = secrets.token_urlsafe(32), secrets.token_urlsafe(24)
     CODE_EXP = float("inf")
-    srv = ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
+    srv = bind_watch(port)
     print(f"watch: 127.0.0.1:{srv.server_port}/?c={CODE}  (read-only, valid until this process stops)", flush=True)
     audit("watch", "", f"port {srv.server_port}")
     srv.serve_forever()
+
+
+def port_listening(port):
+    with socket.socket() as sock:
+        sock.settimeout(0.3)
+        return sock.connect_ex(("127.0.0.1", int(port))) == 0
+
+
+def pid_alive(pid):
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def ensure_watcher():
+    """Return the link of a running read-only board for this project, starting one if needed.
+
+    The board outlives the command that started it. It never starts the board with the buttons.
+    """
+    if os.environ.get("FACTORY_NO_WATCH") == "1" or config().get("auto_watch") is False:
+        return None
+    STATE.mkdir(parents=True, exist_ok=True)
+    with open(STATE / "watch.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            info = json.loads((STATE / WATCH_FILE).read_text())
+        except (OSError, ValueError):
+            info = {}
+        if info.get("url") and pid_alive(info.get("pid")) and port_listening(info.get("port", 0)):
+            return info["url"]
+        child = subprocess.Popen(
+            [sys.executable, "-I", str(Path(__file__).resolve()), "watch", "auto"], cwd=str(ROOT),
+            env={**os.environ, "FACTORY_ROOT": str(ROOT)}, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, start_new_session=True, text=True)
+        ready, _, _ = select.select([child.stdout], [], [], 10)
+        line = child.stdout.readline() if ready else ""
+        m = re.match(r"watch: (127\.0\.0\.1:(\d+)/\?c=\S+)", line)
+        child.stdout.close()
+        if not m:
+            child.kill()
+            child.wait()
+            return None
+        fd, tmp = tempfile.mkstemp(dir=STATE)
+        with os.fdopen(fd, "w") as f:
+            json.dump({"pid": child.pid, "port": int(m.group(2)), "url": m.group(1)}, f)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, STATE / WATCH_FILE)
+        return m.group(1)
+
+
+def announce_board():
+    url = ensure_watcher()
+    if url:
+        print(f"board: {url}", file=sys.stderr)
+
+
+def cmd_board():
+    url = ensure_watcher()
+    need(url, "auto_watch is off, or the read-only board could not start. Run `job watch` yourself")
+    print(url)
 
 
 HUMAN_ONLY = {"approve", "commit", "unblock"}
 
 
 COMMANDS = {
-    "create": (cmd_create, None), "advance": (cmd_advance, 2), "gate": (cmd_gate, 1), "stack": (cmd_stack, 1), "watch": (cmd_watch, 1),
+    "create": (cmd_create, None), "advance": (cmd_advance, 2), "gate": (cmd_gate, 1), "stack": (cmd_stack, 1), "watch": (cmd_watch, 1), "board": (cmd_board, 0),
     "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_serve, 1),
 }
 
@@ -880,7 +960,7 @@ if __name__ == "__main__":
         die(f"usage: job {'|'.join(COMMANDS)}")
     fn, arity = COMMANDS[name]
     if name in ("serve", "watch") and not args:
-        args = ["8765" if name == "serve" else "8766"]
+        args = ["8765" if name == "serve" else str(WATCH_FIRST_PORT)]
     if name == "create":
         need(len(args) in (2, 5), "create takes <id> <title> [--review BASE HEAD]")
     else:
