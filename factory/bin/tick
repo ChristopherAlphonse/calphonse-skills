@@ -225,7 +225,7 @@ def guard_files(harness):
 
     Returns ({relative path: text}, hook config for the harness, or None when the harness loads files itself).
     """
-    pol = shell_policy(harness)
+    pol = shell_policy("kiro")  # the strictest list: it also denies command wrappers and `git <option> <verb>`
     rules = {**pol, "no_write": NO_WRITE, "write_only": WRITE_ONLY or []}
     base = f"{GUARD_DIR[harness]}/{SKILL}-guard"
     py, js = str(ROOT / f"{base}.py"), str(ROOT / f"{base}.json")
