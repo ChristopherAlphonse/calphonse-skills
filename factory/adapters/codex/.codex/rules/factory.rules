@@ -1,4 +1,0 @@
-prefix_rule(pattern=["git", "commit"], decision="forbidden", justification="factory policy: commits need the user")
-prefix_rule(pattern=["git", "push"], decision="forbidden", justification="factory policy: pushes need the user")
-prefix_rule(pattern=["gh", "pr", "create"], decision="forbidden", justification="factory policy: PRs need the user")
-prefix_rule(pattern=["glab", "mr", "create"], decision="forbidden", justification="factory policy: MRs need the user")

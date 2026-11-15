@@ -2,21 +2,25 @@
 """Run one factory pass headlessly in any supported harness, only if its deny policy is installed.
 
   tick <harness> [--dry-run]   check policy, then run one pass
-  tick check <harness>         exit 0 when the policy blocks commit, push, PR and MR creation
-  tick install <harness>       copy the policy template into the project, never overwriting
+  tick check <harness>         exit 0 when the project's policy denies every blocked command
+  tick install <harness>       write the harness's deny policy into the project, never overwriting
+  tick print <harness>         print the deny policy to merge by hand
+  tick list                    print the blocked command prefixes, one per line
 """
 import json, os, re, shutil, subprocess, sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(os.environ.get("FACTORY_ROOT", Path.cwd())).resolve()
-ADAPTERS = Path(__file__).resolve().parent.parent / "adapters"
 PROMPT = ("Use the factory skill and run one pass (factory run). Wait for every stage agent you spawn. "
-          "Never run git commit, git push, or create a PR or MR. Stop after the pass.")
-BLOCKED = [("git", "commit"), ("git", "push"), ("gh", "pr", "create"), ("glab", "mr", "create")]
+          "Never commit, push, merge, or create a PR or MR. Stop after the pass.")
+GIT_WRITES = ["commit", "push", "merge", "cherry-pick", "revert", "rebase", "am",
+              "commit-tree", "update-ref", "symbolic-ref", "config", "fast-import"]
+GIT_GLOBALS = ["-c", "-C", "--git-dir", "--work-tree", "--namespace"]
+BLOCKED = ([("git", g) for g in GIT_WRITES] + [("git", g) for g in GIT_GLOBALS]
+           + [("gh",), ("glab",), ("curl",), ("wget",), ("sh", "-c"), ("bash", "-c"), ("zsh", "-c")])
 COMMANDS = {
     "claude": lambda p: ["claude", "-p", p],
-    "codex": lambda p: ["codex", "exec", "--sandbox", "workspace-write", p],
     "opencode": lambda p: ["opencode", "run", p],
     "kiro": lambda p: ["kiro-cli", "chat", "--v3", "--no-interactive", "--agent", "factory", p],
 }
@@ -39,36 +43,54 @@ def read_json(path, jsonc=False):
         return {}
 
 
+def name(prefix):
+    return " ".join(prefix)
+
+
 def policy_gaps(harness):
-    """Return the blocked commands the project's policy for this harness does not deny."""
-    missing = []
+    """Return the blocked prefixes the project's policy for this harness does not deny."""
     if harness == "claude":
         deny = set()
-        for name in ("settings.json", "settings.local.json"):
-            deny |= set(read_json(ROOT / ".claude" / name).get("permissions", {}).get("deny", []))
-        return [" ".join(b) for b in BLOCKED if f"Bash({' '.join(b)} *)" not in deny]
-    if harness == "codex":
-        text = "\n".join(p.read_text() for p in (ROOT / ".codex" / "rules").glob("*.rules")) if (ROOT / ".codex" / "rules").is_dir() else ""
-        for b in BLOCKED:
-            pat = r"prefix_rule\([^)]*pattern\s*=\s*\[" + r"\s*,\s*".join(f'"{t}"' for t in b) + r"\s*\][^)]*decision\s*=\s*\"forbidden\""
-            if not re.search(pat, text):
-                missing.append(" ".join(b))
-        return missing
+        for f in ("settings.json", "settings.local.json"):
+            deny |= set(read_json(ROOT / ".claude" / f).get("permissions", {}).get("deny", []))
+        return [name(b) for b in BLOCKED if f"Bash({name(b)} *)" not in deny]
     if harness == "opencode":
         cfg = {}
-        for name in ("opencode.jsonc", "opencode.json"):
-            if (ROOT / name).exists():
-                cfg = read_json(ROOT / name, jsonc=True)
+        for f in ("opencode.jsonc", "opencode.json"):
+            if (ROOT / f).exists():
+                cfg = read_json(ROOT / f, jsonc=True)
                 break
-        rules = [(r.get("resource"), r.get("effect")) for r in cfg.get("permissions", []) if r.get("action") == "shell"]
+        rules = {(r.get("resource"), r.get("effect")) for r in cfg.get("permissions", []) if r.get("action") == "shell"}
         legacy = cfg.get("permission", {}).get("bash", {}) if isinstance(cfg.get("permission"), dict) else {}
-        return [" ".join(b) for b in BLOCKED
-                if (f"{' '.join(b)}*", "deny") not in rules and legacy.get(f"{' '.join(b)}*") != "deny"]
+        return [name(b) for b in BLOCKED
+                if (f"{name(b)} *", "deny") not in rules and legacy.get(f"{name(b)} *") != "deny"]
     if harness == "kiro":
         cfg = read_json(ROOT / ".kiro" / "agents" / "factory.json")
         denied = {m for r in cfg.get("permissions", {}).get("rules", [])
                   if r.get("capability") == "shell" and r.get("effect") == "deny" for m in r.get("match", [])}
-        return [" ".join(b) for b in BLOCKED if f"{' '.join(b)} *" not in denied]
+        return [name(b) for b in BLOCKED if f"{name(b)} *" not in denied]
+    die(f"unknown harness {harness!r}, expected one of {', '.join(COMMANDS)}")
+
+
+def policy_files(harness):
+    """Generate the deny policy for a harness as {relative path: text}."""
+    if harness == "claude":
+        deny = [f"Bash({name(b)} *)" for b in BLOCKED]
+        for g in GIT_WRITES:
+            deny += [f"Bash(git * {g} *)", f"Bash(git * {g})"]
+        return {".claude/settings.json": json.dumps({"permissions": {"deny": deny}}, indent=2) + "\n"}
+    if harness == "opencode":
+        rules = [{"action": "shell", "resource": f"{name(b)} *", "effect": "deny"} for b in BLOCKED]
+        return {"opencode.jsonc": json.dumps({"permissions": rules}, indent=2) + "\n"}
+    if harness == "kiro":
+        agent = {
+            "name": "factory",
+            "description": "Software factory orchestrator. Runs one pass of the factory skill and never commits, pushes, or opens a PR or MR.",
+            "prompt": "Use the factory skill. Run one pass and stop. Never commit, push, merge, or create a PR or MR.",
+            "resources": ["skill://.kiro/skills/*/SKILL.md"],
+            "permissions": {"rules": [{"capability": "shell", "match": [f"{name(b)} *" for b in BLOCKED], "effect": "deny"}]},
+        }
+        return {".kiro/agents/factory.json": json.dumps(agent, indent=2) + "\n"}
     die(f"unknown harness {harness!r}, expected one of {', '.join(COMMANDS)}")
 
 
@@ -85,17 +107,20 @@ def log(harness, detail):
 
 
 def cmd_install(harness):
-    src = ADAPTERS / harness
-    if not src.is_dir():
-        die(f"unknown harness {harness!r}")
-    clashes = [f for f in src.rglob("*") if f.is_file() and (ROOT / f.relative_to(src)).exists()]
+    files = policy_files(harness)
+    clashes = [f for f in files if (ROOT / f).exists()]
     if clashes:
-        die("already exists, merge these deny rules by hand: " + ", ".join(str(f.relative_to(src)) for f in clashes))
-    for f in (p for p in src.rglob("*") if p.is_file()):
-        dest = ROOT / f.relative_to(src)
+        die(f"already exists, merge the output of `tick print {harness}` by hand: " + ", ".join(clashes))
+    for rel, text in files.items():
+        dest = ROOT / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(f, dest)
-        print(f"installed {dest.relative_to(ROOT)}")
+        dest.write_text(text)
+        print(f"installed {rel}")
+
+
+def cmd_print(harness):
+    for rel, text in policy_files(harness).items():
+        print(f"# {rel}\n{text}", end="")
 
 
 def cmd_check(harness, quiet=False):
@@ -127,7 +152,11 @@ if __name__ == "__main__":
         cmd_install(a[1])
     elif len(a) == 2 and a[0] == "check":
         cmd_check(a[1])
+    elif len(a) == 2 and a[0] == "print":
+        cmd_print(a[1])
+    elif a == ["list"]:
+        print("\n".join(name(b) for b in BLOCKED))
     elif len(a) in (1, 2) and a[0] in COMMANDS and (len(a) == 1 or a[1] == "--dry-run"):
         cmd_run(a[0], len(a) == 2)
     else:
-        die("usage: tick <claude|codex|opencode|kiro> [--dry-run] | check <h> | install <h>")
+        die("usage: tick <claude|opencode|kiro> [--dry-run] | check|install|print <h> | list")

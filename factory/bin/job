@@ -202,6 +202,7 @@ def justify(job, cur, to):
         if to == "gate":
             need(s == "DONE", "polish.md needs STATUS: DONE")
             job["polished"] = True
+            (rd / CHECKS_FILE).unlink(missing_ok=True)
         elif to == "build":
             need(s == "REWORK", "polish.md needs STATUS: REWORK")
             to = bump_round(job)
@@ -439,7 +440,7 @@ def cmd_advance(jid, to):
 def cmd_gate(jid):
     job = load(jid)
     enforce(job)
-    need(job["stage"] == "gate", f"{jid} is {job['stage']}, not gate")
+    need(job["stage"] in ("gate", "ship"), f"{jid} is {job['stage']}, not gate or ship")
     checks = config()["checks"]
     need(checks, f"set `checks` in {STATE / 'config.json'}")
     cwd = job["worktree"] or str(ROOT)
