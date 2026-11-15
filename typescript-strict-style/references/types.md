@@ -11,5 +11,5 @@ Make the compiler reject the states you would otherwise assert against. `safety.
 - **A type guard must check what its name claims.** A guard that returns `true` without verifying is worse than `as`, because the bug now hides behind a safe-looking name. Name guards `isX` or `hasX`, and create a brand only inside one.
 - **Use `satisfies` to check a literal without widening it.** `const routes = { ... } satisfies Record<string, Route>` keeps the literal types and still fails on a bad shape.
 - **Derive types before declaring new ones.** Reach for `Pick`, `Omit`, `Parameters`, `ReturnType`, `Awaited`, and `typeof` on the source of truth first.
-- **Pass an object when a function takes more than two arguments of the same type.** Skip this on hot paths.
+- **Pass an object instead of positional arguments** so the call site names each one. Skip this on hot paths.
 - **Assert exhaustiveness inline.** In a `default` arm write `const _exhaustive: never = value;` so adding a variant fails the build.
