@@ -52,7 +52,7 @@ Claude Code is the supported harness. Its deny rules are measured, and the rest 
 
 `tests/probe_harness.py <harness>` runs every attack with and without the policy in a scratch repo and reports BLOCKED, GAP, or INCONCLUSIVE. On Claude Code, 24 of 24 attacks were blocked, each succeeding in the no-policy control. On OpenCode only 4 attacks had a valid control, and all 4 were blocked. The probe refuses to attack until a canary shows the harness is inside the scratch repo.
 
-A command that `policy.yaml` does not name, such as the repo's own test or lint command, waits for a human. An unattended pass cannot run it. A builder that needs one, such as `npm test`, stops and writes `STATUS: BLOCKED`. The gate is not affected, because `JOB gate` runs the `checks` command itself. To let it run, add the pattern as an allow rule in `policy.yaml`, then merge the output of `TICK print` into the project's policy.
+Tests, linters, and type checks run unattended: `policy.yaml` allows the common ones (`npm test`, `pytest`, `dotnet test`, `go test`, `tsc --noEmit`, `eslint`, and similar), and `TICK install` also allows the project's `checks` command and any patterns in the `allow` list of `.planning/factory/config.json`. Installs, publishes, and deploys are not on the list. Any other command that no rule names waits for a human, so an unattended pass cannot run it. A builder that needs one stops and writes `STATUS: BLOCKED`. The project's `allow` list can never override a deny or an ask, and the agent cannot edit `config.json`.
 
 Keep skill frontmatter to `name` and `description`, with `name` equal to the folder name. Kiro requires that.
 

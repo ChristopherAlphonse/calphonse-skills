@@ -17,7 +17,7 @@ To review an existing branch, use the separate `factory-review` skill. It has th
    { "checks": "npm test" }
    ```
 
-   Other keys: `concurrency` (default 1), `max_rounds` (default 3), `base_branch` (default `main`), and extra `protected_paths`.
+   Other keys: `concurrency` (default 1), `max_rounds` (default 3), `base_branch` (default `main`), extra `protected_paths`, and `allow` (extra shell patterns the agents may run unattended, such as `make verify*`; your `checks` command is allowed already).
 3. Install the policy for your harness: `bin/tick install claude`. It comes from `policy.yaml`.
 4. Start a job in Claude Code with `/factory <feature idea>`.
 5. Open the board in your own terminal with `bin/job serve`, then open the address it prints.
@@ -179,7 +179,7 @@ State lives in the project, never in this repo.
 
 | Path | Holds |
 | --- | --- |
-| `.planning/factory/config.json` | `checks`, `concurrency`, `max_rounds`, `base_branch`, `protected_paths` |
+| `.planning/factory/config.json` | `checks`, `concurrency`, `max_rounds`, `base_branch`, `protected_paths`, `allow` |
 | `.planning/factory/jobs/<id>/job.json` | the job's state, written only by `bin/job` |
 | `.planning/factory/jobs/<id>/*.md` | the stage files from the table above |
 | `.planning/factory/audit.log` | one JSON line per state change, with the actor (`agent`, `human`, or `tick`) |
@@ -221,6 +221,7 @@ python3 -m unittest discover -s factory/tests
 ## Limits
 
 - An agent that runs as your user can still edit files and run git. The factory makes that visible and stops the ordinary paths. Branch protection on the remote is the real guarantee.
+- Running tests runs the project's code. The policy sees the test command, not what the tests do inside it. A review of a branch you do not trust is therefore code execution on your machine. The worktree hooks and the integrity checks catch a commit or an edit to tracked files, not a network call or a write outside the worktree.
 - The ask rules are enforced by the harness, and no human is there to answer one in an unattended pass. That is the intent. Only Claude Code's handling is known to me from its documentation. Kiro's and OpenCode's handling of `ask` in a headless run is unmeasured.
 - A command the allow list permits can still write a file through shell redirection (`echo x > file`). The file-write rules cover the harness's edit tools, not the shell. The integrity checks catch a commit, a moved branch, or changed hooks, and park the job. They detect, they do not prevent.
 - The gate is only as good as your `checks` command. Make sure it fails when no tests run.

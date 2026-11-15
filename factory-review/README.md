@@ -30,7 +30,7 @@ To build a feature, use the separate `factory` skill. The two have the same layo
 
 Gitignore `.planning/` and `.worktrees/` in the project.
 
-Other keys for `.planning/factory-review/config.json`: `concurrency` (default 1) and `auto_watch` (set `false` to stop the read-only board starting by itself).
+Other keys for `.planning/factory-review/config.json`: `concurrency` (default 1), `auto_watch` (set `false` to stop the read-only board starting by itself), and `allow` (extra shell patterns reviewers may run unattended, such as `make verify*`). Reviewers can already run the common test, lint, and type-check commands. Run `bin/tick install` after changing `allow`.
 
 ## How a review moves
 
@@ -172,7 +172,7 @@ State lives in the project, never in this repo.
 
 | Path | Holds |
 | --- | --- |
-| `.planning/factory-review/config.json` | `concurrency`, `auto_watch` |
+| `.planning/factory-review/config.json` | `concurrency`, `auto_watch`, `allow` |
 | `.planning/factory-review/jobs/<id>/job.json` | the job's state, written only by `bin/job`. It records the base and head commits under `review` |
 | `.planning/factory-review/jobs/<id>/*.md` | the stage files from the table above |
 | `.planning/factory-review/jobs/<id>/reviews/` | one `review-<name>.md` per reviewer |
@@ -208,13 +208,14 @@ Measure a harness before trusting it with `tests/probe_harness.py <harness>`. It
 python3 -m unittest discover -s factory-review/tests
 ```
 
-86 tests, about a minute. `test_job.py` covers creating a review, the stage rules, stack detection, the read-only guarantees, the audit log, and the board. `test_integrity.py` replays the bypasses a red-team agent found against `factory`. `test_watch.py` and `test_autowatch.py` cover the read-only board, and `test_tick.py` covers the deny rules.
+90 tests, about a minute. `test_job.py` covers creating a review, the stage rules, stack detection, the read-only guarantees, the audit log, and the board. `test_integrity.py` replays the bypasses a red-team agent found against `factory`. `test_watch.py` and `test_autowatch.py` cover the read-only board, and `test_tick.py` covers the deny rules.
 
 ## Limits
 
 - The review skills have only been exercised in miniature. Run a real review before relying on the depth of each one.
 - The verify stage is only as good as what can be run locally. A finding that needs a service you do not have comes back unverifiable.
 - An agent running as your user can still edit files and run git. The engine makes that visible. Branch protection on your remote is the real guarantee.
+- Running tests runs the project's code. The policy sees the test command, not what the tests do inside it. A review of a branch you do not trust is therefore code execution on your machine. The worktree hooks and the integrity checks catch a commit or an edit to tracked files, not a network call or a write outside the worktree.
 - The ask rules are enforced by the harness, and no human is there to answer one in an unattended pass. That is the intent. Only Claude Code's handling is known to me from its documentation. Kiro's and OpenCode's handling of `ask` in a headless run is unmeasured.
 - A command the allow list permits can still write a file through shell redirection (`echo x > file`). The file-write rules cover the harness's edit tools, not the shell. For a review, the integrity check catches a changed tracked file and parks the job. It detects, it does not prevent.
 - The deny-rule measurement was done on `factory`. The list is the same, but the probe has not been rerun for `factory-review`.

@@ -59,7 +59,7 @@ Claude Code is the supported harness. OpenCode and Kiro adapters exist and are u
 
 `TICK install <harness>` writes the policy (deny, ask, and allow rules, plus the file-write limits) into the project and never overwrites, and `TICK print <harness>` prints them to merge by hand. `TICK check <harness>` exits non-zero when any blocked command is not denied, and `TICK list` shows the list. `TICK <harness>` checks, then runs one pass.
 
-A command that `policy.yaml` does not name, such as the repo's own test or lint command, waits for a human. An unattended pass cannot run it. A reviewer that needs one tags the finding `[ASSUMPTION]`, and the verifier marks it `UNVERIFIABLE`. To let it run, add the pattern as an allow rule in `policy.yaml`, then merge the output of `TICK print` into the project's policy.
+Tests, linters, and type checks run unattended: `policy.yaml` allows the common ones (`npm test`, `pytest`, `dotnet test`, `go test`, `tsc --noEmit`, `eslint`, and similar), and `TICK install` also allows the project's `checks` command and any patterns in the `allow` list of `.planning/factory-review/config.json`. Installs, publishes, and deploys are not on the list. Any other command that no rule names waits for a human, so an unattended pass cannot run it. A reviewer that needs one tags the finding `[ASSUMPTION]`, and the verifier marks it `UNVERIFIABLE`. The project's `allow` list can never override a deny or an ask, and the agent cannot edit `config.json`.
 
 Keep skill frontmatter to `name` and `description`, with `name` equal to the folder name. Kiro requires that.
 
