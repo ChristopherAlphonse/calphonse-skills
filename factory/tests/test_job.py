@@ -1036,6 +1036,27 @@ class TestServer(Factory):
         self.human("approve", "a")
         self.assertIsNone(self.get_jobs()["a"]["needs"])
 
+    def test_wait_returns_when_the_user_approves(self):
+        self.new_spec("a")
+        waiter = subprocess.Popen([sys.executable, "-I", str(JOB), "wait", "30"], cwd=str(self.base), env=self.env,
+                                  stdout=subprocess.PIPE, text=True)
+        time.sleep(1)
+        self.assertIsNone(waiter.poll())
+        self.human("approve", "a")
+        out, _ = waiter.communicate(timeout=15)
+        self.assertEqual(waiter.returncode, 0)
+        self.assertIn("RESUME: a", out)
+
+    def test_wait_times_out_and_idles(self):
+        self.new_spec("a")
+        r = self.run_job("wait", 1)
+        self.assertEqual((r.returncode, "STILL WAITING on a" in r.stdout), (3, True))
+        self.human("approve", "a")
+        r = self.run_job("wait", 1)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("nothing waits on you", r.stdout)
+        self.no("wait", "0")
+
     def test_file_endpoint(self):
         self.new_spec("a")
         self.ok("create", "b", "T")

@@ -778,6 +778,24 @@ def needs_you(job):
     return {"action": action, "files": files, "why": why, "todo": todo, "command": serve_command()}
 
 
+def cmd_wait(seconds):
+    """Block until a job that waits on the user no longer does, so an agent can resume without being told."""
+    need(seconds.isdigit() and 0 < int(seconds) <= 3600, "wait takes a number of seconds, 1 to 3600")
+    held = sorted(j["id"] for j in all_jobs() if waiting_on_human(j))
+    if not held:
+        print("nothing waits on you. Run `JOB queue`.")
+        return
+    deadline = time.time() + int(seconds)
+    while time.time() < deadline:
+        time.sleep(min(2, max(0, deadline - time.time())))
+        freed = [i for i in held if not waiting_on_human(load(i))]
+        if freed:
+            print(f"RESUME: {', '.join(freed)} no longer wait on the user. Run `JOB queue` and continue.")
+            return
+    print(f"STILL WAITING on {', '.join(held)}. Run `JOB wait` again. Do not end your turn.")
+    sys.exit(3)
+
+
 def snapshot(job):
     d = jobdir(job["id"])
     rd = d / f"round-{job['round']}"
@@ -1033,7 +1051,7 @@ HUMAN_ONLY = {"approve", "commit", "unblock"}
 
 COMMANDS = {
     "create": (cmd_create, None), "advance": (cmd_advance, 2), "gate": (cmd_gate, 1), "stack": (cmd_stack, 1), "watch": (cmd_watch, 1), "board": (cmd_board, 0),
-    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_serve, 1),
+    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_serve, 1), "wait": (cmd_wait, 1),
 }
 
 if __name__ == "__main__":
@@ -1043,8 +1061,9 @@ if __name__ == "__main__":
     if name not in COMMANDS:
         die(f"usage: job {'|'.join(COMMANDS)}")
     fn, arity = COMMANDS[name]
-    if name in ("serve", "watch") and not args:
-        args = ["8765" if name == "serve" else str(WATCH_FIRST_PORT)]
+    if name in ("serve", "watch", "wait") and not args:
+        args = {"serve": "8765", "watch": str(WATCH_FIRST_PORT), "wait": "90"}[name]
+        args = [args]
     if name == "create":
         need(len(args) in (2, 5), "create takes <id> <title> [--review BASE HEAD]")
     else:
