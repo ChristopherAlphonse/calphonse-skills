@@ -89,6 +89,11 @@ class RepoIndex(unittest.TestCase):
             with self.subTest(skill=skill):
                 self.assertIn("`policy.yaml`", (REPO / skill / "SKILL.md").read_text())
 
+    def test_only_the_build_skill_may_rewrite_files_with_a_formatter(self):
+        self.assertTrue((REPO / "factory" / "policy.build.yaml").exists())
+        self.assertFalse((REPO / "factory-review" / "policy.build.yaml").exists())
+        self.assertNotIn("policy.build.yaml", (REPO / "factory-review" / "bin" / "tick").read_text().split("POLICY_EXTRA = ")[1].split("\n")[0])
+
     def test_factory_review_needs_nothing_from_the_factory_folder(self):
         for path in (REPO / "factory-review").rglob("*"):
             if path.is_file() and path.suffix in {"", ".py", ".js", ".html"}:

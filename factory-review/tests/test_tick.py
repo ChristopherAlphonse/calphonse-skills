@@ -226,6 +226,34 @@ class BaselinePolicyTests(unittest.TestCase):
                 (state / "config.json").write_text(json.dumps(bad))
                 self.assertEqual(run(self.root, "install", "claude").returncode, 2)
 
+    def test_quality_tools_for_every_common_stack_run_unattended_in_every_harness(self):
+        by_stack = {
+            "js": ["npm run lint*", "npm run format:check*", "eslint *", "prettier --check *", "biome ci*", "vitest *"],
+            "python": ["ruff check*", "ruff format --check*", "black --check *", "isort --check*", "mypy *", "flake8 *", "pylint *"],
+            "dotnet": ["dotnet test*", "dotnet build*", "dotnet format --verify-no-changes*"],
+            "go": ["go vet*", "gofmt -l *", "golangci-lint run*", "staticcheck *"],
+            "rust": ["cargo clippy*", "cargo fmt --check*"],
+            "jvm and ruby": ["mvn verify*", "gradle check*", "bundle exec rubocop*"],
+            "other": ["shellcheck *", "terraform fmt -check*", "yamllint *", "markdownlint *", "hadolint *", "make lint*"],
+        }
+        for h in HARNESSES:
+            root = self.root / h
+            root.mkdir()
+            run(root, "install", h)
+            allow = enforced(root, h)["allow"]
+            for stack, patterns in by_stack.items():
+                with self.subTest(harness=h, stack=stack):
+                    self.assertFalse(set(patterns) - allow)
+
+    def test_nothing_that_installs_publishes_deploys_or_uploads_is_allowed(self):
+        for h in HARNESSES:
+            root = self.root / h
+            root.mkdir()
+            run(root, "install", h)
+            for pattern in enforced(root, h)["allow"]:
+                with self.subTest(harness=h, pattern=pattern):
+                    self.assertNotRegex(pattern, r"install|publish|deploy|upload|push|terraform apply|^aws |^docker |^kubectl ")
+
     def test_a_missing_ask_rule_is_a_gap_and_a_deny_in_its_place_is_not(self):
         run(self.root, "install", "claude")
         path = self.root / ".claude" / "settings.json"
@@ -301,6 +329,22 @@ class BaselinePolicyTests(unittest.TestCase):
         self.assertEqual([r["match"] for r in allow], [["**/.planning/factory-review/**"]])
         deny = [m for r in rules if r["capability"] == "fs_write" and r["effect"] == "deny" for m in r["match"]]
         self.assertIn("**/.worktrees/**", deny)
+
+
+    def test_a_review_may_check_formatting_but_never_rewrite_files(self):
+        self.assertFalse((TICK.parent.parent / "policy.build.yaml").exists())
+        for h in HARNESSES:
+            with self.subTest(h):
+                root = self.root / h
+                root.mkdir()
+                run(root, "install", h)
+                got = enforced(root, h)
+                for pattern in ("prettier --write *", "black *", "ruff format*", "gofmt -w *", "cargo fmt*",
+                                "dotnet format*", "terraform fmt*", "npm run format*"):
+                    self.assertNotIn(pattern, got["allow"])
+                for flag in ("*--fix*", "*--write*", "*--apply*", "*--updateSnapshot*"):
+                    self.assertIn(flag, got["ask"])
+                self.assertIn("eslint *", got["allow"])
 
 
 if __name__ == "__main__":

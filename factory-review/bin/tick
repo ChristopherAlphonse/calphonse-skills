@@ -17,7 +17,13 @@ from pathlib import Path
 
 ROOT = Path(os.environ.get("FACTORY_ROOT", Path.cwd())).resolve()
 SKILL = "factory-review"
-POLICY_FILE = Path(__file__).resolve().parent.parent / "policy.yaml"
+POLICY_DIR = Path(__file__).resolve().parent.parent
+POLICY_FILE = POLICY_DIR / "policy.yaml"
+POLICY_EXTRA = []  # more rule files this skill loads
+# Flags that make a tool rewrite files. A skill that must not change the code it reads asks before them,
+# and ask beats the broad allow rules such as `eslint *`.
+REWRITE_ASK = ["*--fix*", "*--write*", "*--apply*", "*--autocorrect*", "*--auto-correct*",
+              "*--updateSnapshot*", "*--update-snapshots*", "*--snapshot-update*"]
 PROMPT = ("Use the factory-review skill and run one pass (factory-review run). Wait for every reviewer you spawn. "
           "Never edit the code under review. Never commit, push, merge, post a comment, or create a PR or MR. Stop after the pass.")
 GIT_WRITES = ["commit", "push", "merge", "cherry-pick", "revert", "rebase", "am",
@@ -63,7 +69,7 @@ def name(prefix):
     return " ".join(prefix)
 
 
-def load_policy(path=POLICY_FILE):
+def load_policy(path=POLICY_FILE, strict=True):
     out = {"deny": [], "ask": [], "allow": []}
     rule = None
     for raw in Path(path).read_text().splitlines():
@@ -86,7 +92,7 @@ def load_policy(path=POLICY_FILE):
             out[rule["effect"]].append(line[2:].strip())
         else:
             die(f"{path.name}: cannot read line {raw!r}")
-    if not all(out.values()):
+    if strict and not all(out.values()):
         die(f"{path.name}: needs at least one deny, ask, and allow pattern")
     return out
 
@@ -97,6 +103,10 @@ def uniq(items):
 
 def shell_policy(harness):
     base = load_policy()
+    for extra in POLICY_EXTRA:
+        more = load_policy(POLICY_DIR / extra, strict=False)
+        base = {k: base[k] + more[k] for k in base}
+    base["ask"] = base["ask"] + REWRITE_ASK
     stricter = [f"{name(b)} *" for b in BLOCKED]
     if harness == "kiro":
         stricter += [f"{w} *" for w in KIRO_WRAPPERS]

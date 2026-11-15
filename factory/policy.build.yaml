@@ -1,0 +1,29 @@
+# Extra rules only the build skill loads: formatters and fixers that rewrite the working tree.
+# A review never loads this file, because a review must not change the code it reads.
+# Same format and precedence as policy.yaml.
+rules:
+  - capability: shell
+    effect: allow
+    match:
+      - npm run format*
+      - npm run lint:fix*
+      - npm run fix*
+      - yarn format*
+      - pnpm run format*
+      - prettier --write *
+      - npx prettier --write *
+      - biome format --write*
+      - biome check --write*
+      - npx biome format --write*
+      - npx biome check --write*
+      - black *
+      - isort *
+      - ruff format*
+      - gofmt -w *
+      - goimports -w *
+      - cargo fmt*
+      - dotnet format*
+      - terraform fmt*
+      - shfmt -w *
+      - make format*
+      - make fmt*
