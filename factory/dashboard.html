@@ -1,195 +1,694 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Factory Board</title>
-<style>
-:root{--bg:#f6f7f9;--col:#eceef2;--card:#fff;--ink:#1b1f27;--mute:#667085;--line:#d9dde5;--ok:#1a7f4b;--bad:#c0362c;--warn:#a96a00;--you:#6b3fd4;--acc:#2a5bd7}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1115;--col:#171a21;--card:#1e222b;--ink:#e6e9ef;--mute:#8b93a3;--line:#2c313c;--ok:#4cc38a;--bad:#ff7b72;--warn:#e0a53a;--you:#b497ff;--acc:#7aa2ff}}
-:root[data-theme="dark"]{--bg:#0f1115;--col:#171a21;--card:#1e222b;--ink:#e6e9ef;--mute:#8b93a3;--line:#2c313c;--ok:#4cc38a;--bad:#ff7b72;--warn:#e0a53a;--you:#b497ff;--acc:#7aa2ff}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,sans-serif}
-header{display:flex;gap:12px;align-items:baseline;padding:14px 16px;border-bottom:1px solid var(--line)}
-h1{font-size:16px;margin:0}
-#meta{color:var(--mute);font-size:12px}
-.policy{margin-left:auto;font-size:12px;color:var(--you)}
-#board{display:flex;gap:10px;padding:12px 16px;overflow-x:auto;align-items:flex-start}
-.col{background:var(--col);border-radius:8px;min-width:210px;flex:1 0 210px;padding:8px}
-.col h2{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);margin:2px 4px 8px;display:flex;justify-content:space-between}
-.col.you h2{color:var(--you)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:9px;margin-bottom:8px;cursor:pointer}
-.card.hold{border-color:var(--you);box-shadow:0 0 0 1px var(--you)}
-.card .t{font-weight:600}
-.card .id{color:var(--mute);font-size:11px}
-.row{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
-.chip{font-size:11px;padding:1px 6px;border-radius:9px;border:1px solid var(--line);color:var(--mute)}
-.chip.PASS{color:var(--ok);border-color:var(--ok)}
-.chip.FAIL,.chip.CHANGES{color:var(--bad);border-color:var(--bad)}
-.bar{height:4px;background:var(--line);border-radius:2px;margin-top:7px;overflow:hidden}
-.bar i{display:block;height:100%;background:var(--acc)}
-button{font:inherit;border:1px solid var(--you);background:transparent;color:var(--you);border-radius:5px;padding:3px 9px;cursor:pointer;margin-top:7px}
-button:hover{background:var(--you);color:#fff}
-#drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background:var(--card);border-left:1px solid var(--line);padding:14px;overflow:auto;display:none}
-#drawer.open{display:block}
-#drawer pre{white-space:pre-wrap;word-break:break-word;background:var(--col);padding:10px;border-radius:6px;font-size:12px}
-#drawer .files{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0}
-#drawer .files .chip{cursor:pointer}
-#drawer .files .chip.on{color:var(--acc);border-color:var(--acc)}
-.x{float:right;margin:0}
-</style>
-</head>
-<body>
-<header><h1>Factory Board</h1><span id="meta">connecting</span><span class="policy">local only: the factory never pushes or opens a PR/MR, and commits only when you click</span></header>
-<main id="board"></main>
-<aside id="drawer"><button class="x" id="close">close</button><div id="dhead"></div><div class="files" id="dfiles"></div><pre id="dbody"></pre></aside>
-<script>
-const COLS = [
-  {label:'Shape', stages:['shape'], kinds:['build']},
-  {label:'Spec', stages:['spec'], kinds:['build']},
-  {label:'Scope', stages:['scope'], kinds:['review']},
-  {label:'Build', stages:['build','gate'], kinds:['build']},
-  {label:'Review', stages:['review'], kinds:['build','review']},
-  {label:'Reconcile', stages:['reconcile'], kinds:['review']},
-  {label:'Polish', stages:['polish'], kinds:['build']},
-  {label:'Verify', stages:['verify'], kinds:['review']},
-  {label:'Prove', stages:['prove'], kinds:['build']},
-  {label:'Report', stages:['report'], kinds:['review']},
-  {label:'Ship', stages:['ship'], kinds:['build']},
-  {label:'Needs you', stages:['needs-human'], you:true},
-  {label:'Ready to land', stages:['ready','rejected'], always:true},
-];
-const POLL_MS = 2000;
-const api = (path, opts = {}) => fetch(path, {...opts, credentials: 'same-origin', headers: {...(opts.headers || {}), 'X-Factory': '1'}});
-let readonly = false;
-let jobs = [], open = null, openFile = null, lastSig = '', notice = '';
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Factory Board</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --col: #eceef2;
+        --card: #fff;
+        --ink: #1b1f27;
+        --mute: #667085;
+        --line: #d9dde5;
+        --ok: #1a7f4b;
+        --bad: #c0362c;
+        --warn: #a96a00;
+        --you: #6b3fd4;
+        --acc: #2a5bd7;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #0f1115;
+          --col: #171a21;
+          --card: #1e222b;
+          --ink: #e6e9ef;
+          --mute: #8b93a3;
+          --line: #2c313c;
+          --ok: #4cc38a;
+          --bad: #ff7b72;
+          --warn: #e0a53a;
+          --you: #b497ff;
+          --acc: #7aa2ff;
+        }
+      }
+      :root[data-theme="dark"] {
+        --bg: #0f1115;
+        --col: #171a21;
+        --card: #1e222b;
+        --ink: #e6e9ef;
+        --mute: #8b93a3;
+        --line: #2c313c;
+        --ok: #4cc38a;
+        --bad: #ff7b72;
+        --warn: #e0a53a;
+        --you: #b497ff;
+        --acc: #7aa2ff;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          14px/1.4 system-ui,
+          sans-serif;
+      }
+      header {
+        display: flex;
+        gap: 12px;
+        align-items: baseline;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+      h1 {
+        font-size: 16px;
+        margin: 0;
+      }
+      #meta {
+        color: var(--mute);
+        font-size: 12px;
+      }
+      .policy {
+        margin-left: auto;
+        font-size: 12px;
+        color: var(--you);
+      }
+      #board {
+        display: flex;
+        gap: 10px;
+        padding: 12px 16px;
+        overflow-x: auto;
+        align-items: flex-start;
+      }
+      .col {
+        background: var(--col);
+        border-radius: 8px;
+        min-width: 210px;
+        flex: 1 0 210px;
+        padding: 8px;
+      }
+      .col h2 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--mute);
+        margin: 2px 4px 8px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .col.you h2 {
+        color: var(--you);
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 9px;
+        margin-bottom: 8px;
+        cursor: pointer;
+      }
+      .card.hold {
+        border-color: var(--you);
+        box-shadow: 0 0 0 1px var(--you);
+      }
+      .card .t {
+        font-weight: 600;
+      }
+      .card .id {
+        color: var(--mute);
+        font-size: 11px;
+      }
+      .row {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+      }
+      .chip {
+        font-size: 11px;
+        padding: 1px 6px;
+        border-radius: 9px;
+        border: 1px solid var(--line);
+        color: var(--mute);
+      }
+      .chip.PASS {
+        color: var(--ok);
+        border-color: var(--ok);
+      }
+      .chip.FAIL,
+      .chip.CHANGES {
+        color: var(--bad);
+        border-color: var(--bad);
+      }
+      .bar {
+        height: 4px;
+        background: var(--line);
+        border-radius: 2px;
+        margin-top: 7px;
+        overflow: hidden;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        background: var(--acc);
+      }
+      button {
+        font: inherit;
+        border: 1px solid var(--you);
+        background: transparent;
+        color: var(--you);
+        border-radius: 5px;
+        padding: 3px 9px;
+        cursor: pointer;
+        margin-top: 7px;
+      }
+      button:hover {
+        background: var(--you);
+        color: #fff;
+      }
+      #drawer {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(920px, 100%);
+        background: var(--card);
+        border-left: 1px solid var(--line);
+        padding: 14px;
+        overflow: auto;
+        display: none;
+      }
+      #drawer.open {
+        display: block;
+      }
+      #dbody {
+        word-break: break-word;
+      }
+      #dbody.raw {
+        white-space: pre-wrap;
+        background: var(--col);
+        padding: 10px;
+        border-radius: 6px;
+        font:
+          12px/1.4 ui-monospace,
+          monospace;
+      }
+      #dbody.md {
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      #dbody.md h1,
+      #dbody.md h2,
+      #dbody.md h3,
+      #dbody.md h4 {
+        margin: 14px 0 6px;
+        line-height: 1.25;
+      }
+      #dbody.md h1 {
+        font-size: 18px;
+      }
+      #dbody.md h2 {
+        font-size: 15px;
+      }
+      #dbody.md h3,
+      #dbody.md h4 {
+        font-size: 13px;
+      }
+      #dbody.md p,
+      #dbody.md ul,
+      #dbody.md ol,
+      #dbody.md blockquote,
+      #dbody.md table {
+        margin: 0 0 10px;
+      }
+      #dbody.md ul,
+      #dbody.md ol {
+        padding-left: 22px;
+      }
+      #dbody.md code {
+        background: var(--col);
+        padding: 1px 4px;
+        border-radius: 4px;
+        font:
+          12px ui-monospace,
+          monospace;
+      }
+      #dbody.md pre {
+        background: var(--col);
+        padding: 10px;
+        border-radius: 6px;
+        overflow: auto;
+        margin: 0 0 10px;
+      }
+      #dbody.md pre code {
+        padding: 0;
+        background: none;
+      }
+      #dbody.md blockquote {
+        border-left: 3px solid var(--line);
+        padding-left: 10px;
+        color: var(--mute);
+      }
+      #dbody.md a {
+        color: var(--acc);
+      }
+      #dbody.md hr {
+        border: 0;
+        border-top: 1px solid var(--line);
+      }
+      #dbody.md .tw {
+        overflow-x: auto;
+      }
+      #dbody.md table {
+        border-collapse: collapse;
+      }
+      #dbody.md th,
+      #dbody.md td {
+        border: 1px solid var(--line);
+        padding: 3px 8px;
+        text-align: left;
+      }
+      #drawer .files {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+        margin: 8px 0;
+      }
+      #drawer .files .chip {
+        cursor: pointer;
+      }
+      #drawer .files .chip.on {
+        color: var(--acc);
+        border-color: var(--acc);
+      }
+      .x {
+        float: right;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Factory Board</h1>
+      <span id="meta">connecting</span
+      ><span class="policy"
+        >local only: the factory never pushes or opens a PR/MR, and commits only
+        when you click</span
+      >
+    </header>
+    <main id="board"></main>
+    <aside id="drawer">
+      <button class="x" id="close">close</button>
+      <div id="dhead"></div>
+      <div class="files" id="dfiles"></div>
+      <div id="dbody" class="raw"></div>
+    </aside>
+    <script>
+      const COLS = [
+        { label: "Shape", stages: ["shape"], kinds: ["build"] },
+        { label: "Spec", stages: ["spec"], kinds: ["build"] },
+        { label: "Scope", stages: ["scope"], kinds: ["review"] },
+        { label: "Build", stages: ["build", "gate"], kinds: ["build"] },
+        { label: "Review", stages: ["review"], kinds: ["build", "review"] },
+        { label: "Reconcile", stages: ["reconcile"], kinds: ["review"] },
+        { label: "Polish", stages: ["polish"], kinds: ["build"] },
+        { label: "Verify", stages: ["verify"], kinds: ["review"] },
+        { label: "Prove", stages: ["prove"], kinds: ["build"] },
+        { label: "Report", stages: ["report"], kinds: ["review"] },
+        { label: "Ship", stages: ["ship"], kinds: ["build"] },
+        { label: "Needs you", stages: ["needs-human"], you: true },
+        { label: "Ready to land", stages: ["ready", "rejected"], always: true },
+      ];
+      const POLL_MS = 2000;
+      const api = (path, opts = {}) =>
+        fetch(path, {
+          ...opts,
+          credentials: "same-origin",
+          headers: { ...(opts.headers || {}), "X-Factory": "1" },
+        });
+      let readonly = false;
+      let jobs = [],
+        open = null,
+        openFile = null,
+        lastSig = "",
+        notice = "";
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-const chip = (text, cls) => el('span', 'chip ' + (cls || ''), text);
+      const el = (tag, cls, text) => {
+        const e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text != null) e.textContent = text;
+        return e;
+      };
+      const chip = (text, cls) => el("span", "chip " + (cls || ""), text);
 
-async function post(path, body) {
-  const res = await api(path, {method:'POST', body:JSON.stringify(body)});
-  if (!res.ok) { notice = 'Refused: ' + path.split('/').pop() + ' (' + res.status + ')'; document.getElementById('meta').textContent = notice; }
-  poll();
-}
+      async function post(path, body) {
+        const res = await api(path, {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          notice =
+            "Refused: " + path.split("/").pop() + " (" + res.status + ")";
+          document.getElementById("meta").textContent = notice;
+        }
+        poll();
+      }
 
-function card(j) {
-  const c = el('div', 'card' + (j.needs_human ? ' hold' : ''));
-  c.append(el('div', 't', j.title), el('div', 'id', j.id));
-  const r = el('div', 'row');
-  r.append(chip(j.kind === 'review' ? 'review job: ' + j.stage : j.stage));
-  if (j.round && j.kind !== 'review') r.append(chip('round ' + j.round + '/' + j.round_limit));
-  if (j.stage === 'gate' || j.gate) r.append(chip('gate ' + (j.gate || 'pending'), j.gate || ''));
-  c.append(r);
-  if (j.kind === 'review' && j.review) c.append(el('div', 'id', j.review.base_ref + ' .. ' + j.review.head_ref));
-  if (j.stack && j.stack.length) {
-    const sr = el('div', 'row');
-    j.stack.forEach(k => sr.append(chip(k)));
-    c.append(sr);
-  }
-  if (j.report && j.report.FINDINGS !== undefined) {
-    const rr = el('div', 'row');
-    rr.append(chip(j.report.FINDINGS + ' findings'));
-    if (j.report.BLOCKERS !== undefined) rr.append(chip(j.report.BLOCKERS + ' blockers', Number(j.report.BLOCKERS) ? 'FAIL' : 'PASS'));
-    c.append(rr);
-  }
-  if (j.stage === 'review') {
-    const rr = el('div', 'row');
-    for (const [name, v] of Object.entries(j.reviews)) rr.append(chip(name + (v ? ' ' + v : ' ...'), v || ''));
-    c.append(rr);
-  }
-  const [done, total] = j.progress;
-  if (total) {
-    const b = el('div', 'bar'), i = el('i');
-    i.style.width = Math.round(100 * done / total) + '%';
-    b.append(i); c.append(b, el('div', 'id', 'tasks ' + done + '/' + total));
-  }
-  if (j.can_approve) {
-    const b = el('button', '', 'Approve spec');
-    b.onclick = e => { e.stopPropagation(); post('/api/approve', {id:j.id}); };
-    c.append(b);
-  }
-  if (j.commit) r.append(chip('committed locally ' + j.commit.slice(0, 7), 'PASS'));
-  if (j.can_commit) {
-    const b = el('button', '', 'Commit locally');
-    b.onclick = e => { e.stopPropagation(); post('/api/commit', {id:j.id}); };
-    c.append(b);
-  }
-  if (j.stage === 'needs-human') {
-    const b = el('button', '', 'Unblock, grant more rounds');
-    b.onclick = e => { e.stopPropagation(); post('/api/unblock', {id:j.id}); };
-    c.append(b);
-  }
-  c.onclick = () => showDrawer(j.id);
-  return c;
-}
+      function card(j) {
+        const c = el("div", "card" + (j.needs_human ? " hold" : ""));
+        c.append(el("div", "t", j.title), el("div", "id", j.id));
+        const r = el("div", "row");
+        r.append(
+          chip(j.kind === "review" ? "review job: " + j.stage : j.stage),
+        );
+        if (j.round && j.kind !== "review")
+          r.append(chip("round " + j.round + "/" + j.round_limit));
+        if (j.stage === "gate" || j.gate)
+          r.append(chip("gate " + (j.gate || "pending"), j.gate || ""));
+        c.append(r);
+        if (j.kind === "review" && j.review)
+          c.append(
+            el("div", "id", j.review.base_ref + " .. " + j.review.head_ref),
+          );
+        if (j.stack && j.stack.length) {
+          const sr = el("div", "row");
+          j.stack.forEach((k) => sr.append(chip(k)));
+          c.append(sr);
+        }
+        if (j.report && j.report.FINDINGS !== undefined) {
+          const rr = el("div", "row");
+          rr.append(chip(j.report.FINDINGS + " findings"));
+          if (j.report.BLOCKERS !== undefined)
+            rr.append(
+              chip(
+                j.report.BLOCKERS + " blockers",
+                Number(j.report.BLOCKERS) ? "FAIL" : "PASS",
+              ),
+            );
+          c.append(rr);
+        }
+        if (j.stage === "review") {
+          const rr = el("div", "row");
+          for (const [name, v] of Object.entries(j.reviews))
+            rr.append(chip(name + (v ? " " + v : " ..."), v || ""));
+          c.append(rr);
+        }
+        const [done, total] = j.progress;
+        if (total) {
+          const b = el("div", "bar"),
+            i = el("i");
+          i.style.width = Math.round((100 * done) / total) + "%";
+          b.append(i);
+          c.append(b, el("div", "id", "tasks " + done + "/" + total));
+        }
+        if (j.can_approve) {
+          const b = el("button", "", "Approve spec");
+          b.onclick = (e) => {
+            e.stopPropagation();
+            post("/api/approve", { id: j.id });
+          };
+          c.append(b);
+        }
+        if (j.commit)
+          r.append(chip("committed locally " + j.commit.slice(0, 7), "PASS"));
+        if (j.can_commit) {
+          const b = el("button", "", "Commit locally");
+          b.onclick = (e) => {
+            e.stopPropagation();
+            post("/api/commit", { id: j.id });
+          };
+          c.append(b);
+        }
+        if (j.stage === "needs-human") {
+          const b = el("button", "", "Unblock, grant more rounds");
+          b.onclick = (e) => {
+            e.stopPropagation();
+            post("/api/unblock", { id: j.id });
+          };
+          c.append(b);
+        }
+        c.onclick = () => showDrawer(j.id);
+        return c;
+      }
 
-function render() {
-  const board = document.getElementById('board');
-  board.replaceChildren();
-  for (const col of COLS) {
-    const mine = jobs.filter(j => col.stages.includes(j.stage));
-    const relevant = col.always || col.you || mine.length || jobs.some(j => col.kinds && col.kinds.includes(j.kind));
-    if (!relevant) continue;
-    const d = el('section', 'col' + (col.you ? ' you' : ''));
-    const h = el('h2'); h.append(el('span', '', col.label), el('span', '', String(mine.length)));
-    d.append(h);
-    mine.forEach(j => d.append(card(j)));
-    board.append(d);
-  }
-  const waiting = jobs.filter(j => j.needs_human).length;
-  document.getElementById('meta').textContent = jobs.length + ' jobs' + (waiting ? ', ' + waiting + ' waiting on you' : '') + ', updated ' + new Date().toLocaleTimeString();
-  if (open) renderDrawerHead();
-}
+      function render() {
+        const board = document.getElementById("board");
+        board.replaceChildren();
+        for (const col of COLS) {
+          const mine = jobs.filter((j) => col.stages.includes(j.stage));
+          const relevant =
+            col.always ||
+            col.you ||
+            mine.length ||
+            jobs.some((j) => col.kinds && col.kinds.includes(j.kind));
+          if (!relevant) continue;
+          const d = el("section", "col" + (col.you ? " you" : ""));
+          const h = el("h2");
+          h.append(
+            el("span", "", col.label),
+            el("span", "", String(mine.length)),
+          );
+          d.append(h);
+          mine.forEach((j) => d.append(card(j)));
+          board.append(d);
+        }
+        const waiting = jobs.filter((j) => j.needs_human).length;
+        document.getElementById("meta").textContent =
+          jobs.length +
+          " jobs" +
+          (waiting ? ", " + waiting + " waiting on you" : "") +
+          ", updated " +
+          new Date().toLocaleTimeString();
+        if (open) renderDrawerHead();
+      }
 
-async function poll() {
-  try {
-    const res = await api('/api/jobs');
-    const next = await res.json();
-    const sig = JSON.stringify(next);
-    jobs = next;
-    if (sig !== lastSig) { lastSig = sig; render(); if (open && openFile) loadFile(); }
-    else document.getElementById('meta').textContent = jobs.length + ' jobs, updated ' + new Date().toLocaleTimeString();
-  } catch (e) { document.getElementById('meta').textContent = 'offline, retrying'; }
-}
+      async function poll() {
+        try {
+          const res = await api("/api/jobs");
+          const next = await res.json();
+          const sig = JSON.stringify(next);
+          jobs = next;
+          if (sig !== lastSig) {
+            lastSig = sig;
+            render();
+            if (open && openFile) loadFile();
+          } else
+            document.getElementById("meta").textContent =
+              jobs.length + " jobs, updated " + new Date().toLocaleTimeString();
+        } catch (e) {
+          document.getElementById("meta").textContent = "offline, retrying";
+        }
+      }
 
-function renderDrawerHead() {
-  const j = jobs.find(x => x.id === open);
-  if (!j) return;
-  const head = document.getElementById('dhead');
-  head.replaceChildren(el('h3', '', j.title), el('div', 'id', j.id + ' at ' + j.stage + (j.branch ? ', ' + j.branch : '')));
-  const files = document.getElementById('dfiles');
-  files.replaceChildren();
-  j.files.forEach(f => {
-    const c = chip(f, f === openFile ? 'on' : '');
-    c.onclick = () => { openFile = f; renderDrawerHead(); loadFile(); };
-    files.append(c);
-  });
-}
+      function renderDrawerHead() {
+        const j = jobs.find((x) => x.id === open);
+        if (!j) return;
+        const head = document.getElementById("dhead");
+        head.replaceChildren(
+          el("h3", "", j.title),
+          el(
+            "div",
+            "id",
+            j.id + " at " + j.stage + (j.branch ? ", " + j.branch : ""),
+          ),
+        );
+        const files = document.getElementById("dfiles");
+        files.replaceChildren();
+        j.files.forEach((f) => {
+          const c = chip(f, f === openFile ? "on" : "");
+          c.onclick = () => {
+            openFile = f;
+            renderDrawerHead();
+            loadFile();
+          };
+          files.append(c);
+        });
+      }
 
-async function loadFile() {
-  const body = document.getElementById('dbody');
-  if (!openFile) { body.textContent = 'pick a file'; return; }
-  const res = await api('/api/file?job=' + encodeURIComponent(open) + '&name=' + encodeURIComponent(openFile));
-  body.textContent = res.ok ? await res.text() : 'not found';
-}
+      function inline(text, parent) {
+        const re =
+          /`([^`]+)`|\*\*([^*]+)\*\*|\*([^*\s][^*]*)\*|\[([^\]]+)\]\((\S+?)\)/g;
+        let last = 0,
+          m;
+        while ((m = re.exec(text))) {
+          if (m.index > last) parent.append(text.slice(last, m.index));
+          if (m[1] != null) parent.append(el("code", "", m[1]));
+          else if (m[2] != null) {
+            const b = el("strong");
+            inline(m[2], b);
+            parent.append(b);
+          } else if (m[3] != null) {
+            const i = el("em");
+            inline(m[3], i);
+            parent.append(i);
+          } else if (/^https?:\/\//i.test(m[5])) {
+            const a = el("a", "", m[4]);
+            a.href = m[5];
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            parent.append(a);
+          } else parent.append(m[4]);
+          last = re.lastIndex;
+        }
+        if (last < text.length) parent.append(text.slice(last));
+      }
 
-function showDrawer(id) {
-  open = id;
-  const j = jobs.find(x => x.id === id);
-  openFile = j && j.files.length ? j.files[j.files.length - 1] : null;
-  document.getElementById('drawer').classList.add('open');
-  renderDrawerHead(); loadFile();
-}
-document.getElementById('close').onclick = () => { open = null; document.getElementById('drawer').classList.remove('open'); };
-api('/api/mode').then(r => r.json()).then(m => {
-  readonly = !!m.readonly;
-  if (readonly) {
-    const p = document.querySelector('.policy');
-    p.textContent = 'read-only view: no approve, commit, or unblock here. Those stay in the terminal board';
-  }
-}).catch(() => {});
-poll(); setInterval(poll, POLL_MS);
-</script>
-</body>
+      const cells = (line) =>
+        line
+          .trim()
+          .replace(/^\||\|$/g, "")
+          .split("|")
+          .map((c) => c.trim());
+      const isSep = (line) =>
+        /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/.test(line);
+
+      function renderMarkdown(src) {
+        const root = document.createDocumentFragment();
+        const lines = src.replace(/\r\n?/g, "\n").split("\n");
+        let i = 0;
+        while (i < lines.length) {
+          const line = lines[i];
+          let m;
+          if (!line.trim()) {
+            i++;
+            continue;
+          }
+          if ((m = line.match(/^(`{3,}|~{3,})/))) {
+            const buf = [];
+            i++;
+            while (i < lines.length && !lines[i].startsWith(m[1]))
+              buf.push(lines[i++]);
+            i++;
+            const pre = el("pre");
+            pre.append(el("code", "", buf.join("\n")));
+            root.append(pre);
+          } else if ((m = line.match(/^(#{1,6})\s+(.*)$/))) {
+            const h = el("h" + Math.min(m[1].length, 4));
+            inline(m[2], h);
+            root.append(h);
+            i++;
+          } else if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
+            root.append(el("hr"));
+            i++;
+          } else if (/^\s*>/.test(line)) {
+            const buf = [];
+            while (i < lines.length && /^\s*>/.test(lines[i]))
+              buf.push(lines[i++].replace(/^\s*>\s?/, ""));
+            const q = el("blockquote");
+            q.append(renderMarkdown(buf.join("\n")));
+            root.append(q);
+          } else if (
+            line.includes("|") &&
+            i + 1 < lines.length &&
+            isSep(lines[i + 1]) &&
+            lines[i + 1].includes("-")
+          ) {
+            const t = el("table"),
+              head = el("tr");
+            cells(line).forEach((c) => {
+              const th = el("th");
+              inline(c, th);
+              head.append(th);
+            });
+            t.append(head);
+            i += 2;
+            while (
+              i < lines.length &&
+              lines[i].includes("|") &&
+              lines[i].trim()
+            ) {
+              const tr = el("tr");
+              cells(lines[i++]).forEach((c) => {
+                const td = el("td");
+                inline(c, td);
+                tr.append(td);
+              });
+              t.append(tr);
+            }
+            const w = el("div", "tw");
+            w.append(t);
+            root.append(w);
+          } else if (/^\s*([-*+]|\d+[.)])\s+/.test(line)) {
+            const ordered = /^\s*\d/.test(line),
+              list = el(ordered ? "ol" : "ul");
+            while (
+              i < lines.length &&
+              /^\s*([-*+]|\d+[.)])\s+/.test(lines[i])
+            ) {
+              const li = el("li");
+              inline(lines[i++].replace(/^\s*([-*+]|\d+[.)])\s+/, ""), li);
+              list.append(li);
+            }
+            root.append(list);
+          } else {
+            const buf = [];
+            while (
+              i < lines.length &&
+              lines[i].trim() &&
+              !/^(#{1,6}\s|`{3}|~{3}|\s*>|\s*([-*+]|\d+[.)])\s)/.test(lines[i])
+            )
+              buf.push(lines[i++]);
+            if (!buf.length) buf.push(lines[i++]);
+            const p = el("p");
+            inline(buf.join(" "), p);
+            root.append(p);
+          }
+        }
+        return root;
+      }
+
+      async function loadFile() {
+        const body = document.getElementById("dbody");
+        if (!openFile) {
+          body.className = "raw";
+          body.textContent = "pick a file";
+          return;
+        }
+        const res = await api(
+          "/api/file?job=" +
+            encodeURIComponent(open) +
+            "&name=" +
+            encodeURIComponent(openFile),
+        );
+        const text = res.ok ? await res.text() : "not found";
+        if (res.ok && /\.(md|markdown)$/i.test(openFile)) {
+          body.className = "md";
+          body.replaceChildren(renderMarkdown(text));
+        } else {
+          body.className = "raw";
+          body.textContent = text;
+        }
+      }
+
+      function showDrawer(id) {
+        open = id;
+        const j = jobs.find((x) => x.id === id);
+        openFile = j && j.files.length ? j.files[j.files.length - 1] : null;
+        document.getElementById("drawer").classList.add("open");
+        renderDrawerHead();
+        loadFile();
+      }
+      document.getElementById("close").onclick = () => {
+        open = null;
+        document.getElementById("drawer").classList.remove("open");
+      };
+      api("/api/mode")
+        .then((r) => r.json())
+        .then((m) => {
+          readonly = !!m.readonly;
+          if (readonly) {
+            const p = document.querySelector(".policy");
+            p.textContent =
+              "read-only view: no approve, commit, or unblock here. Those stay in the terminal board";
+          }
+        })
+        .catch(() => {});
+      poll();
+      setInterval(poll, POLL_MS);
+    </script>
+  </body>
 </html>
