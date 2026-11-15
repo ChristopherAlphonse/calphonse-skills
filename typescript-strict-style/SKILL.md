@@ -22,6 +22,7 @@ Read the reference for the area you are working in. Do not load them all up fron
 | Control flow, limits, types, assertions, error handling, function size, conditions | `references/safety.md` |
 | Hot paths, batching, N+1 fetches, design-phase cost | `references/performance.md` |
 | Names, state and scope, return types, index/count/size, rounding | `references/developer-experience.md` |
+| Unions, branded and non-empty types, `unknown` at boundaries, casts, type guards, `satisfies` | `references/types.md` |
 | Formatter, lint limits, bracing, adding a dependency, shared tooling | `references/style-and-dependencies.md` |
 
 ## Quick Reference
@@ -30,6 +31,7 @@ Read the reference for the area you are working in. Do not load them all up fron
 | ------------ | ------------------------------------------------------------------------------- |
 | Safety       | Bound every loop/queue; assert preconditions; handle every error explicitly     |
 | Performance  | Batch, don't loop-await; design for the hot path, don't retrofit it             |
+| Types        | Make illegal states unrepresentable; parse `unknown` at the boundary; no unchecked `as` |
 | Naming       | `camelCase`/`PascalCase`; units as suffix; no abbreviations                     |
 | State        | No aliased mutable state; shrink scope; validate close to use                   |
 | Style        | Prettier + ESLint strict; brace every `if`; enforce limits via lint, not memory |
