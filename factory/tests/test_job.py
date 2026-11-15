@@ -7,18 +7,16 @@ import re
 import select
 import shutil
 import socket
-import time
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 
 JOB = Path(__file__).resolve().parent.parent / "bin" / "job"
-SCRATCH = Path("/private/tmp/claude-501/-Users-christopheralphonse-calphonse-skills/"
-               "0c3da180-545d-49cf-8166-aa1ec84c74af/scratchpad")
-SCRATCH.mkdir(parents=True, exist_ok=True)
+SCRATCH = os.environ.get("FACTORY_TEST_TMP")
 
 
 class Factory(unittest.TestCase):
@@ -395,7 +393,7 @@ class TestBuildGate(Factory):
     def test_gate_pass_writes_checks_file(self):
         self.to_gate("j")
         text = self.run_gate("j")
-        self.assertTrue(text.startswith("GATE: PASS") or re.search(r"^GATE: PASS$", text, re.M))
+        self.assertTrue(text.startswith("GATE: PASS") or re.search(r"^GATE: PASS$", text, re.MULTILINE))
         self.assertRegex(text, r"(?m)^TREE: \S+")
         self.assertTrue((self.jd("j") / "round-1" / "checks.md").exists())
 
@@ -468,6 +466,21 @@ class TestProtected(Factory):
         self.assertRegex(text, r"(?m)^GATE: FAIL$")
         self.assertRegex(text, r"(?m)^REASON:.*ci\.yml")
         self.assertFalse(self.marker.exists())
+
+    def test_a_failing_git_call_refuses_instead_of_reporting_no_changes(self):
+        self.to_gate("j")
+        (self.wt("j") / "CODEOWNERS").write_text("* @evil\n")
+        import importlib.machinery, importlib.util
+        loader = importlib.machinery.SourceFileLoader("job_under_test", str(JOB))
+        job = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+        os.environ["FACTORY_ROOT"] = str(self.root)
+        self.addCleanup(os.environ.pop, "FACTORY_ROOT", None)
+        loader.exec_module(job)
+        self.assertIn("CODEOWNERS", job.protected_hits(str(self.wt("j")), "HEAD"))
+        with self.assertRaises(SystemExit):
+            job.protected_hits(str(self.wt("j")), "no-such-ref")
+        with self.assertRaises(SystemExit):
+            job.git_files(["no-such-subcommand"], str(self.wt("j")))
 
     def test_tracked_protected_change_fails(self):
         self.marker_cfg()
@@ -1128,6 +1141,11 @@ class TestServer(Factory):
         self.assertEqual(self.http("POST", "/api/approve", body={"id": "b"})[0], 200)
         self.no("approve", "a", "spec")
         self.assertFalse(self.js("a")["approvals"].get("spec"))
+
+    def test_post_with_a_non_string_id_gets_a_400(self):
+        for bad in (5, None, ["a"], {"a": 1}):
+            with self.subTest(bad=bad):
+                self.assertEqual(self.http("POST", "/api/approve", body={"id": bad})[0], 400)
 
     def test_post_status_codes(self):
         self.new_spec("a")

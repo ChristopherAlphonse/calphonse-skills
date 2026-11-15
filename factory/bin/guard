@@ -15,6 +15,7 @@ WRITE_TOOLS = {"fs_write", "fs_append", "str_replace", "delete_file",  # Kiro
                "write", "edit", "multiedit", "patch"}  # OpenCode
 PATH_KEYS = ("path", "file_path", "filePath", "notebook_path")
 PATCH_FILE = re.compile(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", re.M)
+FD_DUP = re.compile(r"\d*>&\d+-?")  # `2>&1` is not a second command
 SPLIT = re.compile(r"&&|\|\||[;|&\n`(){}]|\$\(")
 REDIRECT = re.compile(r""">>?\s*("[^"]*"|'[^']*'|[^\s;&|<>()]+)""")
 
@@ -65,7 +66,7 @@ def check_writes(rules, cwd, args):
 
 
 def check_shell(rules, cwd, command):
-    segments = [s.strip() for s in SPLIT.split(command) if s.strip()]
+    segments = [s.strip() for s in SPLIT.split(FD_DUP.sub("", command)) if s.strip()]
     if not segments:
         block("an empty command")
     for text in [command.strip(), *segments]:

@@ -60,6 +60,10 @@ class Guard:
         self.assertEqual(self.sh("echo x > .claude/settings.json"), 2)
         self.assertEqual(self.sh("echo x > /dev/null"), 0)
 
+    def test_fd_duplication_is_not_a_second_command(self):
+        self.assertEqual(self.sh("ls 2>&1"), 0)
+        self.assertEqual(self.sh("echo x 2>&1 > .claude/settings.json"), 2)
+
     def test_quoted_and_expanded_redirect_targets_are_checked(self):
         for c in ('echo x > ".claude/settings.json"', "echo x > '.claude/settings.json'", "echo x > $HOME/y"):
             with self.subTest(c):

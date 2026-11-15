@@ -234,8 +234,15 @@ def resolve_review(base_ref, head_ref):
     return {"base_ref": base_ref, "head_ref": head_ref, "base": merge_base, "head": head}
 
 
+def git_out(args, cwd):
+    """stdout of a git call that must succeed. A failed call must not read as "no files"."""
+    r = git(args, cwd)
+    need(r.returncode == 0, f"git {args[0]} failed: {r.stderr.strip()[-200:]}")
+    return r.stdout
+
+
 def git_files(args, cwd):
-    return [f for f in git(args, cwd).stdout.split("\0") if f]
+    return [f for f in git_out(args, cwd).split("\0") if f]
 
 
 def review_files(review):
@@ -491,9 +498,9 @@ def fingerprint(cwd):
 
 
 def changed_files(cwd, base="HEAD"):
-    tracked = git(["diff", "--name-only", "--no-renames", "-z", base], cwd).stdout.split("\0")
-    new = git(["ls-files", "--others", "--exclude-standard", "-z"], cwd).stdout.split("\0")
-    return sorted({f for f in tracked + new if f})
+    tracked = git_files(["diff", "--name-only", "--no-renames", "-z", base], cwd)
+    new = git_files(["ls-files", "--others", "--exclude-standard", "-z"], cwd)
+    return sorted(set(tracked + new))
 
 
 def base_of(job):
@@ -972,6 +979,8 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(n) or b"{}")
             jid = body["id"]
         except (ValueError, KeyError, TypeError):
+            return self.send(400, "{}")
+        if not isinstance(jid, str):
             return self.send(400, "{}")
         routes = {"/api/approve": lambda: cmd_approve(jid, "spec"),
                   "/api/commit": lambda: cmd_commit(jid),
