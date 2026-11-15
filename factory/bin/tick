@@ -2,6 +2,10 @@
 """Run one factory pass headlessly in any supported harness, only if its deny policy is installed.
 
   tick <harness> [--dry-run]   check policy, then run one pass
+  tick loop <harness> [seconds] [--once]
+                               every few seconds, run a pass whenever `job queue` has a `run` row. Your board click
+                               turns a `hold` into a `run`, so the next pass starts by itself. Stops retrying a
+                               job that makes no progress (see STALL_LIMIT)
   tick check <harness>         exit 0 when the project's policy covers policy.yaml and every blocked command
   tick install <harness>       write the harness's policy into the project, never overwriting
   tick print <harness>         print the policy to merge by hand
@@ -11,7 +15,7 @@ The baseline rules (deny, ask, allow) live in ../policy.yaml. Every harness gets
 denies below. Deny beats ask, and ask beats allow. An unattended pass cannot answer an ask, so an ask
 stops the command until a human runs it.
 """
-import json, os, re, shlex, shutil, subprocess, sys
+import fcntl, hashlib, json, os, re, shlex, shutil, subprocess, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -367,19 +371,78 @@ def cmd_check(harness, quiet=False):
         print(f"{harness}: policy ok")
 
 
-def cmd_run(harness, dry):
-    cmd_check(harness, quiet=True)
+def run_pass(harness):
     argv = COMMANDS[harness](PROMPT)
-    if dry:
-        print(json.dumps(argv))
-        return
-    need = argv[0]
-    if not shutil.which(need):
-        die(f"{need} is not on PATH")
+    if not shutil.which(argv[0]):
+        die(f"{argv[0]} is not on PATH")
     log(harness, "start")
     code = subprocess.run(argv, cwd=ROOT).returncode
     log(harness, f"exit {code}")
-    sys.exit(code)
+    return code
+
+
+def cmd_run(harness, dry):
+    cmd_check(harness, quiet=True)
+    if dry:
+        print(json.dumps(COMMANDS[harness](PROMPT)))
+        return
+    sys.exit(run_pass(harness))
+
+
+STALL_LIMIT = 2  # passes in a row that change no job file before the loop stops retrying that state
+JOB = POLICY_DIR / "bin" / "job"
+
+
+def queue_rows():
+    r = subprocess.run([sys.executable, "-I", str(JOB), "queue"], cwd=ROOT, capture_output=True, text=True,
+                       env={**os.environ, "FACTORY_ROOT": str(ROOT), "FACTORY_NO_WATCH": "1"})
+    if r.returncode:
+        die(f"job queue failed: {r.stderr.strip()[-200:]}")
+    return [line.split("\t") for line in r.stdout.splitlines() if line.strip()]
+
+
+def jobs_fingerprint():
+    h = hashlib.sha256()
+    for p in sorted((ROOT / ".planning" / "factory" / "jobs").glob("*/job.json")):
+        h.update(p.read_bytes())
+    return h.hexdigest()
+
+
+def loop_step(harness, stalls):
+    """One look at the queue. Runs a pass when a job can run. Returns a one-line status."""
+    todo = [r[1] for r in queue_rows() if r[0] == "run"]
+    if not todo:
+        return "idle: nothing to run"
+    before = jobs_fingerprint()
+    if stalls.get(before, 0) >= STALL_LIMIT:
+        return f"stalled: {', '.join(todo)} made no progress in {STALL_LIMIT} passes, look at the board"
+    code = run_pass(harness)
+    if jobs_fingerprint() == before:
+        stalls[before] = stalls.get(before, 0) + 1
+    return f"pass for {', '.join(todo)} exit {code}"
+
+
+def cmd_loop(harness, seconds, once):
+    cmd_check(harness, quiet=True)
+    state = ROOT / ".planning" / "factory"
+    state.mkdir(parents=True, exist_ok=True)
+    lock = open(state / "tick-loop.lock", "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        die("another tick loop is already running for this project")
+    stalls, last = {}, None
+    try:
+        while True:
+            status = loop_step(harness, stalls)
+            if status != last:
+                print(f"{datetime.now().strftime('%H:%M:%S')} {status}", flush=True)
+                last = status
+            if once:
+                return
+            time.sleep(seconds)
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":
@@ -390,6 +453,11 @@ if __name__ == "__main__":
         cmd_check(a[1])
     elif len(a) == 2 and a[0] == "print":
         cmd_print(a[1])
+    elif len(a) >= 2 and a[0] == "loop" and a[1] in COMMANDS:
+        nums = [x for x in a[2:] if x != "--once"]
+        if len(nums) > 1 or a[2:].count("--once") > 1 or not all(n.isdigit() and int(n) > 0 for n in nums):
+            die("usage: tick loop <claude|opencode|kiro> [seconds] [--once]")
+        cmd_loop(a[1], int(nums[0]) if nums else 15, "--once" in a)
     elif a == ["list"]:
         print("\n".join(name(b) for b in BLOCKED))
     elif len(a) in (1, 2) and a[0] in COMMANDS and (len(a) == 1 or a[1] == "--dry-run"):

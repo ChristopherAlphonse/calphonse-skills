@@ -21,7 +21,7 @@ To review an existing branch, use the separate `factory-review` skill. It has th
 3. Install the policy for your harness: `bin/tick install claude`. It comes from `policy.yaml`.
 4. Start a job in Claude Code with `/factory <feature idea>`.
 5. Open the board in your own terminal with `bin/job serve`, then open the address it prints.
-6. Keep passes going with `/loop 5m /factory run`, or schedule `bin/tick claude` with cron.
+6. Keep passes going, including after you click approve, commit, or unblock: run `bin/tick loop kiro` (or `claude`, `opencode`) in a spare terminal. Or use `/loop 5m /factory run`, or schedule `bin/tick claude` with cron.
 
 Gitignore `.planning/` and `.worktrees/` in the project.
 
@@ -202,6 +202,7 @@ State lives in the project, never in this repo.
 | `bin/job serve [port]` | start the board with the approve, commit, and unblock buttons (needs your terminal, default port 8765) |
 | `bin/job watch [port]` | start a read-only board to follow along (no terminal needed, no buttons, default port 8766) |
 | `bin/tick <harness> [--dry-run]` | run one headless pass if the policy is installed |
+| `bin/tick loop <harness> [seconds] [--once]` | run a pass whenever a job can run, so your board click continues the work by itself |
 | `bin/tick install`, `check`, `print`, `list` | install, verify, show, or list the policy |
 
 ## Harnesses

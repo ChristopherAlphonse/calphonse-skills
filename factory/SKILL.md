@@ -118,7 +118,7 @@ For a build job the files are the whole repo. Review jobs (see `factory-review`)
 
 ## Loop
 
-A pass finds nothing to run, or only `hold` rows, and ends. To repeat passes, schedule `TICK <harness>` with cron or launchd every few minutes. In Claude Code, `/loop 5m /factory run` does the same interactively. Everything is files, so any pass resumes every job from its stage, in any harness.
+A pass finds nothing to run, or only `hold` rows, and ends. To continue automatically after the user's click, the user starts `TICK loop <harness> [seconds]` in a terminal (default 15 seconds). It reads `JOB queue` and runs a pass whenever a row says `run`, so approving a spec, committing, or unblocking starts the next pass with no chat message. It never approves anything, runs one loop per project, and stops retrying a state that changed no job file in two passes (`stalled`, visible on the board). `--once` does a single check. Alternatively schedule `TICK <harness>` with cron or launchd every few minutes. In Claude Code, `/loop 5m /factory run` does the same interactively. Everything is files, so any pass resumes every job from its stage, in any harness.
 
 ## Board
 
