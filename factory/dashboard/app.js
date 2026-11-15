@@ -303,6 +303,12 @@ grip.onkeydown = (e) => {
   e.preventDefault();
   setDrawerWidth($("drawer").offsetWidth + dir * 40, true);
 };
+function resetDrawerWidth() {
+  localStorage.removeItem(DRAWER_KEY);
+  document.documentElement.style.removeProperty("--drawer-w");
+}
+grip.ondblclick = resetDrawerWidth;
+$("reset").onclick = resetDrawerWidth;
 const saved = Number(localStorage.getItem(DRAWER_KEY));
 if (saved) setDrawerWidth(saved);
 

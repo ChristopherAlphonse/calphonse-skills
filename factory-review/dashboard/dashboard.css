@@ -301,7 +301,7 @@ button:hover {
 }
 .x {
   float: right;
-  margin: 0;
+  margin: 0 0 0 6px;
 }
 
 @media (max-width: 600px) {
