@@ -45,18 +45,23 @@ button:hover{background:var(--you);color:#fff}
 <aside id="drawer"><button class="x" id="close">close</button><div id="dhead"></div><div class="files" id="dfiles"></div><pre id="dbody"></pre></aside>
 <script>
 const COLS = [
-  {label:'Shape', stages:['shape']},
-  {label:'Spec', stages:['spec']},
-  {label:'Build', stages:['build','gate']},
-  {label:'Review', stages:['review']},
-  {label:'Polish', stages:['polish']},
-  {label:'Prove', stages:['prove']},
-  {label:'Ship', stages:['ship']},
+  {label:'Shape', stages:['shape'], kinds:['build']},
+  {label:'Spec', stages:['spec'], kinds:['build']},
+  {label:'Scope', stages:['scope'], kinds:['review']},
+  {label:'Build', stages:['build','gate'], kinds:['build']},
+  {label:'Review', stages:['review'], kinds:['build','review']},
+  {label:'Reconcile', stages:['reconcile'], kinds:['review']},
+  {label:'Polish', stages:['polish'], kinds:['build']},
+  {label:'Verify', stages:['verify'], kinds:['review']},
+  {label:'Prove', stages:['prove'], kinds:['build']},
+  {label:'Report', stages:['report'], kinds:['review']},
+  {label:'Ship', stages:['ship'], kinds:['build']},
   {label:'Needs you', stages:['needs-human'], you:true},
-  {label:'Ready to land', stages:['ready','rejected']},
+  {label:'Ready to land', stages:['ready','rejected'], always:true},
 ];
 const POLL_MS = 2000;
 const api = (path, opts = {}) => fetch(path, {...opts, credentials: 'same-origin', headers: {...(opts.headers || {}), 'X-Factory': '1'}});
+let readonly = false;
 let jobs = [], open = null, openFile = null, lastSig = '', notice = '';
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -72,10 +77,22 @@ function card(j) {
   const c = el('div', 'card' + (j.needs_human ? ' hold' : ''));
   c.append(el('div', 't', j.title), el('div', 'id', j.id));
   const r = el('div', 'row');
-  r.append(chip(j.stage));
-  if (j.round) r.append(chip('round ' + j.round + '/' + j.round_limit));
+  r.append(chip(j.kind === 'review' ? 'review job: ' + j.stage : j.stage));
+  if (j.round && j.kind !== 'review') r.append(chip('round ' + j.round + '/' + j.round_limit));
   if (j.stage === 'gate' || j.gate) r.append(chip('gate ' + (j.gate || 'pending'), j.gate || ''));
   c.append(r);
+  if (j.kind === 'review' && j.review) c.append(el('div', 'id', j.review.base_ref + ' .. ' + j.review.head_ref));
+  if (j.stack && j.stack.length) {
+    const sr = el('div', 'row');
+    j.stack.forEach(k => sr.append(chip(k)));
+    c.append(sr);
+  }
+  if (j.report && j.report.FINDINGS !== undefined) {
+    const rr = el('div', 'row');
+    rr.append(chip(j.report.FINDINGS + ' findings'));
+    if (j.report.BLOCKERS !== undefined) rr.append(chip(j.report.BLOCKERS + ' blockers', Number(j.report.BLOCKERS) ? 'FAIL' : 'PASS'));
+    c.append(rr);
+  }
   if (j.stage === 'review') {
     const rr = el('div', 'row');
     for (const [name, v] of Object.entries(j.reviews)) rr.append(chip(name + (v ? ' ' + v : ' ...'), v || ''));
@@ -112,6 +129,8 @@ function render() {
   board.replaceChildren();
   for (const col of COLS) {
     const mine = jobs.filter(j => col.stages.includes(j.stage));
+    const relevant = col.always || col.you || mine.length || jobs.some(j => col.kinds && col.kinds.includes(j.kind));
+    if (!relevant) continue;
     const d = el('section', 'col' + (col.you ? ' you' : ''));
     const h = el('h2'); h.append(el('span', '', col.label), el('span', '', String(mine.length)));
     d.append(h);
@@ -163,6 +182,13 @@ function showDrawer(id) {
   renderDrawerHead(); loadFile();
 }
 document.getElementById('close').onclick = () => { open = null; document.getElementById('drawer').classList.remove('open'); };
+api('/api/mode').then(r => r.json()).then(m => {
+  readonly = !!m.readonly;
+  if (readonly) {
+    const p = document.querySelector('.policy');
+    p.textContent = 'read-only view: no approve, commit, or unblock here. Those stay in the terminal board';
+  }
+}).catch(() => {});
 poll(); setInterval(poll, POLL_MS);
 </script>
 </body>

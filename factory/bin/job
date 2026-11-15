@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Only writer of job.json. Refuses illegal stage moves. Serves the board."""
-import fnmatch, hashlib, hmac, json, os, re, secrets, shlex, subprocess, sys, tempfile, threading, time
+import fnmatch, hashlib, hmac, json, os, re, secrets, shlex, shutil, subprocess, sys, tempfile, threading, time
 from datetime import datetime, timezone
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,6 +20,7 @@ PROTECTED_FLOOR = [
     ".gitattributes", "**/.gitattributes", ".circleci/**", ".buildkite/**", "azure-pipelines.yml",
     ".npmrc", "**/.npmrc",
 ]
+READONLY = False
 KEY = ""
 SESSION = ""
 CODE = ""
@@ -54,6 +55,44 @@ HINT = {
     "prove": "prove-it-works -> uat.md, then advance ship or build",
     "ship": "pr-body-style (+ demo-script) -> pr-body.md, wait for user approval, advance ready",
 }
+REVIEW_TRANSITIONS = {
+    "scope": {"review", "rejected", "needs-human"},
+    "review": {"reconcile", "needs-human"},
+    "reconcile": {"verify", "needs-human"},
+    "verify": {"report", "needs-human"},
+    "report": {"ready", "needs-human"},
+}
+HINT_REVIEW = {
+    "scope": "code-review-frontend step 0 (find lint, type, and test tooling) -> scope.md (STATUS: READY, or reject with rejection.md); add security or architecture reviewers with `job route`",
+    "review": "code (code-review-frontend, plus dotnet for C#), qa (qa-review), test (test-review), and routed extras -> round-1/review-<name>.md; read-only, never edit",
+    "reconcile": "reconcile-reviews -> reconcile.md (STATUS: READY), one ranked list with file and line",
+    "verify": "prove-it-works: rerun every VERIFIED (ran) command and check every cited line -> verified.md (STATUS: READY), drop what does not reproduce",
+    "report": "unslop -> report.md (STATUS: READY, FINDINGS: n, BLOCKERS: n) and comments.md to paste by hand; never post",
+}
+STACK_RULES = [
+    ("typescript-strict-style", {".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"}, set()),
+    ("vercel-react-best-practices", {".tsx", ".jsx"}, {"next.config.js", "next.config.mjs", "next.config.ts"}),
+    ("nextjs-proxy-csp-hardening", set(), {"proxy.ts", "proxy.js", "middleware.ts", "middleware.js"}),
+    ("dotnet", {".cs", ".csproj", ".sln", ".cshtml", ".razor"}, set()),
+    ("aws", {".tf"}, {"cdk.json", "serverless.yml", "serverless.yaml", "samconfig.toml"}),
+]
+
+
+def detect_stack(files):
+    """Pick the stack skills from file suffixes and names, so no agent has to judge it."""
+    suffixes = {Path(f).suffix.lower() for f in files}
+    names = {Path(f).name for f in files}
+    return [skill for skill, sufs, ns in STACK_RULES if suffixes & sufs or names & ns]
+
+
+def transitions(job):
+    return REVIEW_TRANSITIONS if job.get("review") else TRANSITIONS
+
+
+def hint_for(job):
+    hint = (HINT_REVIEW if job.get("review") else HINT).get(job["stage"], "")
+    stack = job.get("stack") or []
+    return hint + (f" | stack skills: {', '.join(stack)}" if stack and hint else "")
 
 
 def die(msg):
@@ -138,19 +177,64 @@ def need(cond, msg):
         die(msg)
 
 
-def cmd_create(jid, title):
+def resolve_review(base_ref, head_ref):
+    for ref in (base_ref, head_ref):
+        need(ref and not ref.startswith("-"), f"bad ref {ref!r}")
+
+    def rev(ref):
+        r = git(["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"], ROOT)
+        need(r.returncode == 0, f"unknown ref {ref}")
+        return r.stdout.strip()
+
+    head, base = rev(head_ref), rev(base_ref)
+    mb = git(["merge-base", base, head], ROOT)
+    need(mb.returncode == 0, "the refs share no history")
+    merge_base = mb.stdout.strip()
+    need(git(["diff", "--quiet", merge_base, head], ROOT).returncode == 1, "nothing to review: the diff is empty")
+    return {"base_ref": base_ref, "head_ref": head_ref, "base": merge_base, "head": head}
+
+
+def git_files(args, cwd):
+    return [f for f in git(args, cwd).stdout.split("\0") if f]
+
+
+def review_files(review):
+    return git_files(["diff", "--name-only", "-z", review["base"], review["head"]], ROOT)
+
+
+def cmd_create(jid, title, *opts):
+    need(len(opts) in (0, 3) and (not opts or opts[0] == "--review"), "usage: create <id> <title> [--review BASE HEAD]")
+    review = resolve_review(opts[1], opts[2]) if opts else None
     d = jobdir(jid)
     need(not d.exists(), f"{jid} exists")
     d.mkdir(parents=True)
-    save({
+    job = {
         "id": jid, "title": title, "stage": "shape", "round": 0,
         "round_limit": config()["max_rounds"], "reviewers": list(BASE_REVIEWERS),
-        "polished": False, "approvals": {}, "progress": [0, 0],
+        "polished": False, "approvals": {}, "progress": [0, 0], "stack": [],
         "branch": None, "worktree": None, "commit": None, "tip": None,
         "started": now(), "ended": None, "note": "",
-    })
-    audit("create", jid, title)
+    }
+    if review:
+        job.update(stage="scope", round=1, review=review)
+        try:
+            make_worktree(job)
+        except BaseException:
+            shutil.rmtree(d)
+            raise
+        job["stack"] = detect_stack(review_files(review))
+    save(job)
+    audit("create-review" if review else "create", jid, f"{review['base_ref']}..{review['head_ref']}" if review else title)
     print(jid)
+
+
+def cmd_stack(jid):
+    job = load(jid)
+    review = job.get("review")
+    files = review_files(review) if review else git_files(["ls-files", "-z"], job["worktree"] or ROOT)
+    job["stack"] = detect_stack(files)
+    save(job)
+    print(",".join(job["stack"]))
 
 
 def bump_round(job):
@@ -301,10 +385,13 @@ def make_worktree(job):
         return
     wt = ROOT / ".worktrees" / job["id"]
     branch = f"factory/{job['id']}"
-    r = git(["worktree", "add", str(wt), "-b", branch, config()["base_branch"]], ROOT)
+    start = job["review"]["head"] if job.get("review") else config()["base_branch"]
+    r = git(["worktree", "add", str(wt), "-b", branch, start], ROOT)
     need(r.returncode == 0, f"worktree failed: {r.stderr.strip()}")
     job["worktree"], job["branch"] = str(wt), branch
     job["base_commit"] = job["base_tip"] = job["tip"] = git(["rev-parse", "HEAD"], wt).stdout.strip()
+    if not job.get("review"):
+        job["stack"] = detect_stack(git_files(["ls-files", "-z"], wt))
     try:
         install_hooks(job)
     except BaseException:
@@ -365,10 +452,13 @@ def audited_state(jid):
         a, human = e["action"], e["actor"] == "human"
         if a == "create":
             st["stage"] = "shape"
+        elif a == "create-review":
+            st["stage"] = "scope"
         elif a == "advance":
             st["stage"] = e["detail"].split(" -> ")[1]
         elif a == "unblock":
-            st["stage"] = "build"
+            m = re.search(r"-> (\S+?);", e["detail"])
+            st["stage"] = m.group(1) if m else "build"
         elif a == "violation":
             st["stage"] = "needs-human"
         elif a == "approve" and human:
@@ -395,6 +485,10 @@ def integrity_problems(job):
     tip = git(["rev-parse", "HEAD"], wt).stdout.strip()
     if tip != job["tip"]:
         probs.append(f"branch moved outside the factory: {job['tip'][:7]} -> {tip[:7]}")
+    if job.get("review"):
+        edited = git_files(["diff", "--name-only", "-z", "HEAD"], wt)
+        if edited:
+            probs.append("a reviewer edited tracked files: " + ", ".join(edited[:5]))
     if git(["config", "--worktree", "core.hooksPath"], wt).stdout.strip() != job["hooks_path"]:
         probs.append("core.hooksPath was changed")
     try:
@@ -416,10 +510,33 @@ def enforce(job):
     probs = integrity_problems(job)
     if not probs:
         return
+    job["parked_from"] = job["stage"]
     job["stage"], job["note"] = "needs-human", "; ".join(probs)
     save(job)
     audit("violation", job["id"], job["note"])
     die(f"{job['id']} parked on the user: {job['note']}")
+
+
+def justify_review(job, cur, to):
+    d = jobdir(job["id"])
+    rd = d / "round-1"
+    if to == "needs-human":
+        need(kv(d / "blocked.md").get("STATUS") == "BLOCKED", "blocked.md needs STATUS: BLOCKED")
+    elif cur == "scope" and to == "review":
+        need(kv(d / "scope.md").get("STATUS") == "READY", "scope.md needs STATUS: READY")
+    elif cur == "scope" and to == "rejected":
+        need((d / "rejection.md").exists(), "rejection.md missing")
+    elif cur == "review":
+        missing = [r for r in job["reviewers"] if kv(rd / f"review-{r}.md").get("VERDICT") not in ("PASS", "CHANGES")]
+        need(not missing, f"missing reviews: {', '.join(missing)}")
+    elif cur == "reconcile":
+        need(kv(d / "reconcile.md").get("STATUS") == "READY", "reconcile.md needs STATUS: READY")
+    elif cur == "verify":
+        need(kv(d / "verified.md").get("STATUS") == "READY", "verified.md needs STATUS: READY")
+    elif cur == "report":
+        r = kv(d / "report.md")
+        need(r.get("STATUS") == "READY" and r.get("FINDINGS", "").isdigit(), "report.md needs STATUS: READY and FINDINGS: <n>")
+    return to
 
 
 def cmd_advance(jid, to):
@@ -427,8 +544,10 @@ def cmd_advance(jid, to):
     enforce(job)
     cur = job["stage"]
     need(cur not in TERMINAL | HUMAN_STAGES, f"{jid} is {cur}, only the user can move it")
-    need(to in TRANSITIONS.get(cur, ()), f"{cur} -> {to} is not a legal move")
-    real = justify(job, cur, to)
+    need(to in transitions(job).get(cur, ()), f"{cur} -> {to} is not a legal move")
+    real = justify_review(job, cur, to) if job.get("review") else justify(job, cur, to)
+    if real == "needs-human":
+        job["parked_from"] = cur
     job["stage"] = real
     if real in TERMINAL:
         job["ended"] = now()
@@ -529,15 +648,19 @@ def cmd_unblock(jid):
     human_only()
     job = load(jid)
     need(job["stage"] == "needs-human", f"{jid} is at {job['stage']}")
-    job["stage"] = "build"
+    review = job.get("review")
+    job["stage"] = (job.get("parked_from") or "scope") if review else "build"
     job["polished"] = False
     job["round_limit"] = job["round"] + config()["max_rounds"]
     job["note"] = ""
     if job["worktree"]:
+        if review:
+            r = git(["reset", "--hard", review["head"]], job["worktree"])
+            need(r.returncode == 0, f"could not restore the reviewed commit: {r.stderr.strip()[-300:]}")
         install_hooks(job)
         job["tip"] = git(["rev-parse", "HEAD"], job["worktree"]).stdout.strip()
     save(job)
-    audit("unblock", jid, f"round limit {job['round_limit']}")
+    audit("unblock", jid, f"-> {job['stage']}; round limit {job['round_limit']}")
 
 
 def all_jobs():
@@ -573,7 +696,7 @@ def cmd_queue():
             action, running = "run", running + 1
         else:
             action = "wait"
-        print(f"{action}\t{job['id']}\t{s}\t{HINT.get(s, '')}")
+        print(f"{action}\t{job['id']}\t{s}\t{hint_for(job)}")
 
 
 def snapshot(job):
@@ -581,10 +704,11 @@ def snapshot(job):
     rd = d / f"round-{job['round']}"
     reviews = {r: kv(rd / f"review-{r}.md").get("VERDICT") for r in job["reviewers"]}
     files = sorted(str(p.relative_to(d)) for p in d.rglob("*.md"))
-    return {**job, "gate": kv(rd / CHECKS_FILE).get("GATE"), "reviews": reviews,
+    return {**job, "kind": "review" if job.get("review") else "build", "report": kv(d / "report.md"),
+            "gate": kv(rd / CHECKS_FILE).get("GATE"), "reviews": reviews,
             "files": files, "needs_human": waiting_on_human(job),
-            "can_approve": job["stage"] == "spec" and waiting_on_human(job),
-            "can_commit": job["stage"] == "ship" and waiting_on_human(job)}
+            "can_approve": not READONLY and job["stage"] == "spec" and waiting_on_human(job),
+            "can_commit": not READONLY and job["stage"] == "ship" and waiting_on_human(job)}
 
 
 CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; "
@@ -631,7 +755,7 @@ class Handler(BaseHTTPRequestHandler):
         with AUTH_LOCK:
             good = bool(supplied and CODE) and time.time() < CODE_EXP and \
                 hmac.compare_digest(supplied.encode(), CODE.encode())
-            if good:
+            if good and not READONLY:
                 CODE = ""
             return good
 
@@ -650,6 +774,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(403, "{}")
         if not self.trusted():
             return self.send(403, "{}")
+        if u.path == "/api/mode":
+            return self.send(200, json.dumps({"readonly": READONLY}))
         if u.path == "/api/jobs":
             return self.send(200, json.dumps([snapshot(j) for j in all_jobs()]))
         if u.path == "/api/file":
@@ -666,7 +792,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send(404, "{}")
 
     def do_POST(self):
-        if not self.trusted():
+        if READONLY or not self.trusted():
             return self.send(403, "{}")
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -713,11 +839,23 @@ def cmd_serve(port):
     srv.serve_forever()
 
 
+def cmd_watch(port):
+    """Read-only board. It holds no key and has no action routes, so an agent may start it."""
+    global READONLY, SESSION, CODE, CODE_EXP
+    READONLY = True
+    SESSION, CODE = secrets.token_urlsafe(32), secrets.token_urlsafe(24)
+    CODE_EXP = float("inf")
+    srv = ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
+    print(f"watch: 127.0.0.1:{srv.server_port}/?c={CODE}  (read-only, valid until this process stops)", flush=True)
+    audit("watch", "", f"port {srv.server_port}")
+    srv.serve_forever()
+
+
 HUMAN_ONLY = {"approve", "commit", "unblock"}
 
 
 COMMANDS = {
-    "create": (cmd_create, 2), "advance": (cmd_advance, 2), "gate": (cmd_gate, 1),
+    "create": (cmd_create, None), "advance": (cmd_advance, 2), "gate": (cmd_gate, 1), "stack": (cmd_stack, 1), "watch": (cmd_watch, 1),
     "route": (cmd_route, 2), "progress": (cmd_progress, 3), "queue": (cmd_queue, 0), "serve": (cmd_serve, 1),
 }
 
@@ -728,7 +866,10 @@ if __name__ == "__main__":
     if name not in COMMANDS:
         die(f"usage: job {'|'.join(COMMANDS)}")
     fn, arity = COMMANDS[name]
-    if name == "serve" and not args:
-        args = ["8765"]
-    need(len(args) == arity, f"{name} takes {arity} args")
+    if name in ("serve", "watch") and not args:
+        args = ["8765" if name == "serve" else "8766"]
+    if name == "create":
+        need(len(args) in (2, 5), "create takes <id> <title> [--review BASE HEAD]")
+    else:
+        need(len(args) == arity, f"{name} takes {arity} args")
     fn(*args)

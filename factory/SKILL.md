@@ -1,6 +1,6 @@
 ---
 name: factory
-description: Run features from idea to a reviewed local change by chaining the other skills in this repo as stages (shape, spec, build, review, polish, prove, ship), with a kanban board to follow, a scripted state machine, and a headless tick, built and measured for Claude Code, with OpenCode and Kiro adapters untested. Use when the user wants a whole feature driven end to end, a software factory, a pipeline, or the board. Never commits, pushes, or opens a PR or MR on its own.
+description: Run work through the other skills in this repo as stages, with a kanban board, a scripted state machine, and a headless tick. Two workflows. Build takes a feature from idea to a reviewed local commit (shape, spec, build, review, polish, prove, ship). Review takes an existing branch or diff and produces a verified, ranked review (scope, review, reconcile, verify, report). Skills for the codebase are chosen automatically (TypeScript and React get typescript-strict-style and vercel-react-best-practices, C# gets dotnet). Built and measured for Claude Code. Use when the user wants a whole feature driven end to end, a code review run through their review skills, a software factory, a pipeline, or the board. Never commits, pushes, posts review comments, or opens a PR or MR on its own.
 ---
 
 # Factory
@@ -9,13 +9,42 @@ You are the orchestrator. You do no stage work yourself. For each stage you spaw
 
 `JOB` means this skill's `bin/job`. `TICK` means `bin/tick`. Run both from the target project root. State lives in `.planning/factory/` and worktrees in `.worktrees/`, both in the target project, never in this repo. Gitignore both there.
 
+## Workflows
+
+A job has a kind. `JOB create <id> "<title>"` makes a build job. `JOB create <id> "<title>" --review BASE HEAD` makes a review job for the changes between two local refs. The factory never reaches a forge, so fetch the PR or MR branch yourself first.
+
+| | Build | Review |
+| --- | --- | --- |
+| Input | a feature idea | two local refs, for example `main` and `pr-42` |
+| Worktree | a new branch off `base_branch` | a branch at the exact reviewed commit |
+| Stages | shape, spec, build, gate, review, polish, gate, prove, ship, ready | scope, review, reconcile, verify, report, ready |
+| Writes code | yes, uncommitted | never. A tracked file that changes parks the job on you |
+| Your clicks | Approve spec, Commit locally | none. Unblock only after a park |
+| Output | a local commit and a PR body | `report.md` and `comments.md` to paste by hand |
+
+## Review workflow
+
+Everything under Enterprise policy applies. Reviewers read, run, and report. They never edit, commit, or post.
+
+| Stage | Skill | Writes | Advance when |
+| --- | --- | --- | --- |
+| scope | `code-review-frontend` step 0 (find the repo's lint, type, and test tooling), `whats-going-on` if `.planning/` has no map | `scope.md` with `STATUS: READY`, or `rejection.md` for a diff not worth reviewing | to `review`, or `rejected` |
+| review | `code`: `code-review-frontend` for TS and React, plus `dotnet` for C# files. `qa`: `qa-review`. `test`: `test-review`. Extras with `JOB route`: `security-review`, `architecture-review` | `round-1/review-<name>.md` with `VERDICT: PASS` or `CHANGES`, findings with file and line | every reviewer has a verdict |
+| reconcile | `reconcile-reviews` | `reconcile.md` with `STATUS: READY`, one ranked list | to `verify` |
+| verify | `prove-it-works`, applied to the findings: rerun every `VERIFIED (ran)` command and open every cited line. Drop what does not reproduce | `verified.md` with `STATUS: READY` | to `report` |
+| report | `unslop`, then `pr-body-style` tone for the summary | `report.md` with `STATUS: READY`, `FINDINGS: n`, `BLOCKERS: n`, and `comments.md` | to `ready` |
+
+Run the reviewers in parallel and wait for all of them. Pass each reviewer the base and head commits from `job.json`, the worktree path, and the stack skills from the queue hint. A reviewer that cannot proceed writes `blocked.md` with `STATUS: BLOCKED`, and `JOB advance` then parks the job.
+
+`ready` on a review job means the report is written. Posting comments to the MR is the user's own step. `reconcile-reviews` can post inline comments, and the factory never uses that path.
+
 ## Enterprise policy
 
 These hold in every harness and are enforced by structure, not by this text.
 
 - **No commit, push, PR, or MR without the user.** Agents leave changes uncommitted in the job's worktree. The only commit is `JOB commit`, which the user triggers from the board. It runs the repo's own hooks and refuses unless the tree matches the one that passed the gate.
 - **Never run** `git commit`, `git push`, `git merge`, `git rebase`, `git config`, `git -c`, `git -C`, `gh`, `glab`, `curl`, or `wget`. Never use the network.
-- **Never** try to run `approve`, `commit`, or `unblock`, or to start the board. They belong to the user, and the CLI refuses them.
+- **Never** try to run `approve`, `commit`, or `unblock`, or to start `JOB serve`. They belong to the user, and the CLI refuses them. `JOB watch` is the exception: it is a read-only board with no key and no action routes, and you may start it so the user can follow along.
 - **Protected paths** (CI config, CODEOWNERS, `.env`, factory config, plus any in `config.json`) fail the gate when touched.
 - **Audit.** Every state change is one line in `.planning/factory/audit.log`.
 - **Board.** The user starts `JOB serve` in their own terminal. It binds to localhost, redeems a one-time code for a session cookie, and holds the approval key in memory. The user's clicks are the only approvals.
@@ -57,7 +86,7 @@ Keep skill frontmatter to `name` and `description`, with `name` equal to the fol
 - A job gets `max_rounds` build rounds (default 3). The next failure moves it to `needs-human` on its own.
 - Concurrency comes from `config.json` (default 1).
 
-## Stages
+## Build workflow
 
 Each stage's agent writes the file named here with the status line first. `JOB advance` reads that line.
 
@@ -73,7 +102,17 @@ Each stage's agent writes the file named here with the status line first. `JOB a
 | prove | `prove-it-works` | `uat.md` with `STATUS: PASS` or `FAIL` | to `ship` on pass, `build` on fail |
 | ship | `pr-body-style` (+ `demo-script` optional) | `pr-body.md`, and `commit.md` holding the commit message | **user clicks Commit locally on the board**, then to `ready` |
 
-Stack skills for build, chosen from the diff: `typescript-strict-style` for TS/JS, `vercel-react-best-practices` for React and Next.js, `dotnet` for C#, `aws` for infrastructure, `nextjs-proxy-csp-hardening` when touching `proxy.ts` or CSP. If `.planning/` has no codebase map, run `whats-going-on` before Shape.
+Stack skills are chosen by `bin/job`, not by you. It reads the file names and writes the result to `job.json` and to the queue hint (`stack skills: ...`). `JOB stack <id>` refreshes it after the build adds files.
+
+| If the files include | Use |
+| --- | --- |
+| `.ts`, `.tsx`, `.js`, `.jsx` and variants | `typescript-strict-style` |
+| `.tsx`, `.jsx`, or `next.config.*` | `vercel-react-best-practices` |
+| `proxy.ts`, `proxy.js`, `middleware.ts`, `middleware.js` | `nextjs-proxy-csp-hardening` |
+| `.cs`, `.csproj`, `.sln`, `.cshtml`, `.razor` | `dotnet` |
+| `.tf`, `cdk.json`, `serverless.yml`, `samconfig.toml` | `aws` |
+
+For a build job the files are the whole repo. For a review job they are only the files in the diff. If `.planning/` has no codebase map, run `whats-going-on` before Shape.
 
 ### Reviewers
 
@@ -86,13 +125,15 @@ Stack skills for build, chosen from the diff: `typescript-strict-style` for TS/J
 3. After an agent returns, call `JOB advance <id> <next>` with the target the file justifies. If it refuses, read the message, send the stage back once with the problem named, and after a second refusal have the builder write `STATUS: BLOCKED`.
 4. Report the rows touched, any `hold` rows and what they wait on, and the board address.
 
+At the start of the first pass, start `JOB watch` in the background (`nohup JOB watch 8766 > watch.log &`) and give the user the link it prints. Do not use `JOB serve`: only the user starts that.
+
 ## Loop
 
 A pass finds nothing to run, or only `hold` rows, and ends. To repeat passes, schedule `TICK <harness>` with cron or launchd every few minutes. In Claude Code, `/loop 5m /factory run` does the same interactively. Everything is files, so any pass resumes every job from its stage, in any harness.
 
 ## Board
 
-`JOB serve [port]` serves the kanban on 127.0.0.1 and prints an address with a one-time code. It only starts in an interactive terminal. The board reads `.planning/factory/jobs/*/job.json` every 2 seconds. Columns: Shape, Spec, Build (build and gate), Review, Polish, Prove, Ship, Needs you, Ready to land. Cards show round, gate, one chip per reviewer, task progress, and the local commit. A card waiting on the user is outlined. Approve spec, Commit locally, and Unblock are the only buttons, and the only way those moves happen. Click a card to read every file in its folder. The board looks and behaves the same whichever harness ran the pass.
+`JOB watch [port]` (default 8766) is the read-only view. It needs no terminal, holds no key, and answers no approve, commit, or unblock request. Its link stays valid until the process stops and can open in several tabs. Anyone, including an agent, may start it. `JOB serve [port]` serves the kanban on 127.0.0.1 and prints an address with a one-time code. It only starts in an interactive terminal. The board reads `.planning/factory/jobs/*/job.json` every 2 seconds. Columns: Shape, Spec, Build (build and gate), Review, Polish, Prove, Ship, Needs you, Ready to land. Cards show round, gate, one chip per reviewer, task progress, and the local commit. A card waiting on the user is outlined. Approve spec, Commit locally, and Unblock are the only buttons, and the only way those moves happen. Click a card to read every file in its folder. The board looks and behaves the same whichever harness ran the pass.
 
 ## Out of scope
 

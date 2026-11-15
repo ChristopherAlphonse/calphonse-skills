@@ -1,6 +1,6 @@
 # Factory
 
-The factory takes a feature from idea to a reviewed, committed change on a local branch. It does this by chaining the other skills in this repo as stages. A script moves each job from stage to stage and checks the evidence before every move. You follow the work on a kanban board.
+The factory runs work through the other skills in this repo as stages. It has two workflows. **Build** takes a feature from idea to a reviewed, committed change on a local branch. **Review** takes an existing branch and produces a verified, ranked code review. A script moves each job from stage to stage and checks the evidence before every move. You follow the work on a kanban board.
 
 It never pushes and never opens a PR or MR. The only commit is the one you make by clicking a button on the board.
 
@@ -69,6 +69,59 @@ Each stage runs the skill that owns it. A fresh subagent does the work and write
 
 A job gets `max_rounds` build rounds. After that it moves to **Needs you** instead of looping. Editing `spec.md` after you approve it blocks the build until you approve again.
 
+## Review workflow
+
+Use it to review a branch or PR with your own review skills. The factory never reaches a forge, so fetch the branch first, then point a job at two local refs:
+
+```
+git fetch origin pull/42/head:pr-42
+bin/job create pr-42-review "Review PR 42" --review main pr-42
+```
+
+The job gets a worktree at the exact reviewed commit. Reviewers read and run code there. They never edit it. If a tracked file changes or the branch moves, the job parks on you.
+
+```mermaid
+stateDiagram-v2
+    [*] --> scope
+    scope --> review: scope.md says READY
+    scope --> rejected: rejection.md
+    review --> reconcile: every reviewer left a verdict
+    reconcile --> verify: reconcile.md says READY
+    verify --> report: verified.md says READY
+    report --> ready: report.md has STATUS and FINDINGS
+    ready --> [*]
+    rejected --> [*]
+    review --> needs_human: blocked.md, or the worktree was touched
+    needs_human --> review: you click Unblock
+    note right of needs_human
+        Any stage can land here.
+        Unblock resumes where the job was parked
+        and resets the worktree to the reviewed commit.
+    end note
+```
+
+| Stage | Skill | Writes |
+| --- | --- | --- |
+| scope | `code-review-frontend` step 0 | `scope.md` |
+| review | `code-review-frontend` (plus `dotnet` for C#), `qa-review`, `test-review`, and `security-review` or `architecture-review` when routed | `round-1/review-<name>.md` |
+| reconcile | `reconcile-reviews` | `reconcile.md`, one ranked list |
+| verify | `prove-it-works` on the findings: rerun every command, open every cited line, drop what does not reproduce | `verified.md` |
+| report | `unslop` | `report.md` and `comments.md` |
+
+The end of a review job is a report you read on the board. Posting comments to the MR is your own step, outside the factory.
+
+### Stack skills
+
+`bin/job` picks the skills for the codebase from file names. You do not choose them, and an agent does not judge them. The choice is stored in `job.json`, shown on the card, and printed in `bin/job queue`.
+
+| Files in the diff (review) or the repo (build) | Skill |
+| --- | --- |
+| `.ts`, `.tsx`, `.js`, `.jsx` | `typescript-strict-style` |
+| `.tsx`, `.jsx`, `next.config.*` | `vercel-react-best-practices` |
+| `proxy.ts`, `middleware.ts` | `nextjs-proxy-csp-hardening` |
+| `.cs`, `.csproj`, `.sln`, `.cshtml`, `.razor` | `dotnet` |
+| `.tf`, `cdk.json`, `serverless.yml` | `aws` |
+
 ## One pass
 
 A pass is one run of `/factory run` or `bin/tick`. The orchestrator asks the script what to do, spawns agents, and lets the script judge the results. A pass ends when nothing is left to run. Everything is in files, so the next pass resumes every job.
@@ -95,6 +148,20 @@ sequenceDiagram
 ```
 
 `bin/job queue` marks each job `run`, `hold` (waiting on you), `wait` (over the concurrency cap), or `done`. The orchestrator acts only on `run`.
+
+## Following along
+
+Two boards read the same files and look the same.
+
+| | `bin/job serve` | `bin/job watch` |
+| --- | --- | --- |
+| Who starts it | you, in your terminal | you or an agent |
+| Buttons | Approve spec, Commit locally, Unblock | none |
+| Holds the approval key | yes, in memory | no |
+| Link | one-time code, valid 5 minutes | stays valid until the process stops, works in several tabs |
+| Default port | 8765 | 8766 |
+
+Use `watch` to see what an agent is doing. Use `serve` when you need to approve or commit. The header of a watch board says it is read-only.
 
 ## Who can do what
 
@@ -162,13 +229,16 @@ State lives in the project, never in this repo.
 
 | Command | Does |
 | --- | --- |
-| `bin/job create <id> "<title>"` | start a job at shape |
+| `bin/job create <id> "<title>"` | start a build job at shape |
+| `bin/job create <id> "<title>" --review BASE HEAD` | start a review job at scope |
+| `bin/job stack <id>` | recompute the stack skills for a job |
 | `bin/job queue` | list jobs as `action id stage hint` |
 | `bin/job advance <id> <stage>` | move a job if the evidence allows it |
 | `bin/job gate <id>` | run `checks` in the worktree and record the result and tree hash |
 | `bin/job route <id> security,architecture` | add reviewers |
 | `bin/job progress <id> <done> <total>` | set the task progress bar |
-| `bin/job serve [port]` | start the board (needs a terminal, default port 8765) |
+| `bin/job serve [port]` | start the board with the approve, commit, and unblock buttons (needs your terminal, default port 8765) |
+| `bin/job watch [port]` | start a read-only board to follow along (no terminal needed, no buttons, default port 8766) |
 | `bin/tick <harness> [--dry-run]` | run one headless pass if the deny rules are installed |
 | `bin/tick install`, `check`, `print`, `list` | install, verify, show, or list the deny rules |
 
