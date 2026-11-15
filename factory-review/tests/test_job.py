@@ -322,6 +322,7 @@ class TestServer(Review):
         self.assertEqual(job["stack"], ["typescript-strict-style"])
         self.assertIn("reviews/review-code.md", job["files"])
         self.assertFalse(job["can_unblock"])
+        self.assertIsNone(job["needs"])
 
     def test_file_endpoint_serves_only_markdown_inside_the_job(self):
         self.new_review("a", name="feature/a")
@@ -343,6 +344,9 @@ class TestServer(Review):
             self.assertEqual(self.http("POST", "/api/unblock", body={"id": "r"}, **kw)[0], 403)
         self.assertEqual(self.stage("r"), "needs-human")
         self.assertTrue(self.jobs()["r"]["can_unblock"])
+        n = self.jobs()["r"]["needs"]
+        self.assertEqual(n["action"], "Unblock")
+        self.assertTrue(n["command"].startswith("cd ") and n["command"].endswith(" serve"))
         self.assertEqual(self.http("POST", "/api/unblock", body={"id": "r"})[0], 200)
         self.assertEqual(self.stage("r"), "scope")
 

@@ -309,3 +309,37 @@ button:hover {
     display: none !important;
   }
 }
+
+/* Needs-you panel in the drawer */
+#dneeds .needs {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-left: 4px solid var(--you);
+  background: var(--col);
+  font-size: 14px;
+  line-height: 1.5;
+}
+#dneeds h4 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+#dneeds p {
+  margin: 6px 0;
+}
+#dneeds .cmd {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+#dneeds .cmd code {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  background: var(--card);
+  border: 1px solid var(--line);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+}

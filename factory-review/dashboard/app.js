@@ -26,6 +26,10 @@ const setMeta = (text) => {
   $("meta").textContent = text;
 };
 const clock = () => new Date().toLocaleTimeString();
+const metaText = () => {
+  const waiting = state.jobs.filter((j) => j.needs_human).length;
+  return `${state.jobs.length} jobs${waiting ? `, ${waiting} waiting on you` : ""}, updated ${clock()}`;
+};
 const openJob = () => state.jobs.find((j) => j.id === state.openId);
 
 async function post(path, body) {
@@ -72,7 +76,8 @@ function card(j) {
   c.append(el("div", "t", j.title), el("div", "id", j.id), ...statusRows(j));
 
   const last = j.activity?.at(-1);
-  if (last && j.stage !== "ready") c.append(el("div", "id", `now: ${last.text}`));
+  if (j.needs) c.append(el("div", "id", `waiting on you: ${j.needs.action.toLowerCase()}. Click for how.`));
+  else if (last && j.stage !== "ready") c.append(el("div", "id", `now: ${last.text}`));
 
   if (j.can_unblock) c.append(actionButton("Unblock, restore the reviewed commit", "/api/unblock", j));
 
@@ -91,8 +96,7 @@ function column(col, mine) {
 function render() {
   $("board").replaceChildren(...COLUMNS.map((col) => column(col, state.jobs.filter((j) => col.stages.includes(j.stage)))));
 
-  const waiting = state.jobs.filter((j) => j.needs_human).length;
-  setMeta(`${state.jobs.length} jobs${waiting ? `, ${waiting} waiting on you` : ""}, updated ${clock()}`);
+  setMeta(metaText());
   if (state.openId) renderDrawerHead();
 }
 
@@ -104,7 +108,7 @@ async function poll() {
     const sig = JSON.stringify(next);
     state.jobs = next;
     if (sig === state.lastSig) {
-      setMeta(`${next.length} jobs, updated ${clock()}`);
+      setMeta(metaText());
       return;
     }
     state.lastSig = sig;
@@ -115,6 +119,26 @@ async function poll() {
   }
 }
 
+function needsPanel(n) {
+  const box = el("div", "needs");
+  const copy = el("button", "", "Copy");
+  copy.onclick = () => {
+    navigator.clipboard.writeText(n.command).then(() => {
+      copy.textContent = "Copied";
+    });
+  };
+  const cmd = el("div", "cmd");
+  cmd.append(el("code", "", n.command), copy);
+  box.append(
+    el("h4", "", `Needs you: ${n.action}`),
+    el("p", "", n.why),
+    el("p", "", n.todo),
+    cmd,
+    el("p", "id", "Run it in your own terminal. It prints a one-time link with the buttons. This read-only page cannot unblock."),
+  );
+  return box;
+}
+
 function renderDrawerHead() {
   const j = openJob();
   if (!j) return;
@@ -122,6 +146,7 @@ function renderDrawerHead() {
     el("h3", "", j.title),
     el("div", "id", `${j.id} at ${j.stage}${j.branch ? `, ${j.branch}` : ""}`),
   );
+  $("dneeds").replaceChildren(...(j.needs ? [needsPanel(j.needs)] : []));
   $("dfiles").replaceChildren(
     ...j.files.map((f) => {
       const c = chip(f, f === state.openFile ? "on" : "");
