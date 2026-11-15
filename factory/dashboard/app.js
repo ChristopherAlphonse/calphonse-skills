@@ -132,7 +132,6 @@ function render() {
 
 let inflight = null;
 
-// One request at a time: a caller during a request shares it, so responses cannot land out of order.
 function poll() {
   inflight ??= fetchJobs().finally(() => {
     inflight = null;
@@ -213,7 +212,7 @@ async function loadFile() {
   } catch {
     text = "offline, retrying";
   }
-  if (token !== state.loadToken) return; // a newer selection superseded this fetch
+  if (token !== state.loadToken) return;
 
   if (ok && /\.(md|markdown)$/i.test(name)) showBody("md", renderMarkdown(text));
   else showBody("raw", text);
@@ -241,7 +240,6 @@ async function applyMode() {
         "read-only view: no approve, commit, or unblock here. Those stay in the terminal board";
     }
   } catch {
-    // Keep the default policy text; the write endpoints enforce read-only server-side.
   }
 }
 

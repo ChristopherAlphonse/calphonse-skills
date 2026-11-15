@@ -11,7 +11,7 @@ To build a feature, use the separate `factory` skill. The two have the same layo
 ## Quick start
 
 1. Link `factory-review` and the skills it calls into `~/.claude/skills`: `code-review-frontend`, `qa-review`, `test-review`, `security-review`, `architecture-review`, `reconcile-reviews`, `prove-it-works`, `unslop`, `whats-going-on`, plus `typescript-strict-style`, `vercel-react-best-practices`, and `dotnet` for those stacks.
-2. Install the deny rules for your harness in the project: `bin/tick install claude`.
+2. Install the policy for your harness in the project: `bin/tick install claude`. It comes from `policy.yaml`.
 3. Fetch the branch you want reviewed. The review never reaches a forge:
 
    ```
@@ -157,11 +157,11 @@ The layers differ in strength. Only your remote's rules stop an agent that runs 
 
 | Layer | What it does | Strength |
 | --- | --- | --- |
-| Deny rules from `bin/tick` | stop the agent running commit, push, merge, rebase, cherry-pick, revert, am, commit-tree, update-ref, symbolic-ref, config, fast-import, git global options (`-c`, `-C`), `gh`, `glab`, `curl`, `wget`, and `sh -c` | Measured on Claude Code for `factory`, which uses the same list: 24 of 24 attack spellings blocked. A script that shells out is not covered |
+| Policy from `bin/tick` (`policy.yaml` plus a stricter deny list, and file-write limits) | stop the agent running commit, push, merge, rebase, cherry-pick, revert, am, commit-tree, update-ref, symbolic-ref, config, fast-import, git global options (`-c`, `-C`), `gh`, `glab`, `curl`, `wget`, and `sh -c` | Measured on Claude Code for `factory`, which uses the same list: 24 of 24 attack spellings blocked. A script that shells out is not covered |
 | Integrity checks in `bin/job` | detect a moved branch tip, an edited tracked file, changed hooks, a detached HEAD, or `job.json` that disagrees with the audit log | Detects, does not prevent. Parks the job on you |
 | Git hooks in each worktree | refuse commits, pushes, and ref moves without the board's key, and chain to the repo's own hooks | A speed bump. `git -c core.hooksPath=/dev/null` and `push --no-verify` get past them |
 | Board key and session | keep unblock out of the CLI | Stops an agent using the CLI. A process running as you could open its own terminal |
-| `bin/tick` | refuses a headless pass unless the deny rules are installed | Hard, for the runs it starts |
+| `bin/tick` | refuses a headless pass unless the policy is installed | Hard, for the runs it starts |
 | Branch protection on your remote | the only layer outside the agent's reach | Turn it on for every repo you review |
 
 If a tracked file changes or the branch moves, the job parks on you. Unblock restores the reviewed commit and resumes the parked stage. Untracked scratch files, such as test output, do not park a job.
@@ -193,8 +193,8 @@ State lives in the project, never in this repo.
 | `bin/job board` | print the link of the read-only board, starting it if needed |
 | `bin/job serve [port]` | start the board with the Unblock button (needs your terminal, default port 8765) |
 | `bin/job watch [port]` | start a read-only board to follow along (no terminal needed, no buttons, default port 8766) |
-| `bin/tick <harness> [--dry-run]` | run one headless pass if the deny rules are installed |
-| `bin/tick install`, `check`, `print`, `list` | install, verify, show, or list the deny rules |
+| `bin/tick <harness> [--dry-run]` | run one headless pass if the policy is installed |
+| `bin/tick install`, `check`, `print`, `list` | install, verify, show, or list the policy |
 
 ## Harnesses
 
@@ -215,4 +215,6 @@ python3 -m unittest discover -s factory-review/tests
 - The review skills have only been exercised in miniature. Run a real review before relying on the depth of each one.
 - The verify stage is only as good as what can be run locally. A finding that needs a service you do not have comes back unverifiable.
 - An agent running as your user can still edit files and run git. The engine makes that visible. Branch protection on your remote is the real guarantee.
+- The ask rules are enforced by the harness, and no human is there to answer one in an unattended pass. That is the intent. Only Claude Code's handling is known to me from its documentation. Kiro's and OpenCode's handling of `ask` in a headless run is unmeasured.
+- A command the allow list permits can still write a file through shell redirection (`echo x > file`). The file-write rules cover the harness's edit tools, not the shell. For a review, the integrity check catches a changed tracked file and parks the job. It detects, it does not prevent.
 - The deny-rule measurement was done on `factory`. The list is the same, but the probe has not been rerun for `factory-review`.

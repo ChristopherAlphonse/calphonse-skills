@@ -159,7 +159,7 @@ async function loadFile() {
   const name = state.openFile;
   const res = await api(`/api/file?${query}`);
   const text = res.ok ? await res.text() : "not found";
-  if (token !== state.loadToken) return; // a newer selection superseded this fetch
+  if (token !== state.loadToken) return;
 
   if (res.ok && /\.(md|markdown)$/i.test(name)) showBody("md", renderMarkdown(text));
   else showBody("raw", text);
@@ -187,7 +187,6 @@ async function applyMode() {
         "read-only view: no unblock here. That stays in the terminal board";
     }
   } catch {
-    // Keep the default policy text; the write endpoints enforce read-only server-side.
   }
 }
 

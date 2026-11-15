@@ -1,0 +1,165 @@
+# Precedence: deny, then ask, then allow; a command no rule names needs a human. `*` matches any text, spaces included.
+rules:
+  - capability: shell
+    effect: deny
+    match:
+      - git push*
+      - git -C * push*
+      - aws s3 rm*
+      - curl -X POST*
+  # Backstop: ask beats allow, so the `git -C *` allow patterns cannot pass mutating verbs.
+  - capability: shell
+    effect: ask
+    match:
+      - git add*
+      - git -C * add*
+      - git am*
+      - git -C * am*
+      - git apply*
+      - git -C * apply*
+      - git checkout*
+      - git -C * checkout*
+      - git cherry-pick*
+      - git -C * cherry-pick*
+      - git clean*
+      - git -C * clean*
+      - git clone*
+      - git -C * clone*
+      - git commit*
+      - git -C * commit*
+      - git config*
+      - git -C * config*
+      - git fetch*
+      - git -C * fetch*
+      - git gc*
+      - git -C * gc*
+      - git init*
+      - git -C * init*
+      - git merge*
+      - git -C * merge*
+      - git mv*
+      - git -C * mv*
+      - git prune*
+      - git -C * prune*
+      - git pull*
+      - git -C * pull*
+      - git rebase*
+      - git -C * rebase*
+      - git remote add*
+      - git -C * remote add*
+      - git remote remove*
+      - git -C * remote remove*
+      - git remote rename*
+      - git -C * remote rename*
+      - git remote rm*
+      - git -C * remote rm*
+      - git remote set*
+      - git -C * remote set*
+      - git reset*
+      - git -C * reset*
+      - git restore*
+      - git -C * restore*
+      - git revert*
+      - git -C * revert*
+      - git rm*
+      - git -C * rm*
+      - git stash*
+      - git -C * stash*
+      - git submodule*
+      - git -C * submodule*
+      - git switch*
+      - git -C * switch*
+      - git update-ref*
+      - git -C * update-ref*
+      - git worktree*
+      - git -C * worktree*
+  - capability: shell
+    effect: allow
+    match:
+      - basename *
+      - bat *
+      - cat *
+      - cd *
+      - command -v *
+      - cut *
+      - date
+      - date *
+      - df *
+      - diff *
+      - dirname *
+      - du *
+      - echo
+      - echo *
+      - env
+      - fd *
+      - file *
+      - find
+      - find *
+      - grep *
+      - head *
+      - hostname
+      - id
+      - id *
+      - jq *
+      - journalctl *
+      - ls
+      - ls *
+      - printenv
+      - printenv *
+      - printf
+      - printf *
+      - pwd
+      - realpath *
+      - rg *
+      # sed: only the `-n 'N,Mp'` print form.
+      - sed -n '*,*p'*
+      - sort *
+      - stat *
+      - tail *
+      - tr *
+      - tree
+      - tree *
+      - type *
+      - uname
+      - uname *
+      - uniq *
+      - uptime
+      - wc
+      - wc *
+      - which *
+      - whoami
+      - git branch
+      - git branch *
+      - git describe *
+      - git diff
+      - git diff *
+      - git log
+      - git log *
+      - git ls-files *
+      - git ls-remote *
+      - git remote -v *
+      - git rev-parse *
+      - git show *
+      - git status
+      - git status *
+      - git tag *
+      - git -C * branch
+      - git -C * branch *
+      - git -C * describe *
+      - git -C * diff
+      - git -C * diff *
+      - git -C * log
+      - git -C * log *
+      - git -C * ls-files *
+      - git -C * ls-remote *
+      - git -C * remote -v *
+      - git -C * rev-parse *
+      - git -C * show *
+      - git -C * status
+      - git -C * status *
+      - git -C * tag *
+      - npm list *
+      - pip list *
+      - pip show *
+      - brew list *
+      - brew search *

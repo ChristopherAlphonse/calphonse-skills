@@ -1,9 +1,10 @@
-import json, os, subprocess, sys, tempfile, unittest
+import contextlib, importlib.machinery, io, importlib.util, json, os, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
 TICK = Path(__file__).resolve().parent.parent / "bin" / "tick"
 SCRATCH = os.environ.get("FACTORY_TEST_TMP")
 HARNESSES = ["claude", "opencode", "kiro"]
+SKILL = "factory"
 def prefixes():
     out = subprocess.run([sys.executable, "-I", str(TICK), "list"], capture_output=True, text=True).stdout
     return out.split("\n")[:-1]
@@ -50,7 +51,7 @@ class TickTests(unittest.TestCase):
         path.write_text(json.dumps(cfg))
         r = run(self.root, "check", "claude")
         self.assertEqual(r.returncode, 2)
-        self.assertIn("does not deny: gh.", r.stderr)
+        self.assertIn("does not cover: gh *.", r.stderr)
 
     def test_allow_rules_do_not_count_as_deny(self):
         (self.root / ".claude").mkdir()
@@ -59,8 +60,12 @@ class TickTests(unittest.TestCase):
         self.assertEqual(run(self.root, "check", "claude").returncode, 2)
 
     def test_opencode_comments_and_legacy_format(self):
-        (self.root / "opencode.jsonc").write_text("// managed\n" + json.dumps(
-            {"permission": {"bash": {f"{c} *": "deny" for c in BLOCKED}}}))
+        run(self.root, "install", "opencode")
+        rules = json.loads((self.root / "opencode.jsonc").read_text())["permissions"]
+        (self.root / "opencode.jsonc").unlink()
+        legacy = {"bash": {r["resource"]: r["effect"] for r in rules if r["action"] == "shell"},
+                  "edit": {r["resource"]: r["effect"] for r in rules if r["action"] == "edit"}}
+        (self.root / "opencode.jsonc").write_text("// managed\n" + json.dumps({"permission": legacy}))
         self.assertEqual(run(self.root, "check", "opencode").returncode, 0)
 
     def test_install_never_overwrites(self):
@@ -111,6 +116,139 @@ class TickTests(unittest.TestCase):
         lines = [json.loads(l) for l in (self.root / ".planning" / "factory" / "audit.log").read_text().splitlines()]
         self.assertEqual([l["detail"] for l in lines], ["claude: start", "claude: exit 3"])
         self.assertTrue(all(l["actor"] == "tick" for l in lines))
+
+
+def tick_module():
+    loader = importlib.machinery.SourceFileLoader("tick_under_test", str(TICK))
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(mod)
+    return mod
+
+
+def enforced(root, harness):
+    """What an installed policy enforces, as {"deny": set, "ask": set, "allow": set} of shell patterns."""
+    out = {"deny": set(), "ask": set(), "allow": set()}
+    if harness == "claude":
+        perms = json.loads((root / ".claude" / "settings.json").read_text())["permissions"]
+        for kind in out:
+            out[kind] = {r[5:-1] for r in perms[kind] if r.startswith("Bash(")}
+    elif harness == "opencode":
+        for r in json.loads((root / "opencode.jsonc").read_text())["permissions"]:
+            if r["action"] == "shell":
+                out[r["effect"]].add(r["resource"])
+    else:
+        agent = json.loads((root / ".kiro" / "agents" / f"{SKILL}.json").read_text())
+        for r in agent["permissions"]["rules"]:
+            if r["capability"] == "shell":
+                out[r["effect"]] |= set(r["match"])
+    return out
+
+
+class BaselinePolicyTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(dir=SCRATCH)
+        self.root = Path(self.tmp.name)
+        self.tick = tick_module()
+        self.base = self.tick.load_policy()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_policy_yaml_is_read_in_full(self):
+        self.assertIn("git push*", self.base["deny"])
+        self.assertIn("curl -X POST*", self.base["deny"])
+        self.assertIn("git -C * commit*", self.base["ask"])
+        self.assertIn("git worktree*", self.base["ask"])
+        self.assertIn("git status *", self.base["allow"])
+        self.assertIn("sed -n '*,*p'*", self.base["allow"])
+        self.assertEqual(len(self.base["ask"]) % 2, 0, "every ask verb has a plain and a -C form")
+
+    def test_no_pattern_is_both_allowed_and_denied_or_asked(self):
+        self.assertFalse(set(self.base["allow"]) & set(self.base["deny"]))
+        self.assertFalse(set(self.base["allow"]) & set(self.base["ask"]))
+
+    def test_every_harness_enforces_every_baseline_rule_with_the_same_effect(self):
+        for h in HARNESSES:
+            with self.subTest(h):
+                root = self.root / h
+                root.mkdir()
+                run(root, "install", h)
+                got = enforced(root, h)
+                for effect in ("deny", "ask"):
+                    self.assertFalse(set(self.base[effect]) - got[effect], effect)
+                self.assertFalse(set(self.base["allow"]) - got["allow"])
+                self.assertFalse(set(self.base["allow"]) & (got["deny"] | got["ask"]))
+                self.assertIn(f"*/{SKILL}/bin/job *", got["allow"])
+
+    def test_a_missing_ask_rule_is_a_gap_and_a_deny_in_its_place_is_not(self):
+        run(self.root, "install", "claude")
+        path = self.root / ".claude" / "settings.json"
+        cfg = json.loads(path.read_text())
+        cfg["permissions"]["ask"].remove("Bash(git add*)")
+        path.write_text(json.dumps(cfg))
+        r = run(self.root, "check", "claude")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("git add*", r.stderr)
+        cfg["permissions"]["deny"].append("Bash(git add*)")
+        path.write_text(json.dumps(cfg))
+        self.assertEqual(run(self.root, "check", "claude").returncode, 0)
+
+    def test_a_missing_baseline_deny_is_a_gap_in_every_harness(self):
+        edits = {
+            "claude": (".claude/settings.json", lambda c: c["permissions"]["deny"].remove("Bash(aws s3 rm*)")),
+            "opencode": ("opencode.jsonc", lambda c: c["permissions"].remove(
+                {"action": "shell", "resource": "aws s3 rm*", "effect": "deny"})),
+            "kiro": (f".kiro/agents/{SKILL}.json", lambda c: [r["match"].remove("aws s3 rm*")
+                                                             for r in c["permissions"]["rules"]
+                                                             if r["effect"] == "deny" and "aws s3 rm*" in r.get("match", [])]),
+        }
+        for h, (rel, edit) in edits.items():
+            with self.subTest(h):
+                root = self.root / h
+                root.mkdir()
+                run(root, "install", h)
+                path = root / rel
+                cfg = json.loads(path.read_text())
+                edit(cfg)
+                path.write_text(json.dumps(cfg))
+                r = run(root, "check", h)
+                self.assertEqual(r.returncode, 2)
+                self.assertIn("aws s3 rm*", r.stderr)
+
+    def test_an_allow_rule_does_not_stand_in_for_an_ask_rule(self):
+        run(self.root, "install", "kiro")
+        path = self.root / ".kiro" / "agents" / f"{SKILL}.json"
+        cfg = json.loads(path.read_text())
+        for r in cfg["permissions"]["rules"]:
+            if r["effect"] == "ask":
+                r["effect"] = "allow"
+        path.write_text(json.dumps(cfg))
+        r = run(self.root, "check", "kiro")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("git commit*", r.stderr)
+
+    def test_a_malformed_policy_file_is_refused_rather_than_half_read(self):
+        bad = {
+            "unknown effect": "rules:\n  - capability: shell\n    effect: maybe\n    match:\n      - ls\n",
+            "not a shell rule": "rules:\n  - capability: fs_write\n    effect: deny\n    match:\n      - x\n",
+            "stray line": "rules:\n  - capability: shell\n    effect: deny\n    match: [a]\n",
+            "no allow rules": "rules:\n  - capability: shell\n    effect: deny\n    match:\n      - a\n",
+        }
+        for label, text in bad.items():
+            with self.subTest(label):
+                path = self.root / "policy.yaml"
+                path.write_text(text)
+                with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+                    self.tick.load_policy(path)
+
+
+    def test_builders_may_write_code_but_never_policy_state_or_git_internals(self):
+        run(self.root, "install", "claude")
+        perms = json.loads((self.root / ".claude" / "settings.json").read_text())["permissions"]
+        self.assertIn("Edit", perms["allow"])
+        for guarded in ("**/.git/**", "**/.claude/**", "**/.planning/**/job.json", "**/.planning/**/audit.log"):
+            self.assertIn(f"Edit({guarded})", perms["deny"])
+        self.assertNotIn("Edit(**/.worktrees/**)", perms["deny"])
 
 
 if __name__ == "__main__":

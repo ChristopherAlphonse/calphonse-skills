@@ -15,7 +15,6 @@ function wrap(tag, text, parent) {
   parent.append(node);
 }
 
-// Text only ever reaches the DOM through textContent/append, so source markdown cannot inject HTML.
 function inline(text, parent) {
   const re = new RegExp(INLINE);
   let last = 0;
@@ -37,7 +36,6 @@ function inline(text, parent) {
   if (last < text.length) parent.append(text.slice(last));
 }
 
-// Each block reader takes the lines and a start index, and returns [node, nextIndex].
 function readCode(lines, i, fence) {
   const buf = [];
   i++;

@@ -1,4 +1,3 @@
-"""Tampering that the OS cannot prevent must at least be seen, and park the job on the user."""
 import json
 import subprocess
 import unittest

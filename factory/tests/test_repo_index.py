@@ -82,6 +82,13 @@ class RepoIndex(unittest.TestCase):
             with self.subTest(rel=rel):
                 self.assertTrue((REPO / "factory-review" / "dashboard" / rel).exists())
 
+    def test_both_skills_carry_the_same_baseline_policy(self):
+        a, b = (REPO / s / "policy.yaml" for s in ("factory", "factory-review"))
+        self.assertEqual(a.read_text(), b.read_text())
+        for skill in ("factory", "factory-review"):
+            with self.subTest(skill=skill):
+                self.assertIn("`policy.yaml`", (REPO / skill / "SKILL.md").read_text())
+
     def test_factory_review_needs_nothing_from_the_factory_folder(self):
         for path in (REPO / "factory-review").rglob("*"):
             if path.is_file() and path.suffix in {"", ".py", ".js", ".html"}:

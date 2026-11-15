@@ -1,4 +1,3 @@
-"""Shared fixture for the factory-review tests. Everything goes through the CLI or a real `serve 0` subprocess."""
 import http.client
 import json
 import os
@@ -55,7 +54,6 @@ class Review(unittest.TestCase):
         self.procs, self.port, self.cookie = [], None, ""
         self.addCleanup(self.stop_servers)
 
-    # ---- plumbing
     def git(self, *args, cwd=None, check=True):
         r = subprocess.run(["git", *args], cwd=cwd or self.root, env=self.env, capture_output=True, text=True)
         if check and r.returncode != 0:
@@ -105,9 +103,7 @@ class Review(unittest.TestCase):
     def run_queue(self):
         return self.ok("queue").stdout
 
-    # ---- review helpers
     def feature(self, files, name="feature/x"):
-        """Commit the given files on a branch off main, then return to main."""
         self.git("switch", "-c", name)
         for path, text in files.items():
             p = self.root / path
@@ -123,7 +119,6 @@ class Review(unittest.TestCase):
         self.ok("create", jid, "Review it", "main", name)
 
     def to_stage(self, jid, stage):
-        """Advance a job with just enough evidence on disk to reach `stage`."""
         start = STAGES.index(self.stage(jid))
         for cur, nxt in zip(STAGES[start:], STAGES[start + 1:]):
             if cur == stage:
@@ -136,11 +131,9 @@ class Review(unittest.TestCase):
             self.adv(jid, nxt)
 
     def park(self, jid):
-        """Park a job on the user the legitimate way: a reviewer that cannot proceed."""
         self.wf(jid, "blocked.md", "STATUS: BLOCKED\n\nno access\n")
         self.adv(jid, "needs-human")
 
-    # ---- board helpers
     def start_server(self):
         master, slave = pty.openpty()
         p = subprocess.Popen([sys.executable, "-I", str(JOB), "serve", "0"], cwd=str(self.base), env=self.env,
@@ -201,7 +194,6 @@ class Review(unittest.TestCase):
             self.start_server()
 
     def unblock(self, jid):
-        """Run the human action the only way it can run: a click on the board."""
         self.board()
         st, _ = self.http("POST", "/api/unblock", body={"id": jid})
         self.assertEqual(st, 200, f"board refused unblock {jid}")
