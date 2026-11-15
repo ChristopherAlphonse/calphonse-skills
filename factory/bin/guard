@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
-"""Kiro PreToolUse hook: enforce the factory policy where Kiro's own prompts can be skipped.
+"""Tool-call guard for Kiro, Claude Code and OpenCode: enforce the factory policy where each harness's own prompts can be skipped.
 
-Kiro's `--trust-all-tools` approves every `ask` and every command no rule names, and a deny rule cannot
-say "everything except". A hook still runs. Exit 2 blocks the call, so this script fails closed:
+A permission mode that approves every `ask` (Kiro `--trust-all-tools`, Claude Code bypass mode) or a rule that cannot
+say "everything except" leaves gaps. A hook still runs. Exit 2 blocks the call, so this script fails closed:
 anything it cannot read, parse, or match is blocked.
 
-  kiro-guard RULES.json   reads the hook event as JSON on stdin
+  guard RULES.json   reads the hook event as JSON on stdin: {tool_name, tool_input, cwd}
 """
 import json, os, re, sys
 
-WRITE_TOOLS = {"fs_write", "fs_append", "str_replace", "delete_file"}
+SHELL_TOOLS = {"execute_bash", "Bash", "bash"}
+WRITE_TOOLS = {"fs_write", "fs_append", "str_replace", "delete_file",  # Kiro
+               "Write", "Edit", "MultiEdit", "NotebookEdit",  # Claude Code
+               "write", "edit", "multiedit", "patch"}  # OpenCode
+PATH_KEYS = ("path", "file_path", "filePath", "notebook_path")
+PATCH_FILE = re.compile(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", re.M)
 SPLIT = re.compile(r"&&|\|\||[;|&\n`(){}]|\$\(")
 REDIRECT = re.compile(r">>?\s*([^\s;&|<>()]+)")
 
@@ -49,6 +54,16 @@ def check_write(rules, cwd, raw):
         block(f"writing {path}, which is outside the places this agent may write")
 
 
+def check_writes(rules, cwd, args):
+    paths = [args[k] for k in PATH_KEYS if isinstance(args.get(k), str)]
+    if "patchText" in args:  # OpenCode's patch tool names its files inside the patch
+        paths += PATCH_FILE.findall(args["patchText"])
+    if not paths:
+        block("a write whose target file it cannot see")
+    for raw in paths:
+        check_write(rules, cwd, raw)
+
+
 def check_shell(rules, cwd, command):
     segments = [s.strip() for s in SPLIT.split(command) if s.strip()]
     if not segments:
@@ -71,8 +86,8 @@ def main():
     event = json.load(sys.stdin)
     tool, args, cwd = event["tool_name"], event["tool_input"], event.get("cwd") or os.getcwd()
     if tool in WRITE_TOOLS:
-        check_write(rules, cwd, args["path"])
-    elif tool == "execute_bash":
+        check_writes(rules, cwd, args)
+    elif tool in SHELL_TOOLS:
         check_shell(rules, cwd, args["command"])
 
 
