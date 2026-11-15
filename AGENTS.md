@@ -25,6 +25,7 @@ All skills live at the repository root as `{skill-name}/SKILL.md`. `AGENTS.md` i
 | [simplify](simplify/SKILL.md) | Restate the last message in plain human language, with no jargon |
 | [spike](spike/SKILL.md) | Throwaway experiments, sized in story points, that answer a feasibility question before committing to a real build; the deliverable is the verdict, not the code |
 | [swe](swe/SKILL.md) | Pragmatic dev mode: smallest change that fully solves the task, and a reply a busy human reads once |
+| [test-review](test-review/SKILL.md) | Judge whether a diff is adequately tested: sequential sub-agents for regression, behavior, concurrency, and mutation, reporting with proof and never editing the repo |
 | [typescript-strict-style](typescript-strict-style/SKILL.md) | Strict TS/JS discipline: assertion safety, exhaustive error handling, function size, naming, performance, dependency minimalism |
 | [unslop](unslop/SKILL.md) | Cut AI tells from any writing, with stable rule numbers other skills cite |
 | [vercel-react-best-practices](vercel-react-best-practices/SKILL.md) | React and Next.js performance rules from Vercel Engineering, plus general frontend patterns (components, hooks, state, forms, a11y) |
