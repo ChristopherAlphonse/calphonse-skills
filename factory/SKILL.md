@@ -40,7 +40,7 @@ How each layer is enforced, and how far to trust it:
 
 ## Harnesses
 
-Claude Code is the supported harness. Its deny rules are measured, and the rest of the factory was exercised there. OpenCode and Kiro adapters exist and are untested. Run `tests/probe_harness.py <harness>` before trusting either one.
+Claude Code is the primary harness. Claude Code and Kiro are measured with `tests/probe_harness.py`. OpenCode is not fully measured. On Kiro (v3 engine, `kiro-cli` 3.3.0) 23 of 23 conclusive attacks were blocked under `--trust-all-tools`, each succeeding in the no-policy control. `config_hooks` was inconclusive because the model refused it in the control. The two known limits (a script file, `python3 -c`) get through, as on Claude Code. File-tool writes to `.kiro/**`, `.git/**`, `job.json`, `audit.log` and `config.json` were also refused. `deny` rules survive `--trust-all-tools`, but `ask` rules do not: with the flag, Kiro approved `git add` that it refused without it. Only `deny` is a guarantee, so never start the agent with `--trust-all-tools` or `--trust-tools` outside the probe, and keep anything that needs a human in the deny list. `TICK` passes neither flag.
 
 | | Claude Code | OpenCode | Kiro |
 | --- | --- | --- | --- |

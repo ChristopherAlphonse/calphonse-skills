@@ -17,7 +17,7 @@ To review an existing branch, use the separate `factory-review` skill. It has th
    { "checks": "npm test" }
    ```
 
-   Other keys: `concurrency` (default 1), `max_rounds` (default 3), `base_branch` (default `main`), extra `protected_paths`, and `allow` (extra shell patterns the agents may run unattended, such as `make verify*`; your `checks` command is allowed already).
+   Other keys: `concurrency` (default 1), `max_rounds` (default 3), `base_branch` (default `main`), extra `protected_paths`, and `allow` (extra shell patterns the agents may run unattended, such as `make verify*`; your `checks` command is allowed already). Test, lint, format-check, and quality tools for the common stacks are allowed by `policy.yaml`. Formatters that rewrite files are in `policy.build.yaml`, which only this skill loads.
 3. Install the policy for your harness: `bin/tick install claude`. It comes from `policy.yaml`.
 4. Start a job in Claude Code with `/factory <feature idea>`.
 5. Open the board in your own terminal with `bin/job serve`, then open the address it prints.
@@ -206,7 +206,7 @@ State lives in the project, never in this repo.
 
 ## Harnesses
 
-Claude Code is the supported harness. OpenCode and Kiro adapters exist and are untested. Codex support was removed.
+Claude Code is the primary harness. Claude Code and Kiro are measured with `tests/probe_harness.py`. OpenCode is not fully measured. On Kiro (v3 engine, `kiro-cli` 3.3.0) 23 of 23 conclusive attacks were blocked under `--trust-all-tools`, each succeeding in the no-policy control. `config_hooks` was inconclusive because the model refused it in the control. The two known limits (a script file, `python3 -c`) get through, as on Claude Code. File-tool writes to `.kiro/**`, `.git/**`, `job.json`, `audit.log` and `config.json` were also refused. `deny` rules survive `--trust-all-tools`, but `ask` rules do not: with the flag, Kiro approved `git add` that it refused without it. Only `deny` is a guarantee, so never start the agent with `--trust-all-tools` or `--trust-tools` outside the probe, and keep anything that needs a human in the deny list. `TICK` passes neither flag.
 
 Measure a harness before trusting it with `tests/probe_harness.py <harness>`. It runs each attack with and without the policy in a scratch repo and reports BLOCKED, GAP, or INCONCLUSIVE. A canary check refuses to attack until the harness is proven to be inside the scratch repo.
 
@@ -218,11 +218,19 @@ python3 -m unittest discover -s factory/tests
 
 123 tests, one skipped for a non-loopback bind. The run takes about two minutes. `test_job.py` covers the stages and the board, `test_integrity.py` replays the bypasses a red-team agent found, and `test_tick.py` covers the deny rules.
 
+## Notes on the allow list
+
+The allow list is a set of command patterns. It cannot see what a command does inside. Read these before you rely on it.
+
+- **Scripts that fix files.** A lint or format script in `package.json` that internally runs `--fix` is invisible to the policy, because the policy only sees `npm run lint`. For a build job this is allowed to change files, so nothing parks the job. The gate and the reviewers see the result.
+- **`rubocop -A`.** `bundle exec rubocop*` is allowed as written, so builders can autocorrect with `-A` or the long flags.
+- **`dotnet build` and `dotnet test`.** Both restore packages, so they can use the network. They are allowed because they do not work otherwise.
+
 ## Limits
 
 - An agent that runs as your user can still edit files and run git. The factory makes that visible and stops the ordinary paths. Branch protection on the remote is the real guarantee.
 - Running tests runs the project's code. The policy sees the test command, not what the tests do inside it. A review of a branch you do not trust is therefore code execution on your machine. The worktree hooks and the integrity checks catch a commit or an edit to tracked files, not a network call or a write outside the worktree.
-- The ask rules are enforced by the harness, and no human is there to answer one in an unattended pass. That is the intent. Only Claude Code's handling is known to me from its documentation. Kiro's and OpenCode's handling of `ask` in a headless run is unmeasured.
+- The ask rules are enforced by the harness, and no human is there to answer one in an unattended pass. That is the intent. Only Claude Code's handling is known to me from its documentation. Kiro refuses an `ask` in a headless run, but approves it under `--trust-all-tools`. OpenCode's handling is unmeasured.
 - A command the allow list permits can still write a file through shell redirection (`echo x > file`). The file-write rules cover the harness's edit tools, not the shell. The integrity checks catch a commit, a moved branch, or changed hooks, and park the job. They detect, they do not prevent.
 - The gate is only as good as your `checks` command. Make sure it fails when no tests run.
 - The stage skills run as full skills in real use. Testing so far used shortened versions to check the factory's contract.

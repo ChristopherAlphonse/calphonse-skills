@@ -42,6 +42,8 @@ class TickTests(unittest.TestCase):
                 argv = json.loads(ok.stdout)
                 self.assertTrue(argv[0].startswith(("claude", "opencode", "kiro")))
                 self.assertIn("Never commit, push, merge", argv[-1])
+                # A trust flag would auto-approve every ask rule, so the unattended run must never carry one.
+                self.assertFalse([a for a in argv if "trust" in a], argv)
 
     def test_partial_policy_names_only_the_gap(self):
         run(self.root, "install", "claude")
