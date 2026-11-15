@@ -163,3 +163,47 @@ rules:
       - pip show *
       - brew list *
       - brew search *
+  # --- Factory additions: run the project's own tests, linters, and type checks ---
+  # These run the repo's code but never install, publish, or deploy. They are what lets a builder
+  # or reviewer produce evidence unattended. A project adds its own with `allow` in config.json.
+  - capability: shell
+    effect: allow
+    match:
+      - npm test
+      - npm test *
+      - npm run test*
+      - npm run lint*
+      - npm run typecheck*
+      - npm run type-check*
+      - yarn test*
+      - yarn lint*
+      - pnpm test*
+      - pnpm run test*
+      - pnpm run lint*
+      - npx tsc --noEmit*
+      - npx eslint *
+      - npx vitest *
+      - npx jest *
+      - npx prettier --check *
+      - tsc --noEmit*
+      - eslint *
+      - pytest
+      - pytest *
+      - python -m pytest*
+      - python3 -m pytest*
+      - python -m unittest*
+      - python3 -m unittest*
+      - ruff check*
+      - ruff format --check*
+      - mypy *
+      - dotnet test*
+      - go test*
+      - go vet*
+      - cargo test*
+      - cargo clippy*
+      - mvn test*
+      - mvn -q test*
+      - gradle test*
+      - ./gradlew test*
+      - bundle exec rspec*
+      - make test*

@@ -101,8 +101,26 @@ def shell_policy(harness):
     if harness == "kiro":
         stricter += [f"{w} *" for w in KIRO_WRAPPERS]
         stricter += KIRO_GIT_ANYWHERE
-    return {"deny": uniq(base["deny"] + stricter), "ask": uniq(base["ask"]),
-            "allow": uniq(base["allow"] + [f"*/{SKILL}/bin/job *"])}
+    deny, ask = uniq(base["deny"] + stricter), uniq(base["ask"])
+    allow = [a for a in base["allow"] + [f"*/{SKILL}/bin/job *"] + project_allow() if a not in deny + ask]
+    return {"deny": deny, "ask": ask, "allow": uniq(allow)}
+
+
+def project_allow():
+    """Commands this project allowed on top of policy.yaml: `allow` patterns and the `checks` command.
+
+    The file is in NO_WRITE, so an agent cannot widen its own rules. A deny or ask still wins.
+    """
+    path = ROOT / ".planning" / SKILL / "config.json"
+    cfg = read_json(path) if path.exists() else {}
+    extra = cfg.get("allow", [])
+    if not (isinstance(extra, list) and all(isinstance(x, str) and x.strip() for x in extra)):
+        die(f"{path}: `allow` must be a list of non-empty strings")
+    checks = cfg.get("checks", "")
+    if not isinstance(checks, str):
+        die(f"{path}: `checks` must be a string")
+    parts = [c.strip() for c in re.split(r"&&|;", checks) if c.strip()]  # a harness checks each part of a chain
+    return uniq([x.strip() for x in extra] + ([checks.strip()] if checks.strip() else []) + parts)
 
 
 def claude_rules(kind):

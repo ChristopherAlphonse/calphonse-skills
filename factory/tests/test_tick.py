@@ -179,6 +179,52 @@ class BaselinePolicyTests(unittest.TestCase):
                 self.assertFalse(set(self.base["allow"]) & (got["deny"] | got["ask"]))
                 self.assertIn(f"*/{SKILL}/bin/job *", got["allow"])
 
+    def test_test_lint_and_typecheck_commands_run_unattended_in_every_harness(self):
+        runnable = ["npm test", "npm test *", "npm run lint*", "pytest *", "python3 -m pytest*", "dotnet test*",
+                    "go test*", "npx tsc --noEmit*", "make test*"]
+        for h in HARNESSES:
+            with self.subTest(h):
+                root = self.root / h
+                root.mkdir()
+                run(root, "install", h)
+                got = enforced(root, h)
+                self.assertFalse(set(runnable) - got["allow"])
+                for never in ("npm install*", "npm publish*", "pip install*", "dotnet publish*", "aws *"):
+                    self.assertNotIn(never, got["allow"])
+
+    def test_the_project_adds_its_own_commands_through_config_and_checks(self):
+        state = self.root / ".planning" / SKILL
+        state.mkdir(parents=True)
+        (state / "config.json").write_text(json.dumps(
+            {"allow": ["make verify*"], "checks": "npm run lint && npm test"}))
+        run(self.root, "install", "claude")
+        allow = enforced(self.root, "claude")["allow"]
+        for wanted in ("make verify*", "npm run lint && npm test", "npm run lint"):
+            self.assertIn(wanted, allow)
+
+    def test_the_project_cannot_allow_what_the_policy_denies_or_asks_for(self):
+        state = self.root / ".planning" / SKILL
+        state.mkdir(parents=True)
+        (state / "config.json").write_text(json.dumps({"allow": ["git push*", "git add*", "gh *"]}))
+        for h in HARNESSES:
+            with self.subTest(h):
+                root = self.root / h
+                root.mkdir()
+                (root / ".planning" / SKILL).mkdir(parents=True)
+                (root / ".planning" / SKILL / "config.json").write_text((state / "config.json").read_text())
+                run(root, "install", h)
+                got = enforced(root, h)
+                self.assertFalse({"git push*", "git add*", "gh *"} & got["allow"])
+                self.assertEqual(run(root, "check", h).returncode, 0)
+
+    def test_a_bad_allow_list_is_refused(self):
+        state = self.root / ".planning" / SKILL
+        state.mkdir(parents=True)
+        for bad in ({"allow": "make test"}, {"allow": [1]}, {"allow": [""]}, {"checks": ["npm test"]}):
+            with self.subTest(bad=bad):
+                (state / "config.json").write_text(json.dumps(bad))
+                self.assertEqual(run(self.root, "install", "claude").returncode, 2)
+
     def test_a_missing_ask_rule_is_a_gap_and_a_deny_in_its_place_is_not(self):
         run(self.root, "install", "claude")
         path = self.root / ".claude" / "settings.json"
