@@ -16,7 +16,7 @@ WRITE_TOOLS = {"fs_write", "fs_append", "str_replace", "delete_file",  # Kiro
 PATH_KEYS = ("path", "file_path", "filePath", "notebook_path")
 PATCH_FILE = re.compile(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", re.M)
 SPLIT = re.compile(r"&&|\|\||[;|&\n`(){}]|\$\(")
-REDIRECT = re.compile(r">>?\s*([^\s;&|<>()]+)")
+REDIRECT = re.compile(r""">>?\s*("[^"]*"|'[^']*'|[^\s;&|<>()]+)""")
 
 
 def block(why):
@@ -77,12 +77,16 @@ def check_shell(rules, cwd, command):
         if not any_match(rules["allow"], s, shell_glob):
             block(f"`{s}` is not on the allow list")
     for target in REDIRECT.findall(command):
+        target = target.strip("\"'")
+        if "$" in target:  # the shell expands it, so the path cannot be checked here
+            block(f"a redirect to {target}, which the guard cannot resolve")
         if target not in ("/dev/null", "&1", "&2"):
             check_write(rules, cwd, target)
 
 
 def main():
-    rules = json.load(open(sys.argv[1]))
+    with open(sys.argv[1]) as f:
+        rules = json.load(f)
     event = json.load(sys.stdin)
     tool, args, cwd = event["tool_name"], event["tool_input"], event.get("cwd") or os.getcwd()
     if tool in WRITE_TOOLS:

@@ -276,6 +276,28 @@ class TestIds(Factory):
     def test_progress_unknown_job_refused(self):
         self.no("progress", "nope", 1, 2)
 
+    def test_progress_needs_whole_numbers(self):
+        self.ok("create", "j", "T")
+        self.assertIn("refused", self.no("progress", "j", "x", 2).stderr)
+
+    def test_concurrent_writers_do_not_lose_updates(self):
+        self.ok("create", "j", "T")
+        threads = [threading.Thread(target=self.ok, args=("note", "j", f"n{i}")) for i in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        self.assertEqual(len(self.js("j")["activity"]), 8)
+
+    def test_a_corrupt_job_does_not_break_the_queue(self):
+        self.ok("create", "good", "T")
+        self.ok("create", "bad", "T")
+        self.jd("bad").joinpath("job.json").write_text("{not json")
+        r = self.ok("queue")
+        self.assertIn("good", r.stdout)
+        self.assertIn("skipped", r.stderr)
+        self.assertIn("not valid JSON", self.no("note", "bad", "x").stderr)
+
     def test_note_recorded_and_capped(self):
         self.ok("create", "j", "T")
         for i in range(35):
@@ -376,6 +398,13 @@ class TestBuildGate(Factory):
         self.assertTrue(text.startswith("GATE: PASS") or re.search(r"^GATE: PASS$", text, re.M))
         self.assertRegex(text, r"(?m)^TREE: \S+")
         self.assertTrue((self.jd("j") / "round-1" / "checks.md").exists())
+
+    def test_gate_fails_when_checks_time_out(self):
+        self.set_config(checks="sleep 5", checks_timeout=1)
+        self.to_gate("j")
+        text = self.run_gate("j")
+        self.assertRegex(text, r"(?m)^GATE: FAIL$")
+        self.assertIn("timed out", text)
 
     def test_gate_fail_by_exit_code(self):
         self.set_config(checks="exit 3")

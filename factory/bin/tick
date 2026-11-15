@@ -72,28 +72,6 @@ def name(prefix):
     return " ".join(prefix)
 
 
-def read_policy_line(path, raw, rule, out):
-    """Apply one non-blank policy line to `out`; return the rule now being read."""
-    line = raw.strip()
-    if line.startswith("- capability:"):
-        if line.split(":", 1)[1].strip() != "shell":
-            die(f"{path.name}: only shell rules are supported, got {line!r}")
-        return {"effect": None, "match": False}
-    if rule is None:
-        die(f"{path.name}: unexpected line {raw!r}")
-    if line.startswith("effect:"):
-        rule["effect"] = line.split(":", 1)[1].strip()
-        if rule["effect"] not in out:
-            die(f"{path.name}: effect must be deny, ask, or allow, got {rule['effect']!r}")
-    elif line == "match:":
-        rule["match"] = True
-    elif line.startswith("- ") and rule["match"] and rule["effect"]:
-        out[rule["effect"]].append(line[2:].strip())
-    else:
-        die(f"{path.name}: cannot read line {raw!r}")
-    return rule
-
-
 def policy_rule_start(path, line):
     if line.split(":", 1)[1].strip() != "shell":
         die(f"{path.name}: only shell rules are supported, got {line!r}")
@@ -376,7 +354,10 @@ def run_pass(harness):
     if not shutil.which(argv[0]):
         die(f"{argv[0]} is not on PATH")
     log(harness, "start")
-    code = subprocess.run(argv, cwd=ROOT).returncode
+    try:
+        code = subprocess.run(argv, cwd=ROOT, timeout=PASS_TIMEOUT).returncode
+    except subprocess.TimeoutExpired:
+        code = 124
     log(harness, f"exit {code}")
     return code
 
@@ -389,6 +370,7 @@ def cmd_run(harness, dry):
     sys.exit(run_pass(harness))
 
 
+PASS_TIMEOUT = 3600  # seconds one agent pass may run before it is killed
 STALL_LIMIT = 2  # passes in a row that change no job file before the loop stops retrying that state
 JOB = POLICY_DIR / "bin" / "job"
 

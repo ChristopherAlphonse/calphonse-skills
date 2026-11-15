@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Only writer of job.json. Refuses illegal stage moves. Serves the board."""
 import fcntl, fnmatch, hashlib, hmac, json, os, re, secrets, select, shlex, shutil, socket, subprocess, sys, tempfile, threading, time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,7 +14,7 @@ DASH_DIR = Path(__file__).resolve().parent.parent / "dashboard"
 STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript",
           "markdown.js": "text/javascript"}
 DEFAULTS = {
-    "concurrency": 1, "max_rounds": 3, "checks": "", "base_branch": "main",
+    "concurrency": 1, "max_rounds": 3, "checks": "", "base_branch": "main", "checks_timeout": 1800,
 }
 PROTECTED_FLOOR = [
     ".github/**", ".gitlab/**", ".gitlab-ci.yml", "Jenkinsfile", "CODEOWNERS", "**/CODEOWNERS",
@@ -138,11 +139,48 @@ def jobdir(jid):
     return JOBS / jid
 
 
+@contextmanager
+def locked():
+    """One writer at a time across board threads and CLI processes. Re-entrant within a thread."""
+    if getattr(CTX, "depth", 0):
+        CTX.depth += 1
+        try:
+            yield
+        finally:
+            CTX.depth -= 1
+        return
+    STATE.mkdir(parents=True, exist_ok=True)
+    with open(STATE / "job.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        CTX.depth = 1
+        try:
+            yield
+        finally:
+            CTX.depth = 0
+
+
+def serialized(fn):
+    """Wrap a command that reads job.json and writes it back, so two writers cannot lose each other's update."""
+    def wrapper(*args):
+        with locked():
+            return fn(*args)
+    wrapper.__name__ = fn.__name__
+    wrapper.__doc__ = fn.__doc__
+    return wrapper
+
+
+def read_job(p):
+    try:
+        return json.loads(Path(p).read_text())
+    except ValueError:
+        die(f"{p} is not valid JSON")
+
+
 def load(jid):
     p = jobdir(jid) / "job.json"
     if not p.exists():
         die(f"no job {jid}")
-    return json.loads(p.read_text())
+    return read_job(p)
 
 
 def save(job):
@@ -204,6 +242,7 @@ def review_files(review):
     return git_files(["diff", "--name-only", "-z", review["base"], review["head"]], ROOT)
 
 
+@serialized
 def cmd_create(jid, title, *opts):
     need(len(opts) in (0, 3) and (not opts or opts[0] == "--review"), "usage: create <id> <title> [--review BASE HEAD]")
     review = resolve_review(opts[1], opts[2]) if opts else None
@@ -231,6 +270,7 @@ def cmd_create(jid, title, *opts):
     announce_board()
 
 
+@serialized
 def cmd_stack(jid):
     job = load(jid)
     review = job.get("review")
@@ -578,6 +618,7 @@ def justify_review(job, cur, to):
     return to
 
 
+@serialized
 def cmd_advance(jid, to):
     job = load(jid)
     enforce(job)
@@ -611,8 +652,12 @@ def cmd_gate(jid):
         passed, tail = False, ""
         reason = "protected paths touched: " + ", ".join(hits)
     else:
-        r = subprocess.run(checks, shell=True, cwd=cwd, capture_output=True, text=True)
-        passed, reason, tail = r.returncode == 0, "", f"$ {checks}\n{(r.stdout + r.stderr)[-4000:]}"
+        limit = config()["checks_timeout"]
+        try:
+            r = subprocess.run(checks, shell=True, cwd=cwd, capture_output=True, text=True, timeout=limit)
+            passed, reason, tail = r.returncode == 0, "", f"$ {checks}\n{(r.stdout + r.stderr)[-4000:]}"
+        except subprocess.TimeoutExpired:
+            passed, tail, reason = False, "", f"checks timed out after {limit}s"
     verdict = "PASS" if passed else "FAIL"
     rd = jobdir(jid) / f"round-{job['round']}"
     rd.mkdir(exist_ok=True)
@@ -622,6 +667,7 @@ def cmd_gate(jid):
     print(f"GATE: {verdict}" + (f" ({reason})" if reason else ""))
 
 
+@serialized
 def cmd_route(jid, extras):
     job = load(jid)
     names = [e for e in extras.split(",") if e]
@@ -633,7 +679,9 @@ def cmd_route(jid, extras):
     print(",".join(job["reviewers"]))
 
 
+@serialized
 def cmd_progress(jid, done, total):
+    need(done.isdigit() and total.isdigit(), "progress takes two whole numbers")
     job = load(jid)
     job["progress"] = [int(done), int(total)]
     save(job)
@@ -643,6 +691,7 @@ def cmd_progress(jid, done, total):
 ACTIVITY_KEEP = 30
 
 
+@serialized
 def cmd_note(jid, text):
     """Record what the agent is doing right now, so the board can show it between stage changes."""
     need(text.strip(), "note text is empty")
@@ -657,6 +706,7 @@ def human_only():
     need(is_human(), "this is a human action, use the board")
 
 
+@serialized
 def cmd_approve(jid, what):
     human_only()
     need(what == "spec", "only the spec is approved here, commits go through `commit`")
@@ -669,6 +719,7 @@ def cmd_approve(jid, what):
     audit("approve", jid, "spec")
 
 
+@serialized
 def cmd_commit(jid):
     human_only()
     job = load(jid)
@@ -697,6 +748,7 @@ def cmd_commit(jid):
     print(job["commit"])
 
 
+@serialized
 def cmd_unblock(jid):
     human_only()
     job = load(jid)
@@ -717,7 +769,13 @@ def cmd_unblock(jid):
 
 
 def all_jobs():
-    return [json.loads(p.read_text()) for p in sorted(JOBS.glob("*/job.json"))] if JOBS.exists() else []
+    jobs = []
+    for p in sorted(JOBS.glob("*/job.json")) if JOBS.exists() else []:
+        try:
+            jobs.append(json.loads(p.read_text()))
+        except ValueError:
+            print(f"skipped {p}: not valid JSON", file=sys.stderr)
+    return jobs
 
 
 def waiting_on_human(job):
@@ -738,7 +796,8 @@ def cmd_queue():
     for job in all_jobs():
         if job["stage"] not in TERMINAL | HUMAN_STAGES and integrity_problems(job):
             try:
-                enforce(job)
+                with locked():
+                    enforce(load(job["id"]))
             except SystemExit:
                 job = load(job["id"])
         s = job["stage"]
@@ -924,6 +983,9 @@ class Handler(BaseHTTPRequestHandler):
             routes[self.path]()
         except SystemExit:
             return self.send(409, "{}")
+        except Exception as e:
+            print(f"board request {self.path} failed: {e!r}", file=sys.stderr)
+            return self.send(500, "{}")
         finally:
             CTX.human = False
         self.send(200, "{}")

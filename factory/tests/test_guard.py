@@ -60,6 +60,11 @@ class Guard:
         self.assertEqual(self.sh("echo x > .claude/settings.json"), 2)
         self.assertEqual(self.sh("echo x > /dev/null"), 0)
 
+    def test_quoted_and_expanded_redirect_targets_are_checked(self):
+        for c in ('echo x > ".claude/settings.json"', "echo x > '.claude/settings.json'", "echo x > $HOME/y"):
+            with self.subTest(c):
+                self.assertEqual(self.sh(c), 2)
+
     def test_review_agent_writes_only_under_planning(self):
         if not REVIEW:
             self.skipTest("builders may write code")
