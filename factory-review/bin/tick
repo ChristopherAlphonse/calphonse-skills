@@ -38,6 +38,7 @@ KIRO_GIT_ANYWHERE = [m for g in GIT_WRITES for m in (f"git * {g}", f"git * {g} *
 KIRO_TOOLS = ["read", "write", "shell", "grep", "glob", "subagent"]
 NO_WRITE = ["**/.kiro/**", "**/.claude/**", "**/.git/**", "**/.planning/**/job.json", "**/.planning/**/audit.log",
             "**/.planning/**/config.json", "**/.worktrees/**"]
+# Claude Code and OpenCode enforce this allow list. Kiro does not: it allows unnamed workspace writes (measured).
 WRITE_ONLY = ["**/.planning/factory-review/**"]
 KIRO_DESCRIPTION = "Code review orchestrator. Runs one pass of the factory-review skill and never edits code, commits, pushes, or posts to a forge."
 KIRO_PROMPT = "Use the factory-review skill. Run one pass and stop. Never edit the code under review. Never commit, push, merge, post a comment, or create a PR or MR."
