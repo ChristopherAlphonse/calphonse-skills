@@ -302,7 +302,6 @@ button:hover {
     monospace;
 }
 #dbody.md {
-  max-width: 74ch;
   font-size: 14px;
   line-height: 1.6;
 }

@@ -377,6 +377,7 @@ def cmd_advance(jid, to):
     save(job)
     audit("advance", jid, f"{cur} -> {to}")
     print(f"{jid}: {cur} -> {to}")
+    announce_serve()
 
 
 def cmd_route(jid, extras):
@@ -587,7 +588,7 @@ def cmd_serve(port):
     os.chmod(tmp, 0o600)
     os.replace(tmp, STATE / HASH_FILE)
     srv = ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
-    print(f"board: 127.0.0.1:{srv.server_port}/?c={CODE}  (opens once, valid 5 minutes)", flush=True)
+    print(f"board: http://127.0.0.1:{srv.server_port}/?c={CODE}  (opens once, valid 5 minutes)", flush=True)
     audit("serve", "", f"port {srv.server_port}")
     # Bound to 127.0.0.1 only, so TLS adds nothing on loopback.
     srv.serve_forever()  # NOSONAR
@@ -672,10 +673,18 @@ def ensure_watcher():
         return m.group(1)
 
 
+def announce_serve():
+    """Tell the user the exact command to run when a job waits on them, so they never have to ask for it."""
+    if any(j["stage"] in HUMAN_STAGES for j in all_jobs()):
+        print(f"waiting on you. To unblock, run this in your terminal:\n"
+              f"  cd {shlex.quote(str(ROOT))} && {shlex.quote(str(Path(__file__).resolve()))} serve", file=sys.stderr)
+
+
 def announce_board():
     url = ensure_watcher()
     if url:
         print(f"board: {url}", file=sys.stderr)
+    announce_serve()
 
 
 def cmd_board():

@@ -13,6 +13,10 @@ You are the orchestrator of a review. You do no review work yourself. For each s
 
 Before any other tool call, including `JOB create` and `JOB queue`, run `JOB board`. It starts the read-only board if none is running and prints its link as `127.0.0.1:PORT/?c=CODE`. Then write that link to the user as a message of its own, as `http://127.0.0.1:PORT/?c=CODE` with the code included, and only then continue. The point is that the user watches the work happen, so the link must reach them before the first stage starts, never in the final report. Do not spawn a subagent, read the repo, or plan first. Repeat the link in every report that ends a pass. The board keeps running between passes and the link stays the same while it does. If `JOB board` refuses, say so in that first message and give `JOB watch` as the fallback. Do not use `JOB serve`: only the user starts that.
 
+## Waiting on the user
+
+Whenever a job is in Needs you, end the message with the command that opens the board with the Unblock button, in its own code block, with absolute paths and without being asked: `cd <project root> && <absolute path of JOB> serve`. `JOB advance`, `JOB create`, and `JOB queue` print it on stderr as well; copy it from there. Say that the read-only link has no button and this board does. Never run the command yourself: `serve` prints its one-time link in the user's terminal.
+
 ## Workflows
 
 This skill runs one workflow: **review**. Two refs in, a verified report and paste-ready comments out. `JOB create <id> "<title>" <base> <head>` makes a review job.
