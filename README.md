@@ -1,6 +1,50 @@
 # Agent Skills
 
-Personal agent skills that encode workflows, review standards, and testing rituals. Each skill is a directory with a `SKILL.md` file. [AGENTS.md](AGENTS.md) is the canonical index.
+A personal library of agent skills: small, single-purpose instruction sets that make an AI coding agent work the way you want. Each skill is a directory with a `SKILL.md` file. [AGENTS.md](AGENTS.md) is the canonical index.
+
+Use one skill on its own, such as `qa-review` on a diff. Or let the [factory](#how-the-factory-works) chain many of them to take a feature from idea to a reviewed local commit.
+
+## Contents
+
+- [The idea](#the-idea)
+- [Philosophy](#philosophy)
+- [Quick Start](#quick-start)
+- [How the factory works](#how-the-factory-works)
+- [How factory-review works](#how-factory-review-works)
+- [Skills](#skills)
+- [Architecture](#architecture)
+- [Artifact Convention](#artifact-convention)
+- [Contributing a Skill](#contributing-a-skill)
+- [Local Setup](#local-setup)
+- [Notes](#notes)
+
+## The idea
+
+Three rules hold the whole repo together.
+
+1. **A skill does one thing.** `swe` makes the smallest change. `qa-review` judges maintainability. `prove-it-works` checks the real result. None of them tries to be a workflow.
+2. **A workflow is a chain of skills.** `factory` and `factory-review` call other skills as stages. They add no new judgment of their own. They add order, evidence checks, and a place for you to say yes.
+3. **You stay in control.** Agents write files and leave code uncommitted. A script checks the files before a job moves on. Only your click on the board approves a spec or commits.
+
+```mermaid
+flowchart LR
+    S["Skills<br/>installed once, on your machine"] -->|"run inside"| P["Any project"]
+    P -->|"write"| A[".planning/*<br/>reviews, plans, specs<br/>kept with the code"]
+```
+
+The skills travel with you. The output stays with the project it describes.
+
+## Philosophy
+
+Agent skills are personal. They encode your workflows, your review standards, your testing rituals. They should not live inside a single project.
+
+**Skills travel with the developer.** When a skill lives in `~/.agents`, updating it once updates it everywhere. No per-project installs, no drift between copies. The same review standard applies to your weekend project and your team's monolith.
+
+**Artifacts stay in the project.** Skills are portable. Their output is not. Reviews, plans, and specs describe a specific codebase, so they belong in `.planning/*` inside that project, at the same commit as the code they reference.
+
+**Complex workflows decompose into small skills.** A large workflow is hard to read, test, and reuse. Splitting it into focused sub-skills solves all three. Each sub-skill does one thing; a parent orchestrator chains them together.
+
+**The system must be workspace agnostic.** The same skills work in any project directory. The index and skill conventions assume nothing about the target project. They produce artifacts that are project-aware, but the machinery stays independent.
 
 ## Quick Start
 
@@ -26,6 +70,72 @@ npx skills update -p       # project skills only
 npx skills update <name>   # one specific skill
 npx skills update -y       # no prompts
 ```
+
+## How the factory works
+
+`factory` takes a feature idea and produces a reviewed commit on a local branch, with a PR body written. It never pushes and never opens a PR or MR.
+
+Each box below is a stage. A fresh agent runs the skill named in it and writes one file. A script, `bin/job`, reads that file and decides whether the job may move on. Gold boxes wait for your click on the board.
+
+```mermaid
+flowchart LR
+    shape["shape<br/>lets-talk-about-it"] --> spec["spec<br/>prd-mode"]
+    spec --> approve{{"You approve the spec"}}
+    approve --> build["build<br/>swe + stack skills"]
+    build --> gate1["gate<br/>your checks command"]
+    gate1 -->|"fail"| build
+    gate1-->|"pass"| review["review<br/>code, qa, test<br/>+ security, architecture"]
+    review -->|"changes"| build
+    review -->|"all pass"| polish["polish<br/>comment-sicko, unslop"]
+    polish --> gate2["gate again"]
+    gate2 --> prove["prove<br/>prove-it-works"]
+    prove -->|"fail"| build
+    prove -->|"pass"| ship["ship<br/>pr-body-style"]
+    ship --> commit{{"You click Commit locally"}}
+    commit --> ready(["ready"])
+    build -.->|"blocked or rounds used up"| human["Needs you"]
+    human -.->|"you click Unblock"| build
+
+    classDef you fill:#fff3bf,stroke:#b8860b,color:#000
+    class approve,commit,human you
+```
+
+Four things make this safe to run unattended:
+
+| Rule | What it means |
+| --- | --- |
+| Evidence, not "done" | An agent saying it finished counts for nothing. `bin/job` advances a job only when the stage's file exists with the right status line, and the gate passes on a command's real output. |
+| Fresh agent per stage | Each stage starts with no memory of the last one, so a reviewer never inherits the builder's blind spots. |
+| Bounded retries | A job gets `max_rounds` build rounds (default 3), then lands in **Needs you** instead of looping. |
+| No push, no PR | The only commit is the one you trigger. Shell rules block `git push`, `gh`, `glab`, and `curl`, and your remote's protected branches are the real backstop. |
+
+Stack skills are picked from file names, not by the agent: TypeScript and React files add `typescript-strict-style` and `vercel-react-best-practices`, C# adds `dotnet`.
+
+For the full state machine, the trust model, and setup for Claude Code, Kiro, and OpenCode, read [factory/README.md](factory/README.md). [factory/SKILL.md](factory/SKILL.md) is the contract an agent follows.
+
+## How factory-review works
+
+`factory-review` reviews a branch or diff you already have. It is read-only: it never edits the code, commits, or posts comments.
+
+```mermaid
+flowchart LR
+    scope["scope<br/>find lint, type, test tooling"] --> review
+    subgraph review["review, in parallel"]
+        direction TB
+        r1["code"]
+        r2["qa"]
+        r3["test"]
+        r4["security / architecture<br/>only when the diff calls for them"]
+    end
+    review --> reconcile["reconcile<br/>one ranked list"]
+    reconcile --> verify["verify<br/>rerun every claim"]
+    verify --> report["report<br/>report.md + comments.md"]
+    report --> ready(["ready"])
+```
+
+The verify stage is the point of the design. Reviewers make claims, and a claim can be wrong. The verifier did not write the reviews. It opens every cited line, reruns every command in a scratch copy, and marks each finding confirmed, dropped, or unverifiable. Only confirmed findings reach the report, with paste-ready comments for the MR.
+
+See [factory-review/README.md](factory-review/README.md) for the full state machine and setup.
 
 ## Skills
 
@@ -77,18 +187,6 @@ npx skills update -y       # no prompts
 - [simplify](simplify/SKILL.md): Restate the last message in plain human language, with no jargon
 - [swe](swe/SKILL.md): Pragmatic dev mode: smallest change that fully solves the task, and a reply a busy human reads once
 - [factory](factory/SKILL.md): Build a feature from idea to a reviewed local commit through staged skills, a scripted state machine, and a kanban board. Never commits without your click and never pushes or opens a PR
-
-## Philosophy
-
-Agent skills are personal. They encode your workflows, your review standards, your testing rituals. They should not live inside a single project.
-
-**Skills travel with the developer.** When a skill lives in `~/.agents`, updating it once updates it everywhere. No per-project installs, no drift between copies. The same review standard applies to your weekend project and your team's monolith.
-
-**Artifacts stay in the project.** Skills are portable. Their output is not. Reviews, plans, and specs describe a specific codebase, so they belong in `.planning/*` inside that project, at the same commit as the code they reference.
-
-**Complex workflows decompose into small skills.** A large workflow is hard to read, test, and reuse. Splitting it into focused sub-skills solves all three. Each sub-skill does one thing; a parent orchestrator chains them together.
-
-**The system must be workspace agnostic.** The same skills work in any project directory. The index and skill conventions assume nothing about the target project. They produce artifacts that are project-aware, but the machinery stays independent.
 
 ## Architecture
 
