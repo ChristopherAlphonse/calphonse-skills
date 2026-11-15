@@ -11,7 +11,7 @@ The baseline rules (deny, ask, allow) live in ../policy.yaml. Every harness gets
 denies below. Deny beats ask, and ask beats allow. An unattended pass cannot answer an ask, so an ask
 stops the command until a human runs it.
 """
-import json, os, re, shutil, subprocess, sys
+import json, os, re, shlex, shutil, subprocess, sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -193,10 +193,31 @@ def policy_gaps(harness):
         gaps = [p for p in pol["deny"] if p not in deny]
         gaps += [p for p in pol["ask"] if p not in deny | ask]
         gaps += [f"write {g}" for g in NO_WRITE if g not in matched("fs_write", "deny")]
-        if cfg.get("allowedTools") or cfg.get("hooks"):
-            gaps.append("agent must not carry allowedTools or hooks that widen the rules")
+        guard_files, guard_hooks = kiro_guard_files()
+        if cfg.get("hooks") != guard_hooks:
+            gaps.append(f"the {SKILL} agent must carry exactly the kiro-guard hook")
+        for rel, text in guard_files.items():
+            try:
+                current = (ROOT / rel).read_text()
+            except OSError:
+                current = None
+            if current != text:
+                gaps.append(f"{rel} is missing or differs from `tick print kiro`")
+        if cfg.get("allowedTools"):
+            gaps.append("agent must not carry allowedTools, which widen the rules")
         return gaps
     die(f"unknown harness {harness!r}, expected one of {', '.join(COMMANDS)}")
+
+
+def kiro_guard_files():
+    """The PreToolUse hook that enforces the whole policy even under --trust-all-tools, which approves every ask."""
+    pol = shell_policy("kiro")
+    rules = {**pol, "no_write": NO_WRITE, "write_only": WRITE_ONLY or []}
+    hooks = f".kiro/hooks/{SKILL}-guard"
+    script = (Path(__file__).resolve().parent / "kiro-guard").read_text()
+    command = f"python3 {shlex.quote(str(ROOT / (hooks + '.py')))} {shlex.quote(str(ROOT / (hooks + '.json')))}"
+    return ({f"{hooks}.py": script, f"{hooks}.json": json.dumps(rules, indent=2) + "\n"},
+            {"preToolUse": [{"matcher": "*", "command": command}]})
 
 
 def policy_files(harness):
@@ -207,12 +228,14 @@ def policy_files(harness):
         return {"opencode.jsonc": json.dumps({"permissions": opencode_rules()}, indent=2) + "\n"}
     if harness == "kiro":
         pol = shell_policy("kiro")
+        guard_files, guard_hooks = kiro_guard_files()
         agent = {
             "name": SKILL,
             "description": KIRO_DESCRIPTION,
             "prompt": KIRO_PROMPT,
             "tools": KIRO_TOOLS,
             "resources": ["skill://.kiro/skills/*/SKILL.md"],
+            "hooks": guard_hooks,
             "permissions": {"rules": [
                 {"capability": "fs_read", "effect": "allow"},
                 {"capability": "fs_write", "effect": "allow", **({"match": WRITE_ONLY} if WRITE_ONLY else {})},
@@ -222,7 +245,7 @@ def policy_files(harness):
                 {"capability": "shell", "effect": "deny", "match": pol["deny"]},
             ]},
         }
-        return {f".kiro/agents/{SKILL}.json": json.dumps(agent, indent=2) + "\n"}
+        return {f".kiro/agents/{SKILL}.json": json.dumps(agent, indent=2) + "\n", **guard_files}
     die(f"unknown harness {harness!r}, expected one of {', '.join(COMMANDS)}")
 
 
