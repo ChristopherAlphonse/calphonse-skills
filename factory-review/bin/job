@@ -10,8 +10,9 @@ ROOT = Path(os.environ.get("FACTORY_ROOT", Path.cwd())).resolve()
 STATE = ROOT / ".planning" / "factory-review"
 JOBS = STATE / "jobs"
 DASH_DIR = Path(__file__).resolve().parent.parent / "dashboard"
-STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript",
-          "markdown.js": "text/javascript"}
+JS = "text/javascript"
+STATIC = {"dashboard.css": "text/css", "app.js": JS, "dom.js": JS, "markdown.js": JS}
+HOOKS_PATH_KEY = "core.hooksPath"
 DEFAULTS = {"concurrency": 1}
 READONLY = False
 KEY = ""
@@ -64,9 +65,13 @@ def hint_for(job):
     return hint + (f" | stack skills: {', '.join(stack)}" if stack and hint else "")
 
 
+class Refused(Exception):
+    """Raised by die(); callers that survive a refusal catch this. The entry point turns it into exit 1."""
+
+
 def die(msg):
     print(f"refused: {msg}", file=sys.stderr)
-    sys.exit(1)
+    raise Refused(msg)
 
 
 def need(cond, msg):
@@ -210,7 +215,7 @@ def install_hooks(job):
     and chain to the repo's own hooks so its policy checks still run."""
     wt = job["worktree"]
     common = git(["rev-parse", "--git-common-dir"], ROOT).stdout.strip()
-    orig_cfg = git(["config", "core.hooksPath"], ROOT).stdout.strip()
+    orig_cfg = git(["config", HOOKS_PATH_KEY], ROOT).stdout.strip()
     orig = str((ROOT / (orig_cfg or Path(common) / "hooks")).resolve())
     hdir = STATE / "hooks" / job["id"]
     hdir.mkdir(parents=True, exist_ok=True)
@@ -229,7 +234,7 @@ def install_hooks(job):
         (hdir / name).write_text(body)
         (hdir / name).chmod(0o755)
     need(git(["config", "extensions.worktreeConfig", "true"], ROOT).returncode == 0, "cannot enable worktree config")
-    r = git(["config", "--worktree", "core.hooksPath", str(hdir)], wt)
+    r = git(["config", "--worktree", HOOKS_PATH_KEY, str(hdir)], wt)
     need(r.returncode == 0, f"hook install failed: {r.stderr.strip()}")
     job["hooks_path"], job["hooks_sha"] = str(hdir), hooks_digest(hdir)
 
@@ -311,8 +316,8 @@ def integrity_problems(job):
     edited = git_files(["diff", "--name-only", "-z", "HEAD"], wt)
     if edited:
         probs.append("a reviewer edited tracked files: " + ", ".join(edited[:5]))
-    if git(["config", "--worktree", "core.hooksPath"], wt).stdout.strip() != job["hooks_path"]:
-        probs.append("core.hooksPath was changed")
+    if git(["config", "--worktree", HOOKS_PATH_KEY], wt).stdout.strip() != job["hooks_path"]:
+        probs.append(f"{HOOKS_PATH_KEY} was changed")
     try:
         if hooks_digest(job["hooks_path"]) != job["hooks_sha"]:
             probs.append("hook files were changed")
@@ -427,7 +432,7 @@ def cmd_queue():
         if job["stage"] not in TERMINAL | HUMAN_STAGES and integrity_problems(job):
             try:
                 enforce(job)
-            except SystemExit:
+            except Refused:
                 job = load(job["id"])
         s = job["stage"]
         if s in TERMINAL:
@@ -457,7 +462,7 @@ COOKIE = "factory-review"
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
-        pass
+        """Intentionally silent: the board must not write request lines to the terminal."""
 
     def send(self, code, body, ctype="application/json", extra=None):
         data = body if isinstance(body, bytes) else body.encode()
@@ -561,7 +566,7 @@ class Handler(BaseHTTPRequestHandler):
         CTX.human = True
         try:
             cmd_unblock(jid)
-        except SystemExit:
+        except Refused:
             return self.send(409, "{}")
         finally:
             CTX.human = False
@@ -584,7 +589,8 @@ def cmd_serve(port):
     srv = ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
     print(f"board: 127.0.0.1:{srv.server_port}/?c={CODE}  (opens once, valid 5 minutes)", flush=True)
     audit("serve", "", f"port {srv.server_port}")
-    srv.serve_forever()
+    # Bound to 127.0.0.1 only, so TLS adds nothing on loopback.
+    srv.serve_forever()  # NOSONAR
 
 
 WATCH_FILE = "watch.json"
@@ -612,7 +618,8 @@ def cmd_watch(port):
     srv = bind_watch(port)
     print(f"watch: 127.0.0.1:{srv.server_port}/?c={CODE}  (read-only, valid until this process stops)", flush=True)
     audit("watch", "", f"port {srv.server_port}")
-    srv.serve_forever()
+    # Bound to 127.0.0.1 only, so TLS adds nothing on loopback.
+    srv.serve_forever()  # NOSONAR
 
 
 def port_listening(port):
@@ -683,7 +690,8 @@ COMMANDS = {
     "queue": (cmd_queue, 0), "board": (cmd_board, 0), "watch": (cmd_watch, 1), "serve": (cmd_serve, 1),
 }
 
-if __name__ == "__main__":
+
+def main():
     name, args = (sys.argv[1] if len(sys.argv) > 1 else ""), sys.argv[2:]
     if name in HUMAN_ONLY:
         die(f"{name} is a human action: use the board")
@@ -694,3 +702,10 @@ if __name__ == "__main__":
         args = ["8765" if name == "serve" else str(WATCH_FIRST_PORT)]
     need(len(args) == arity, f"{name} takes {arity} args" + (": <id> <title> <base> <head>" if name == "create" else ""))
     fn(*args)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Refused:
+        sys.exit(1)
