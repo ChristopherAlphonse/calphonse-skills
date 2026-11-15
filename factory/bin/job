@@ -899,7 +899,7 @@ def cmd_serve(port):
     os.chmod(tmp, 0o600)
     os.replace(tmp, STATE / HASH_FILE)
     srv = ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
-    print(f"board: 127.0.0.1:{srv.server_port}/?c={CODE}  (opens once, valid 5 minutes)", flush=True)
+    print(f"board: http://127.0.0.1:{srv.server_port}/?c={CODE}  (opens once, valid 5 minutes)", flush=True)
     audit("serve", "", f"port {srv.server_port}")
     srv.serve_forever()
 

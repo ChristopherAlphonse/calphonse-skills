@@ -187,7 +187,7 @@ class Factory(unittest.TestCase):
             ready, _, _ = select.select([master], [], [], 20)
             self.assertTrue(ready, f"serve printed nothing: {buf!r}")
             buf += os.read(master, 4096).decode()
-        m = re.match(r"board: 127\.0\.0\.1:(\d+)/\?c=(\S+)", buf)
+        m = re.match(r"board: http://127\.0\.0\.1:(\d+)/\?c=(\S+)", buf)
         self.assertIsNotNone(m, f"bad first line {buf!r}")
         self.port, self.code = int(m.group(1)), m.group(2)
         status, _, headers = self.http_full("GET", f"/?c={self.code}", cookie=False)
@@ -979,7 +979,7 @@ class TestServer(Factory):
         buf = ""
         while "\n" not in buf:
             buf += os.read(master, 4096).decode()
-        m = re.match(r"board: 127\.0\.0\.1:(\d+)/\?c=(\S+)", buf)
+        m = re.match(r"board: http://127\.0\.0\.1:(\d+)/\?c=(\S+)", buf)
         self.port = int(m.group(1))
         st, _, headers = self.http_full("GET", f"/?c={m.group(2)}", cookie=False)
         self.assertEqual((st, headers["Location"]), (303, "/"))
