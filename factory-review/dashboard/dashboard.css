@@ -168,7 +168,7 @@ button:hover {
   top: 0;
   right: 0;
   bottom: 0;
-  width: min(920px, 100%);
+  width: min(var(--drawer-w, 920px), 100%);
   background: var(--card);
   border-left: 1px solid var(--line);
   padding: 14px;
@@ -177,6 +177,27 @@ button:hover {
 }
 #drawer.open {
   display: block;
+}
+#grip {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: min(var(--drawer-w, 920px), 100%);
+  width: 10px;
+  margin-right: -5px;
+  cursor: col-resize;
+  touch-action: none;
+  display: none;
+  z-index: 1;
+}
+#drawer.open + #grip {
+  display: block;
+}
+#grip:hover,
+#grip:focus-visible,
+#grip.drag {
+  background: color-mix(in srgb, var(--acc) 40%, transparent);
+  outline: none;
 }
 #dbody {
   word-break: break-word;
@@ -281,4 +302,10 @@ button:hover {
 .x {
   float: right;
   margin: 0;
+}
+
+@media (max-width: 600px) {
+  #grip {
+    display: none !important;
+  }
 }

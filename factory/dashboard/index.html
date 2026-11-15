@@ -8,17 +8,20 @@
   </head>
   <body>
     <header>
-      <h1>Factory Board</h1>
-      <span id="meta">connecting</span>
-      <span class="policy">local only: the factory never pushes or opens a PR/MR, and commits only when you click</span>
+      <div class="title">
+        <h1>Factory Board</h1>
+        <span id="meta">connecting</span>
+      </div>
+      <p class="policy">Local only. The factory never pushes or opens a PR/MR, and it commits only when you click.</p>
     </header>
     <main id="board"></main>
     <aside id="drawer">
-      <button class="x" id="close">close</button>
+      <button class="x" id="close">Close</button>
       <div id="dhead"></div>
       <div class="files" id="dfiles"></div>
       <div id="dbody" class="raw"></div>
     </aside>
+    <div id="grip" role="separator" aria-orientation="vertical" aria-label="Resize drawer" tabindex="0"></div>
     <script type="module" src="/static/app.js"></script>
   </body>
 </html>

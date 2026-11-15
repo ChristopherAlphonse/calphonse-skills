@@ -88,7 +88,8 @@ function statusRows(j) {
 }
 
 function card(j) {
-  const c = el("div", `card${j.needs_human ? " hold" : ""}`);
+  const c = el("div", `card${j.needs_human ? " hold" : ""}${j.stage === "rejected" ? " rejected" : ""}`);
+  c.tabIndex = 0;
   c.append(el("div", "t", j.title), el("div", "id", j.id), ...statusRows(j));
 
   const last = j.activity?.at(-1);
@@ -102,6 +103,12 @@ function card(j) {
   if (j.stage === "needs-human") c.append(actionButton("Unblock, grant more rounds", "/api/unblock", j));
 
   c.onclick = () => showDrawer(j.id);
+  c.onkeydown = (e) => {
+    if (e.target === c && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      showDrawer(j.id);
+    }
+  };
   return c;
 }
 
@@ -110,7 +117,7 @@ function isRelevant(col, mine) {
 }
 
 function column(col, mine) {
-  const section = el("section", `col${col.you ? " you" : ""}`);
+  const section = el("section", `col${col.you ? " you" : ""}${col.always ? " end" : ""}${mine.length ? " busy" : ""}`);
   const h = el("h2");
   h.append(el("span", "", col.label), el("span", "", String(mine.length)));
   section.append(h, ...mine.map(card));
@@ -237,11 +244,42 @@ async function applyMode() {
     const mode = await (await api("/api/mode")).json();
     if (mode.readonly) {
       document.querySelector(".policy").textContent =
-        "read-only view: no approve, commit, or unblock here. Those stay in the terminal board";
+        "Read-only view. Approve, commit, and unblock stay in the terminal board.";
     }
   } catch {
   }
 }
+
+const DRAWER_MIN = 320;
+const DRAWER_KEY = "factory.drawerWidth";
+
+function setDrawerWidth(px, save) {
+  const w = Math.round(Math.min(Math.max(px, DRAWER_MIN), window.innerWidth));
+  document.documentElement.style.setProperty("--drawer-w", w + "px");
+  if (save) localStorage.setItem(DRAWER_KEY, w);
+  return w;
+}
+
+const grip = $("grip");
+grip.onpointerdown = (e) => {
+  grip.setPointerCapture(e.pointerId);
+  grip.classList.add("drag");
+};
+grip.onpointermove = (e) => {
+  if (grip.hasPointerCapture(e.pointerId)) setDrawerWidth(window.innerWidth - e.clientX);
+};
+grip.onpointerup = (e) => {
+  grip.classList.remove("drag");
+  setDrawerWidth(window.innerWidth - e.clientX, true);
+};
+grip.onkeydown = (e) => {
+  const dir = { ArrowLeft: 1, ArrowRight: -1 }[e.key];
+  if (!dir) return;
+  e.preventDefault();
+  setDrawerWidth($("drawer").offsetWidth + dir * 40, true);
+};
+const saved = Number(localStorage.getItem(DRAWER_KEY));
+if (saved) setDrawerWidth(saved);
 
 $("close").onclick = closeDrawer;
 document.addEventListener("visibilitychange", () => {

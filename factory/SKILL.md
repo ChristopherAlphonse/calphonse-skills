@@ -13,6 +13,10 @@ You are the orchestrator. You do no stage work yourself. For each stage you spaw
 
 Before any other tool call, including `JOB create` and `JOB queue`, run `JOB board`. It starts the read-only board if none is running and prints its link as `127.0.0.1:PORT/?c=CODE`. Then write that link to the user as a message of its own, as `http://127.0.0.1:PORT/?c=CODE` with the code included, and only then continue. The point is that the user watches the work happen, so the link must reach them before the first stage starts, never in the final report. Do not spawn a subagent, read the repo, or plan first. Repeat the link in every report that ends a pass. The board keeps running between passes and the link stays the same while it does. If `JOB board` refuses, say so in that first message and give `JOB watch` as the fallback. Do not use `JOB serve`: only the user starts that.
 
+## Waiting on the user
+
+Whenever a job waits on the user (spec approval, **Commit locally**, **Unblock**), end the message with the command that opens the board with the buttons, in its own code block, with absolute paths and without being asked: `cd <project root> && <absolute path of JOB> serve`. `JOB advance`, `JOB create`, and `JOB queue` print it on stderr as well; copy it from there. Say that the read-only link has no buttons and this board does. Never run the command yourself: `serve` prints its one-time link in the user's terminal.
+
 ## Workflows
 
 This skill runs the **build** workflow: a feature idea becomes a local commit and a PR body. `JOB create <id> "<title>"` makes a build job.

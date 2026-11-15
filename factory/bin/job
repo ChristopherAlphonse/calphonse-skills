@@ -593,6 +593,7 @@ def cmd_advance(jid, to):
     save(job)
     audit("advance", jid, f"{cur} -> {real}")
     print(f"{jid}: {cur} -> {real}" + (" (round limit hit)" if real != to else ""))
+    announce_serve()
 
 
 def cmd_gate(jid):
@@ -982,10 +983,18 @@ def ensure_watcher():
         return m.group(1)
 
 
+def announce_serve():
+    """Tell the user the exact command to run when a job waits on them, so they never have to ask for it."""
+    if any(waiting_on_human(j) for j in all_jobs()):
+        print(f"waiting on you. To approve, commit, or unblock, run this in your terminal:\n"
+              f"  cd {shlex.quote(str(ROOT))} && {shlex.quote(str(Path(__file__).resolve()))} serve", file=sys.stderr)
+
+
 def announce_board():
     url = ensure_watcher()
     if url:
         print(f"board: {url}", file=sys.stderr)
+    announce_serve()
 
 
 def cmd_board():
