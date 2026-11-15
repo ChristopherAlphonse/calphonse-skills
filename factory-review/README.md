@@ -208,7 +208,7 @@ Measure a harness before trusting it with `tests/probe_harness.py <harness>`. It
 python3 -m unittest discover -s factory-review/tests
 ```
 
-78 tests, about a minute. `test_job.py` covers creating a review, the stage rules, stack detection, the read-only guarantees, the audit log, and the board. `test_integrity.py` replays the bypasses a red-team agent found against `factory`. `test_watch.py` and `test_autowatch.py` cover the read-only board, and `test_tick.py` covers the deny rules.
+86 tests, about a minute. `test_job.py` covers creating a review, the stage rules, stack detection, the read-only guarantees, the audit log, and the board. `test_integrity.py` replays the bypasses a red-team agent found against `factory`. `test_watch.py` and `test_autowatch.py` cover the read-only board, and `test_tick.py` covers the deny rules.
 
 ## Limits
 
