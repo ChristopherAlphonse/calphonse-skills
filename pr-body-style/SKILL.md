@@ -39,7 +39,8 @@ Ask only when two or more candidates remain after this (for example, several rep
 - Avoid method-by-method or file-by-file narration unless the user explicitly asks for implementation detail.
 - Check the wording against the [unslop](../unslop/SKILL.md) skill.
 - Keep wording plain and direct. Prefer "Moves retry handling into the shared HTTP client" over deep root-cause prose.
-- Make every claim match the actual diff and current check status. Verify locally or on the git host when the status may have changed.
+- Make every claim match the actual diff and current check status. Read the git host's CI status when a PR exists. Never run a test suite or build to write the body: it takes minutes and costs credits. If CI status is unavailable, write "Not run" under How to Test and say so in the reply.
+- Writing a body is a read-only, quick task: read `git diff --stat` and the diff of the changed source files, then write. Do not run long commands. Finish in one or two tool calls after reading.
 - Keep "How to Test" concrete and minimal: commands run, user-visible checks, or CI status.
 - Use "Additional Information" only for high-signal context, risks, retained compatibility shims, or follow-up notes. Keep it empty or one sentence when possible.
 
