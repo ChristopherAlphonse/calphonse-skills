@@ -1,6 +1,6 @@
 ---
 name: factory-review
-description: Run a code review through the review and QA skills in this repo as a staged workflow, with a kanban board, a scripted state machine, and a headless tick. Point it at a branch or diff and it scopes the change, runs independent reviewers in parallel, reconciles them into one ranked list, verifies every finding by rerunning the evidence, and writes a report with paste-ready comments. Picks skills for the codebase automatically (TypeScript and React get typescript-strict-style and vercel-react-best-practices, C# gets dotnet). Use when the user wants a branch, PR, or MR reviewed end to end, a verified review, or a review pipeline. Read-only. Never edits the code under review, commits, pushes, or posts comments. To build a feature, use factory instead.
+description: Run a code review through the review and QA skills in this repo as a staged workflow, with a kanban board, a scripted state machine, and a headless tick. Point it at a branch or diff and it scopes the change, runs independent reviewers in parallel, reconciles them into one ranked list, verifies every finding by rerunning the evidence, and writes a report with paste-ready comments. Picks skills for the codebase automatically (TypeScript and React get typescript-strict-style and vercel-react-best-practices, C# gets dotnet, Python gets python). Use when the user wants a branch, PR, or MR reviewed end to end, a verified review, or a review pipeline. Read-only. Never edits the code under review, commits, pushes, or posts comments. To build a feature, use factory instead.
 ---
 
 # Factory-review
@@ -98,7 +98,7 @@ A reviewer that cannot proceed writes `blocked.md` with `STATUS: BLOCKED`. `JOB 
 
 | Name | Skill | Always |
 | --- | --- | --- |
-| `code` | `code-review-frontend` for TypeScript and React, plus `dotnet` for C# files | yes |
+| `code` | `code-review-frontend` for TypeScript and React, plus `dotnet` for C# files and `python` for Python files | yes |
 | `qa` | `qa-review` | yes |
 | `test` | `test-review` | yes |
 | `security` | `security-review` | when the diff touches auth, input handling, secrets, headers, or file uploads |
@@ -118,9 +118,10 @@ Each reviewer does an independent review and does not copy `scope.md`. It writes
 | `.tsx`, `.jsx`, `next.config.*` | `vercel-react-best-practices` |
 | `proxy.ts`, `proxy.js`, `middleware.ts`, `middleware.js` | `nextjs-proxy-csp-hardening` |
 | `.cs`, `.csproj`, `.sln`, `.cshtml`, `.razor` | `dotnet` |
+| `.py`, `.pyi`, `pyproject.toml`, `uv.lock` | `python` |
 | `.tf`, `cdk.json`, `serverless.yml`, `samconfig.toml` | `aws` |
 
-Only the files in the diff count. A C# file elsewhere in the repo does not add `dotnet`.
+Only the files in the diff count. A C# or Python file elsewhere in the repo does not add `dotnet` or `python`.
 
 ### Verify
 

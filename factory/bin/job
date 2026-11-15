@@ -67,7 +67,7 @@ REVIEW_TRANSITIONS = {
 }
 HINT_REVIEW = {
     "scope": "code-review-frontend step 0 (find lint, type, and test tooling) -> scope.md (STATUS: READY, or reject with rejection.md); add security or architecture reviewers with `job route`",
-    "review": "code (code-review-frontend, plus dotnet for C#), qa (qa-review), test (test-review), and routed extras -> round-1/review-<name>.md; read-only, never edit",
+    "review": "code (code-review-frontend, plus dotnet for C# and python for Python), qa (qa-review), test (test-review), and routed extras -> round-1/review-<name>.md; read-only, never edit",
     "reconcile": "reconcile-reviews -> reconcile.md (STATUS: READY), one ranked list with file and line",
     "verify": "prove-it-works: rerun every VERIFIED (ran) command and check every cited line -> verified.md (STATUS: READY), drop what does not reproduce",
     "report": "unslop -> report.md (STATUS: READY, FINDINGS: n, BLOCKERS: n) and comments.md to paste by hand; never post",
@@ -77,6 +77,7 @@ STACK_RULES = [
     ("vercel-react-best-practices", {".tsx", ".jsx"}, {"next.config.js", "next.config.mjs", "next.config.ts"}),
     ("nextjs-proxy-csp-hardening", set(), {"proxy.ts", "proxy.js", "middleware.ts", "middleware.js"}),
     ("dotnet", {".cs", ".csproj", ".sln", ".cshtml", ".razor"}, set()),
+    ("python", {".py", ".pyi"}, {"pyproject.toml", "uv.lock"}),
     ("aws", {".tf"}, {"cdk.json", "serverless.yml", "serverless.yaml", "samconfig.toml"}),
 ]
 

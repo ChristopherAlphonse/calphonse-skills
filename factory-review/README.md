@@ -10,7 +10,7 @@ To build a feature, use the separate `factory` skill. The two have the same layo
 
 ## Quick start
 
-1. Link `factory-review` and the skills it calls into `~/.claude/skills`: `code-review-frontend`, `qa-review`, `test-review`, `security-review`, `architecture-review`, `reconcile-reviews`, `prove-it-works`, `unslop`, `whats-going-on`, plus `typescript-strict-style`, `vercel-react-best-practices`, and `dotnet` for those stacks.
+1. Link `factory-review` and the skills it calls into `~/.claude/skills`: `code-review-frontend`, `qa-review`, `test-review`, `security-review`, `architecture-review`, `reconcile-reviews`, `prove-it-works`, `unslop`, `whats-going-on`, plus `typescript-strict-style`, `vercel-react-best-practices`, `dotnet`, and `python` for those stacks.
 2. Install the policy for your harness in the project: `bin/tick install claude`. It comes from `policy.yaml`.
 3. Fetch the branch you want reviewed. The review never reaches a forge:
 
@@ -65,7 +65,7 @@ Each stage runs the skill that owns it. A fresh subagent does the work and write
 | Stage | Skill | File it writes |
 | --- | --- | --- |
 | scope | `code-review-frontend` step 0 | `scope.md` |
-| review | `code-review-frontend` (plus `dotnet` for C#), `qa-review`, `test-review`, and `security-review` or `architecture-review` when routed | `reviews/review-<name>.md` |
+| review | `code-review-frontend` (plus `dotnet` for C# and `python` for Python), `qa-review`, `test-review`, and `security-review` or `architecture-review` when routed | `reviews/review-<name>.md` |
 | reconcile | `reconcile-reviews` (merge step only) | `reconcile.md` |
 | verify | `prove-it-works` on the findings | `verified.md` |
 | report | `unslop` | `report.md` and `comments.md` |
@@ -123,6 +123,7 @@ Then it has a summary with a recommendation and the ranked findings. `comments.m
 | `.tsx`, `.jsx`, `next.config.*` | `vercel-react-best-practices` |
 | `proxy.ts`, `middleware.ts` | `nextjs-proxy-csp-hardening` |
 | `.cs`, `.csproj`, `.sln`, `.cshtml`, `.razor` | `dotnet` |
+| `.py`, `.pyi`, `pyproject.toml`, `uv.lock` | `python` |
 | `.tf`, `cdk.json`, `serverless.yml` | `aws` |
 
 ## Following along

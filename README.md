@@ -122,7 +122,7 @@ Four things make this safe to run unattended:
 | Bounded retries       | A job gets `max_rounds` build rounds (default 3), then lands in **Needs you** instead of looping.                                                                                      |
 | No push, no PR        | The only commit is the one you trigger. Shell rules block `git push`, `gh`, `glab`, and `curl`, and your remote's protected branches are the real backstop.                            |
 
-Stack skills are picked from file names, not by the agent: TypeScript and React files add `typescript-strict-style` and `vercel-react-best-practices`, C# adds `dotnet`.
+Stack skills are picked from file names, not by the agent: TypeScript and React files add `typescript-strict-style` and `vercel-react-best-practices`, C# adds `dotnet`, Python adds `python`.
 
 For the full state machine, the trust model, and setup for Claude Code, Kiro, and OpenCode, read [factory/README.md](factory/README.md). [factory/SKILL.md](factory/SKILL.md) is the contract an agent follows.
 

@@ -81,6 +81,7 @@ A job gets `max_rounds` build rounds. After that it moves to **Needs you** inste
 | `.tsx`, `.jsx`, `next.config.*` | `vercel-react-best-practices` |
 | `proxy.ts`, `middleware.ts` | `nextjs-proxy-csp-hardening` |
 | `.cs`, `.csproj`, `.sln`, `.cshtml`, `.razor` | `dotnet` |
+| `.py`, `.pyi`, `pyproject.toml`, `uv.lock` | `python` |
 | `.tf`, `cdk.json`, `serverless.yml` | `aws` |
 
 ## One pass
