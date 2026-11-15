@@ -245,67 +245,99 @@ def bump_round(job):
     return "needs-human" if job["round"] > job["round_limit"] else "build"
 
 
+def from_shape(job, d, rd, to):
+    if to == "spec":
+        need(kv(d / "shape.md").get("STATUS") == "READY", "shape.md needs STATUS: READY")
+    elif to == "rejected":
+        need((d / "rejection.md").exists(), "rejection.md missing")
+    return to
+
+
+def from_spec(job, d, rd, to):
+    need((d / SPEC_FILE).exists(), "spec.md missing")
+    need(job["approvals"].get("spec"), "spec not approved by the user")
+    need(job["approvals"].get("spec_sha") == file_sha(d / SPEC_FILE), "spec changed since the user approved it")
+    job["round"] = 1
+    make_worktree(job)
+    return to
+
+
+def from_build(job, d, rd, to):
+    if to == "gate":
+        need(kv(d / "build.md").get("STATUS") == "READY", "build.md needs STATUS: READY")
+    elif to == "needs-human":
+        need(kv(d / "build.md").get("STATUS") == "BLOCKED", "build.md needs STATUS: BLOCKED")
+    return to
+
+
+def from_gate(job, d, rd, to):
+    g = kv(rd / CHECKS_FILE).get("GATE")
+    need(g, "run `job gate` first")
+    if to == "review":
+        need(g == "PASS" and not job["polished"], "needs a passing gate before polish")
+    elif to == "prove":
+        need(g == "PASS" and job["polished"], "needs a passing gate after polish")
+    elif to == "build":
+        need(g == "FAIL", "gate passed, nothing to rebuild")
+        to = bump_round(job)
+    return to
+
+
+def from_review(job, d, rd, to):
+    verdicts = {r: kv(rd / f"review-{r}.md").get("VERDICT") for r in job["reviewers"]}
+    missing = [r for r, v in verdicts.items() if not v]
+    need(not missing, f"missing reviews: {', '.join(missing)}")
+    changes = [r for r, v in verdicts.items() if v == "CHANGES"]
+    if to == "polish":
+        need(not changes, f"open CHANGES from: {', '.join(changes)}")
+    elif to == "build":
+        need(changes, "all reviews passed, nothing to rebuild")
+        need((rd / "reconcile.md").exists(), "reconcile.md missing")
+        to = bump_round(job)
+    return to
+
+
+def from_polish(job, d, rd, to):
+    s = kv(d / "polish.md").get("STATUS")
+    if to == "gate":
+        need(s == "DONE", "polish.md needs STATUS: DONE")
+        job["polished"] = True
+        (rd / CHECKS_FILE).unlink(missing_ok=True)
+    elif to == "build":
+        need(s == "REWORK", "polish.md needs STATUS: REWORK")
+        to = bump_round(job)
+    return to
+
+
+def from_prove(job, d, rd, to):
+    s = kv(d / "uat.md").get("STATUS")
+    if to == "ship":
+        need(s == "PASS", "uat.md needs STATUS: PASS")
+    elif to == "build":
+        need(s == "FAIL", "uat.md needs STATUS: FAIL")
+        to = bump_round(job)
+    return to
+
+
+def from_ship(job, d, rd, to):
+    if to == "ready":
+        need((d / "pr-body.md").exists(), "pr-body.md missing")
+        need(job["commit"], "nothing committed: the user commits locally from the board")
+    elif to == "build":
+        to = bump_round(job)
+    return to
+
+
+JUSTIFY_FROM = {"shape": from_shape, "spec": from_spec, "build": from_build, "gate": from_gate,
+                "review": from_review, "polish": from_polish, "prove": from_prove, "ship": from_ship}
+
+
 def justify(job, cur, to):
     """Check the files that justify cur -> to. Returns the real target and mutates job."""
     d = jobdir(job["id"])
     rd = d / f"round-{job['round']}"
-    if cur == "shape" and to == "spec":
-        need(kv(d / "shape.md").get("STATUS") == "READY", "shape.md needs STATUS: READY")
-    elif cur == "shape" and to == "rejected":
-        need((d / "rejection.md").exists(), "rejection.md missing")
-    elif cur == "spec":
-        need((d / SPEC_FILE).exists(), "spec.md missing")
-        need(job["approvals"].get("spec"), "spec not approved by the user")
-        need(job["approvals"].get("spec_sha") == file_sha(d / SPEC_FILE), "spec changed since the user approved it")
-        job["round"] = 1
-        make_worktree(job)
-    elif cur == "build" and to == "gate":
-        need(kv(d / "build.md").get("STATUS") == "READY", "build.md needs STATUS: READY")
-    elif cur == "build" and to == "needs-human":
-        need(kv(d / "build.md").get("STATUS") == "BLOCKED", "build.md needs STATUS: BLOCKED")
-    elif cur == "gate":
-        g = kv(rd / CHECKS_FILE).get("GATE")
-        need(g, "run `job gate` first")
-        if to == "review":
-            need(g == "PASS" and not job["polished"], "needs a passing gate before polish")
-        elif to == "prove":
-            need(g == "PASS" and job["polished"], "needs a passing gate after polish")
-        elif to == "build":
-            need(g == "FAIL", "gate passed, nothing to rebuild")
-            to = bump_round(job)
-    elif cur == "review":
-        verdicts = {r: kv(rd / f"review-{r}.md").get("VERDICT") for r in job["reviewers"]}
-        missing = [r for r, v in verdicts.items() if not v]
-        need(not missing, f"missing reviews: {', '.join(missing)}")
-        changes = [r for r, v in verdicts.items() if v == "CHANGES"]
-        if to == "polish":
-            need(not changes, f"open CHANGES from: {', '.join(changes)}")
-        elif to == "build":
-            need(changes, "all reviews passed, nothing to rebuild")
-            need((rd / "reconcile.md").exists(), "reconcile.md missing")
-            to = bump_round(job)
-    elif cur == "polish":
-        s = kv(d / "polish.md").get("STATUS")
-        if to == "gate":
-            need(s == "DONE", "polish.md needs STATUS: DONE")
-            job["polished"] = True
-            (rd / CHECKS_FILE).unlink(missing_ok=True)
-        elif to == "build":
-            need(s == "REWORK", "polish.md needs STATUS: REWORK")
-            to = bump_round(job)
-    elif cur == "prove":
-        s = kv(d / "uat.md").get("STATUS")
-        if to == "ship":
-            need(s == "PASS", "uat.md needs STATUS: PASS")
-        elif to == "build":
-            need(s == "FAIL", "uat.md needs STATUS: FAIL")
-            to = bump_round(job)
-    elif cur == "ship":
-        if to == "ready":
-            need((d / "pr-body.md").exists(), "pr-body.md missing")
-            need(job["commit"], "nothing committed: the user commits locally from the board")
-        elif to == "build":
-            to = bump_round(job)
+    if cur in JUSTIFY_FROM:
+        to = JUSTIFY_FROM[cur](job, d, rd, to)
     if to == "build":
         job["polished"] = False
     return to
@@ -446,6 +478,9 @@ def audit_lines():
     return [json.loads(l) for l in p.read_text().splitlines() if l.strip()] if p.exists() else []
 
 
+AUDIT_STAGE = {"create": "shape", "create-review": "scope", "violation": "needs-human"}
+
+
 def audited_state(jid):
     """What the audit log says happened to a job, to cross-check job.json against."""
     st = {"stage": None, "spec": False, "commit": None}
@@ -453,17 +488,13 @@ def audited_state(jid):
         if e.get("job") != jid:
             continue
         a, human = e["action"], e["actor"] == "human"
-        if a == "create":
-            st["stage"] = "shape"
-        elif a == "create-review":
-            st["stage"] = "scope"
+        if a in AUDIT_STAGE:
+            st["stage"] = AUDIT_STAGE[a]
         elif a == "advance":
             st["stage"] = e["detail"].split(" -> ")[1]
         elif a == "unblock":
             m = re.search(r"-> (\S+?);", e["detail"])
             st["stage"] = m.group(1) if m else "build"
-        elif a == "violation":
-            st["stage"] = "needs-human"
         elif a == "approve" and human:
             st["spec"] = True
         elif a == "commit" and human:
@@ -481,8 +512,13 @@ def integrity_problems(job):
     if (job["commit"] or None) != a["commit"]:
         probs.append("commit in job.json does not match a human commit in the audit log")
     wt = job["worktree"]
-    if not wt or not Path(wt).exists():
-        return probs
+    if wt and Path(wt).exists():
+        probs += worktree_problems(job, wt)
+    return probs
+
+
+def worktree_problems(job, wt):
+    probs = []
     if git(["symbolic-ref", "HEAD"], wt).stdout.strip() != f"refs/heads/{job['branch']}":
         probs.append("worktree is not on its factory branch")
     tip = git(["rev-parse", "HEAD"], wt).stdout.strip()
@@ -776,24 +812,40 @@ class Handler(BaseHTTPRequestHandler):
                 CODE = ""
             return good
 
+    def get_root(self, q):
+        if not self.host_ok():
+            return self.send(403, "{}")
+        if self.session_ok():
+            return self.send(200, (DASH_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if self.redeem_code(q.get("c", [""])[0]):
+            cookie = f"{COOKIE}={SESSION}; HttpOnly; SameSite=Strict; Path=/"
+            return self.send(303, "", extra={"Location": "/", "Set-Cookie": cookie})
+        return self.send(403, "{}")
+
+    def get_static(self, name):
+        if not (self.host_ok() and self.session_ok()) or name not in STATIC:
+            return self.send(403, "{}")
+        return self.send(200, (DASH_DIR / name).read_bytes(), STATIC[name])
+
+    def get_file(self, jid, name):
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", jid):
+            return self.send(404, "{}")
+        try:
+            p = (jobdir(jid) / name).resolve()
+            if jobdir(jid).resolve() not in p.parents or p.suffix != ".md" or not p.is_file():
+                return self.send(404, "{}")
+            return self.send(200, p.read_text(), "text/plain; charset=utf-8")
+        except (ValueError, OSError):
+            return self.send(404, "{}")
+
     def do_GET(self):
         from urllib.parse import urlparse, parse_qs
         u = urlparse(self.path)
         q = parse_qs(u.query)
         if u.path == "/":
-            if not self.host_ok():
-                return self.send(403, "{}")
-            if self.session_ok():
-                return self.send(200, (DASH_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
-            if self.redeem_code(q.get("c", [""])[0]):
-                cookie = f"{COOKIE}={SESSION}; HttpOnly; SameSite=Strict; Path=/"
-                return self.send(303, "", extra={"Location": "/", "Set-Cookie": cookie})
-            return self.send(403, "{}")
+            return self.get_root(q)
         if u.path.startswith("/static/"):
-            name = u.path[len("/static/"):]
-            if not (self.host_ok() and self.session_ok()) or name not in STATIC:
-                return self.send(403, "{}")
-            return self.send(200, (DASH_DIR / name).read_bytes(), STATIC[name])
+            return self.get_static(u.path[len("/static/"):])
         if not self.trusted():
             return self.send(403, "{}")
         if u.path == "/api/mode":
@@ -801,16 +853,7 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/jobs":
             return self.send(200, json.dumps([snapshot(j) for j in all_jobs()]))
         if u.path == "/api/file":
-            jid, name = q.get("job", [""])[0], q.get("name", [""])[0]
-            if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", jid):
-                return self.send(404, "{}")
-            try:
-                p = (jobdir(jid) / name).resolve()
-                if jobdir(jid).resolve() not in p.parents or p.suffix != ".md" or not p.is_file():
-                    return self.send(404, "{}")
-                return self.send(200, p.read_text(), "text/plain; charset=utf-8")
-            except (ValueError, OSError):
-                return self.send(404, "{}")
+            return self.get_file(q.get("job", [""])[0], q.get("name", [""])[0])
         self.send(404, "{}")
 
     def do_POST(self):
