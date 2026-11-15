@@ -9,6 +9,10 @@ You are the orchestrator of a review. You do no review work yourself. For each s
 
 `JOB` means this skill's `bin/job`. `TICK` means `bin/tick`. Run both from the target project root. State lives in `.planning/factory-review/` and worktrees in `.worktrees/`, both in the target project, never in this repo. Gitignore both there.
 
+## First action
+
+Before any other tool call, including `JOB create` and `JOB queue`, run `JOB board`. It starts the read-only board if none is running and prints its link as `127.0.0.1:PORT/?c=CODE`. Then write that link to the user as a message of its own, as `http://127.0.0.1:PORT/?c=CODE` with the code included, and only then continue. The point is that the user watches the work happen, so the link must reach them before the first stage starts, never in the final report. Do not spawn a subagent, read the repo, or plan first. Repeat the link in every report that ends a pass. The board keeps running between passes and the link stays the same while it does. If `JOB board` refuses, say so in that first message and give `JOB watch` as the fallback. Do not use `JOB serve`: only the user starts that.
+
 ## Workflows
 
 This skill runs one workflow: **review**. Two refs in, a verified report and paste-ready comments out. `JOB create <id> "<title>" <base> <head>` makes a review job.
@@ -139,15 +143,13 @@ It ends `verified.md` with `CONFIRMED: n, DROPPED: n, UNVERIFIABLE: n`.
 4. After the review stage, check the worktree is untouched (`cd <worktree> && git diff --quiet HEAD`). `JOB` also checks this and parks the job.
 5. Report the rows touched, any parked jobs and what they wait on, and the board address.
 
-**Board link.** The read-only board must be running whenever this skill is invoked. Make `JOB board` the first command of every invocation, before `JOB queue`. It starts the board if none is running and prints the link. `JOB create` and `JOB queue` also start it and print `board: <link>` on stderr. The link has the form `127.0.0.1:PORT/?c=CODE` with no scheme. Give the user the whole thing as `http://127.0.0.1:PORT/?c=CODE`, code included, in your first message and in every report that ends a pass, so the user never has to ask where the board is. The board keeps running between passes and the link stays the same while it does. Do not use `JOB serve`: only the user starts that. If `JOB board` refuses, say so and give the fallback `JOB watch`.
-
 ## Loop
 
 A pass finds nothing to run, or only `hold` rows, and ends. To repeat passes, schedule `TICK <harness>` with cron or launchd every few minutes. In Claude Code, `/loop 5m /factory-review run` does the same interactively. Everything is files, so any pass resumes every job from its stage, in any harness.
 
 ## Board
 
-`JOB board` starts the read-only view if needed and prints its link (see Board link above); `JOB watch [port]` (default 8766) runs it in the foreground. It needs no terminal, holds no key, and answers no unblock request. Its link stays valid until the process stops and can open in several tabs. Anyone, including an agent, may start it. `JOB serve [port]` serves the same board on 127.0.0.1 with the one button, and prints an address with a one-time code. It only starts in an interactive terminal. The board reads `.planning/factory-review/jobs/*/job.json` every 2 seconds.
+`JOB board` starts the read-only view if needed and prints its link (see First action); `JOB watch [port]` (default 8766) runs it in the foreground. It needs no terminal, holds no key, and answers no unblock request. Its link stays valid until the process stops and can open in several tabs. Anyone, including an agent, may start it. `JOB serve [port]` serves the same board on 127.0.0.1 with the one button, and prints an address with a one-time code. It only starts in an interactive terminal. The board reads `.planning/factory-review/jobs/*/job.json` every 2 seconds.
 
 Columns: Scope, Review, Reconcile, Verify, Report, Needs you, Ready to land. A card shows the compared refs, the stack skills, one chip per reviewer, and the findings and blockers counts once the report exists. A parked job sits in Needs you, outlined, with Unblock on `serve` only. Click a card to read every file in its folder.
 
