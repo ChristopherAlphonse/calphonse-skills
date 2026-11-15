@@ -106,7 +106,7 @@ For a build job the files are the whole repo. Review jobs (see `factory-review`)
    While working a job, run `JOB note <id> "<what you are doing>"` when you start a stage and at each meaningful step (a short phrase, under 200 characters). The board shows the latest note on the card, which is the only live view of work between stage changes.
 4. Report the rows touched, any `hold` rows and what they wait on, and the board address.
 
-At the start of the first pass, start `JOB watch` in the background (`nohup JOB watch 8766 > watch.log &`) and give the user the link it prints. Do not use `JOB serve`: only the user starts that.
+**Board link.** The read-only board must be running whenever this skill is invoked. Make `JOB board` the first command of every invocation, before `JOB queue`. It starts the board if none is running and prints the link. `JOB create` and `JOB queue` also start it and print `board: <link>` on stderr. The link has the form `127.0.0.1:PORT/?c=CODE` with no scheme. Give the user the whole thing as `http://127.0.0.1:PORT/?c=CODE`, code included, in your first message and in every report that ends a pass, so the user never has to ask where the board is. The board keeps running between passes and the link stays the same while it does. Do not use `JOB serve`: only the user starts that. If `JOB board` refuses, say so and give the fallback `JOB watch`.
 
 ## Loop
 
@@ -114,7 +114,7 @@ A pass finds nothing to run, or only `hold` rows, and ends. To repeat passes, sc
 
 ## Board
 
-`JOB watch [port]` (default 8766) is the read-only view. It needs no terminal, holds no key, and answers no approve, commit, or unblock request. Its link stays valid until the process stops and can open in several tabs. Anyone, including an agent, may start it. `JOB serve [port]` serves the kanban on 127.0.0.1 and prints an address with a one-time code. It only starts in an interactive terminal. The board reads `.planning/factory/jobs/*/job.json` every 2 seconds. Columns: Shape, Spec, Build (build and gate), Review, Polish, Prove, Ship, Needs you, Ready to land. Cards show round, gate, one chip per reviewer, task progress, and the local commit. A card waiting on the user is outlined. Approve spec, Commit locally, and Unblock are the only buttons, and the only way those moves happen. Click a card to read every file in its folder. The board looks and behaves the same whichever harness ran the pass.
+`JOB board` starts the read-only view if needed and prints its link (see Board link above); `JOB watch [port]` (default 8766) runs it in the foreground. It needs no terminal, holds no key, and answers no approve, commit, or unblock request. Its link stays valid until the process stops and can open in several tabs. Anyone, including an agent, may start it. `JOB serve [port]` serves the kanban on 127.0.0.1 and prints an address with a one-time code. It only starts in an interactive terminal. The board reads `.planning/factory/jobs/*/job.json` every 2 seconds. Columns: Shape, Spec, Build (build and gate), Review, Polish, Prove, Ship, Needs you, Ready to land. Cards show round, gate, one chip per reviewer, task progress, and the local commit. A card waiting on the user is outlined. Approve spec, Commit locally, and Unblock are the only buttons, and the only way those moves happen. Click a card to read every file in its folder. The board looks and behaves the same whichever harness ran the pass.
 
 ## Out of scope
 
