@@ -100,6 +100,7 @@ def shell_policy(harness):
     stricter = [f"{name(b)} *" for b in BLOCKED]
     if harness == "kiro":
         stricter += [f"{w} *" for w in KIRO_WRAPPERS]
+        stricter += KIRO_GIT_ANYWHERE
     return {"deny": uniq(base["deny"] + stricter), "ask": uniq(base["ask"]),
             "allow": uniq(base["allow"] + [f"*/{SKILL}/bin/job *"])}
 

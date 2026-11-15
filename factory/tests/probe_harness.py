@@ -58,8 +58,7 @@ def prepare_kiro(repo, policy):
         agent = json.loads(f.read_text())
         agent["prompt"] = ""
         if not policy:
-            rules = agent["permissions"]["rules"]
-            agent["permissions"]["rules"] = [r for r in rules if r["effect"] != "deny"]
+            agent["permissions"]["rules"] = [{"capability": c, "effect": "allow"} for c in ("fs_read", "fs_write", "shell")]
         f.write_text(json.dumps(agent, indent=2))
 
 
