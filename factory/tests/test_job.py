@@ -35,7 +35,7 @@ class Factory(unittest.TestCase):
             p.write_text(f"#!/bin/sh\necho {tool} >> '{self.cli_marker}'\nexit 1\n")
             p.chmod(0o755)
         env = {k: v for k, v in os.environ.items() if not k.startswith("FACTORY_")}
-        env.update(FACTORY_ROOT=str(self.root), GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1",
+        env.update(FACTORY_ROOT=str(self.root), FACTORY_NO_WATCH="1", GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1",
                    PATH=f"{self.fakebin}:{env.get('PATH', '')}")
         self.env = env
         self.git("init", "-b", "main", cwd=self.root)
