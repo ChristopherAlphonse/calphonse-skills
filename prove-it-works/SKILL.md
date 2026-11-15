@@ -54,6 +54,13 @@ Re-read the original request and write down each thing that must be true.
 - Run the feature the way a user would, and look at what it really does.
 - Look at the actual changes made, not your memory of making them.
 
+If the work includes a test you wrote or kept, judge it with two edits:
+
+- **Break the behavior.** Make the code return a wrong value or skip an effect. If the test still passes, it proves nothing. Usual causes: an assertion looser than the contract, or an expected value computed by the code under test.
+- **Change only the internals.** Restructure the code and keep every observable result. If the test now fails, it is pinned to the implementation. Rewrite it to assert what a caller or user can observe.
+
+If the work includes a number you measured (a speedup, a latency, a test count), find what limits it before you report it, and rule out that it measured something other than the work you think. A before and after taken on different inputs, a warm cache against a cold one, or a run that never reached the changed code all produce numbers that look real.
+
 ### Step 3: If a check fails, doubt the check first
 
 Before assuming the system is broken, make sure you looked in the right
@@ -94,6 +101,8 @@ this step just because the checks passed.
       or "it compiles"
 - [ ] Any failed check was traced to its real cause (the system or the
       check itself)
+- [ ] Each test you wrote fails when the behavior breaks and survives an internal refactor
+- [ ] Each number you report has a stated limiter and a confirmed measurement of the right work
 - [ ] Anything that could not be checked is stated openly in the report
 - [ ] The UAT document was written last, or you explained why it did not apply
 
@@ -107,3 +116,5 @@ this step just because the checks passed.
 | Reading a cached or re-formatted value             | Read the actual value from where it lives                  |
 | Blaming the system when a check fails              | Make sure the check was looking in the right place first   |
 | Checking once by eye and moving on                 | Script it so anyone can re-run it                          |
+| A test that passes when you break the code         | Tighten the assertion, or delete the test                  |
+| Reporting a speedup without saying what limits it  | Find the limiter and confirm the run exercised the change  |
