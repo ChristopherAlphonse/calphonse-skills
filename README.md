@@ -215,6 +215,7 @@ Skills are small on purpose, and some call others:
 | [nextjs-proxy-csp-hardening](nextjs-proxy-csp-hardening/SKILL.md)   | Builds and reviews a secure `proxy.ts`: Content Security Policy, nonces, browser security headers, and migration from `middleware.ts`. Includes a CSP bypass reference for authorized testing. | You add or audit CSP in a Next.js App Router project.          |
 | [dotnet](dotnet/SKILL.md)                                           | A router. Picks the guide for ASP.NET Core Web API work (endpoints, DTOs, error middleware, OpenAPI) or for a design pattern review (Command, Factory, Repository, DI, SOLID).                 | You work on C# or .NET.                                        |
 | [aws](aws/SKILL.md)                                                 | A router. Picks one guide from 24 (IAM, CDK, CloudFormation, networking, databases, serverless, Bedrock, billing, and more) and loads only that one.                                           | You touch an AWS service, credentials, or infrastructure code. |
+| [python](python/SKILL.md)                                           | A router. Picks one guide from 16 (asyncio, pytest, typing, packaging, uv, observability, performance, and more) and loads only that one.                                                      | You write or review Python code.                               |
 
 ### Review
 
