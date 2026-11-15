@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one factory-test pass headlessly in any supported harness, only if its deny policy is installed.
+"""Run one factory-review pass headlessly in any supported harness, only if its deny policy is installed.
 
   tick <harness> [--dry-run]   check policy, then run one pass
   tick check <harness>         exit 0 when the project's policy denies every blocked command
@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(os.environ.get("FACTORY_ROOT", Path.cwd())).resolve()
-PROMPT = ("Use the factory-test skill and run one pass (factory-test run). Wait for every reviewer you spawn. "
+PROMPT = ("Use the factory-review skill and run one pass (factory-review run). Wait for every reviewer you spawn. "
           "Never edit the code under review. Never commit, push, merge, post a comment, or create a PR or MR. Stop after the pass.")
 GIT_WRITES = ["commit", "push", "merge", "cherry-pick", "revert", "rebase", "am",
               "commit-tree", "update-ref", "symbolic-ref", "config", "fast-import"]
@@ -22,7 +22,7 @@ BLOCKED = ([("git", g) for g in GIT_WRITES] + [("git", g) for g in GIT_GLOBALS]
 COMMANDS = {
     "claude": lambda p: ["claude", "-p", p],
     "opencode": lambda p: ["opencode", "run", p],
-    "kiro": lambda p: ["kiro-cli", "chat", "--v3", "--no-interactive", "--agent", "factory-test", p],
+    "kiro": lambda p: ["kiro-cli", "chat", "--v3", "--no-interactive", "--agent", "factory-review", p],
 }
 
 
@@ -65,7 +65,7 @@ def policy_gaps(harness):
         return [name(b) for b in BLOCKED
                 if (f"{name(b)} *", "deny") not in rules and legacy.get(f"{name(b)} *") != "deny"]
     if harness == "kiro":
-        cfg = read_json(ROOT / ".kiro" / "agents" / "factory-test.json")
+        cfg = read_json(ROOT / ".kiro" / "agents" / "factory-review.json")
         denied = {m for r in cfg.get("permissions", {}).get("rules", [])
                   if r.get("capability") == "shell" and r.get("effect") == "deny" for m in r.get("match", [])}
         return [name(b) for b in BLOCKED if f"{name(b)} *" not in denied]
@@ -84,18 +84,18 @@ def policy_files(harness):
         return {"opencode.jsonc": json.dumps({"permissions": rules}, indent=2) + "\n"}
     if harness == "kiro":
         agent = {
-            "name": "factory-test",
-            "description": "Code review orchestrator. Runs one pass of the factory-test skill and never edits code, commits, pushes, or posts to a forge.",
-            "prompt": "Use the factory-test skill. Run one pass and stop. Never edit the code under review. Never commit, push, merge, post a comment, or create a PR or MR.",
+            "name": "factory-review",
+            "description": "Code review orchestrator. Runs one pass of the factory-review skill and never edits code, commits, pushes, or posts to a forge.",
+            "prompt": "Use the factory-review skill. Run one pass and stop. Never edit the code under review. Never commit, push, merge, post a comment, or create a PR or MR.",
             "resources": ["skill://.kiro/skills/*/SKILL.md"],
             "permissions": {"rules": [{"capability": "shell", "match": [f"{name(b)} *" for b in BLOCKED], "effect": "deny"}]},
         }
-        return {".kiro/agents/factory-test.json": json.dumps(agent, indent=2) + "\n"}
+        return {".kiro/agents/factory-review.json": json.dumps(agent, indent=2) + "\n"}
     die(f"unknown harness {harness!r}, expected one of {', '.join(COMMANDS)}")
 
 
 def log(harness, detail):
-    state = ROOT / ".planning" / "factory-test"
+    state = ROOT / ".planning" / "factory-review"
     state.mkdir(parents=True, exist_ok=True)
     line = json.dumps({"ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "actor": "tick",
                        "action": "tick", "job": "", "detail": f"{harness}: {detail}"}) + "\n"

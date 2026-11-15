@@ -1,6 +1,6 @@
 ---
 name: factory
-description: Take a feature from idea to a reviewed local commit by chaining the other skills in this repo as stages (shape, spec, build, review, polish, prove, ship), with a kanban board, a scripted state machine, and a headless tick. Picks skills for the codebase automatically (TypeScript and React get typescript-strict-style and vercel-react-best-practices, C# gets dotnet). Built and measured for Claude Code. Use when the user wants a whole feature driven end to end, a software factory, a pipeline, or the board. Never commits without the user's click and never pushes or opens a PR or MR. To review an existing branch, use factory-test instead.
+description: Take a feature from idea to a reviewed local commit by chaining the other skills in this repo as stages (shape, spec, build, review, polish, prove, ship), with a kanban board, a scripted state machine, and a headless tick. Picks skills for the codebase automatically (TypeScript and React get typescript-strict-style and vercel-react-best-practices, C# gets dotnet). Built and measured for Claude Code. Use when the user wants a whole feature driven end to end, a software factory, a pipeline, or the board. Never commits without the user's click and never pushes or opens a PR or MR. To review an existing branch, use factory-review instead.
 ---
 
 # Factory
@@ -13,7 +13,7 @@ You are the orchestrator. You do no stage work yourself. For each stage you spaw
 
 This skill runs the **build** workflow: a feature idea becomes a local commit and a PR body. `JOB create <id> "<title>"` makes a build job.
 
-To review an existing branch or PR, use the `factory-test` skill. It is a separate workflow that runs on the same engine and the same board, and it never writes code. The engine's `JOB create <id> "<title>" --review BASE HEAD` belongs to it.
+To review an existing branch or PR, use the `factory-review` skill. It is a separate skill with its own engine, board, and state folder (`.planning/factory-review/`), and it never writes code.
 
 ## Enterprise policy
 
@@ -89,7 +89,7 @@ Stack skills are chosen by `bin/job`, not by you. It reads the file names and wr
 | `.cs`, `.csproj`, `.sln`, `.cshtml`, `.razor` | `dotnet` |
 | `.tf`, `cdk.json`, `serverless.yml`, `samconfig.toml` | `aws` |
 
-For a build job the files are the whole repo. Review jobs (see `factory-test`) use only the files in the diff. If `.planning/` has no codebase map, run `whats-going-on` before Shape.
+For a build job the files are the whole repo. Review jobs (see `factory-review`) use only the files in the diff. If `.planning/` has no codebase map, run `whats-going-on` before Shape.
 
 ### Reviewers
 

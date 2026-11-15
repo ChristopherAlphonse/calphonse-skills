@@ -1,4 +1,4 @@
-"""Shared fixture for the factory-test tests. Everything goes through the CLI or a real `serve 0` subprocess."""
+"""Shared fixture for the factory-review tests. Everything goes through the CLI or a real `serve 0` subprocess."""
 import http.client
 import json
 import os
@@ -51,7 +51,7 @@ class Review(unittest.TestCase):
         self.git("commit", "-m", "init")
         with open(self.root / ".git" / "info" / "exclude", "a") as f:
             f.write(".worktrees\n.planning\n")
-        self.state = self.root / ".planning" / "factory-test"
+        self.state = self.root / ".planning" / "factory-review"
         self.procs, self.port, self.cookie = [], None, ""
         self.addCleanup(self.stop_servers)
 
@@ -176,9 +176,9 @@ class Review(unittest.TestCase):
         conn.putrequest(method, path, skip_host=True)
         conn.putheader("Host", host or f"127.0.0.1:{self.port}")
         if cookie is True:
-            conn.putheader("Cookie", f"factory-test={self.cookie}")
+            conn.putheader("Cookie", f"factory-review={self.cookie}")
         elif cookie:
-            conn.putheader("Cookie", f"factory-test={cookie}")
+            conn.putheader("Cookie", f"factory-review={cookie}")
         if xfactory:
             conn.putheader("X-Factory", "1")
         data = raw if raw is not None else (json.dumps(body).encode() if body is not None else b"")

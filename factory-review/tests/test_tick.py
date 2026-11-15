@@ -41,7 +41,7 @@ class TickTests(unittest.TestCase):
                 argv = json.loads(ok.stdout)
                 self.assertTrue(argv[0].startswith(("claude", "opencode", "kiro")))
                 self.assertIn("Never edit the code under review", argv[-1])
-                self.assertIn("factory-test", argv[-1])
+                self.assertIn("factory-review", argv[-1])
 
     def test_partial_policy_names_only_the_gap(self):
         run(self.root, "install", "claude")
@@ -109,7 +109,7 @@ class TickTests(unittest.TestCase):
         (stub / "claude").chmod(0o755)
         r = run(self.root, "claude", extra_env={"PATH": f"{stub}:/usr/bin:/bin"})
         self.assertEqual(r.returncode, 3)
-        lines = [json.loads(l) for l in (self.root / ".planning" / "factory-test" / "audit.log").read_text().splitlines()]
+        lines = [json.loads(l) for l in (self.root / ".planning" / "factory-review" / "audit.log").read_text().splitlines()]
         self.assertEqual([l["detail"] for l in lines], ["claude: start", "claude: exit 3"])
         self.assertTrue(all(l["actor"] == "tick" for l in lines))
 

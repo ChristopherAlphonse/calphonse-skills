@@ -14,8 +14,8 @@ class TestCreate(Review):
         self.assertEqual(self.git("rev-parse", "HEAD", cwd=self.wt("r")).stdout.strip(), tip)
         self.assertEqual(job["review"]["head"], tip)
         self.assertEqual(job["review"]["base"], self.git("rev-parse", "main").stdout.strip())
-        self.assertEqual(job["branch"], "factory-test/r")
-        self.assertEqual(self.git("rev-list", "--count", "main..factory-test/r").stdout.strip(), "1")
+        self.assertEqual(job["branch"], "factory-review/r")
+        self.assertEqual(self.git("rev-list", "--count", "main..factory-review/r").stdout.strip(), "1")
         self.assertEqual(self.git("status", "--porcelain", cwd=self.wt("r")).stdout, "")
 
     def test_bad_inputs_are_refused_and_leave_nothing_behind(self):
@@ -284,7 +284,7 @@ class TestServer(Review):
     def test_root_needs_a_session_and_the_code_is_single_use(self):
         st, body = self.http("GET", "/")
         self.assertEqual(st, 200)
-        self.assertIn(b"Factory-test Board", body)
+        self.assertIn(b"Factory-review Board", body)
         self.assertEqual(self.http("GET", "/", cookie=False)[0], 403)
         self.assertEqual(self.http("GET", "/", cookie="wrong")[0], 403)
         self.assertEqual(self.http("GET", f"/?c={self.code}", cookie=False)[0], 403)
@@ -380,7 +380,7 @@ class TestHumanGate(Review):
 
     def test_with_no_board_running_the_hooks_refuse_everyone(self):
         self.new_review()
-        for args in (("commit", "--allow-empty", "-m", "x"), ("update-ref", "refs/heads/factory-test/r", "HEAD~1")):
+        for args in (("commit", "--allow-empty", "-m", "x"), ("update-ref", "refs/heads/factory-review/r", "HEAD~1")):
             self.assertNotEqual(self.git(*args, cwd=self.wt("r"), check=False).returncode, 0, args)
 
     def test_a_push_of_the_review_branch_is_refused(self):
@@ -388,7 +388,7 @@ class TestHumanGate(Review):
         self.git("init", "-q", "--bare", str(remote), cwd=self.base)
         self.git("remote", "add", "origin", str(remote))
         self.new_review()
-        r = self.git("push", "origin", "HEAD:refs/heads/factory-test/r", cwd=self.wt("r"), check=False)
+        r = self.git("push", "origin", "HEAD:refs/heads/factory-review/r", cwd=self.wt("r"), check=False)
         self.assertNotEqual(r.returncode, 0)
         self.assertEqual(self.git("for-each-ref", cwd=remote).stdout, "")
 

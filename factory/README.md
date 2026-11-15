@@ -4,7 +4,7 @@ The factory takes a feature from idea to a reviewed, committed change on a local
 
 It never pushes and never opens a PR or MR. The only commit is the one you make by clicking a button on the board.
 
-To review an existing branch, use the separate `factory-test` skill. It runs on the same engine and board and never writes code.
+To review an existing branch, use the separate `factory-review` skill. It has the same layout, its own engine and board, and never writes code.
 
 `SKILL.md` is the contract an agent follows. This file explains how the pieces fit.
 
@@ -191,7 +191,7 @@ State lives in the project, never in this repo.
 | Command | Does |
 | --- | --- |
 | `bin/job create <id> "<title>"` | start a build job at shape |
-| `bin/job create <id> "<title>" --review BASE HEAD` | start a review job at scope (the `factory-test` skill uses this) |
+| `bin/job create <id> "<title>" --review BASE HEAD` | start a review job at scope. Left over from before the split: `factory-review` has its own engine and no longer uses it |
 | `bin/job stack <id>` | recompute the stack skills for a job |
 | `bin/job queue` | list jobs as `action id stage hint` |
 | `bin/job advance <id> <stage>` | move a job if the evidence allows it |

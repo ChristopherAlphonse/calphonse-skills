@@ -30,14 +30,14 @@ class Integrity(Review):
     def test_plumbing_commit_and_update_ref(self):
         wt = self.wt("j")
         sha = self.sneak_commit_sha(wt)
-        blocked = self.git("update-ref", "refs/heads/factory-test/j", sha, cwd=wt, check=False)
+        blocked = self.git("update-ref", "refs/heads/factory-review/j", sha, cwd=wt, check=False)
         self.assertNotEqual(blocked.returncode, 0, "the hook should block a plain update-ref")
-        self.git("-c", "core.hooksPath=/dev/null", "update-ref", "refs/heads/factory-test/j", sha, cwd=wt)
+        self.git("-c", "core.hooksPath=/dev/null", "update-ref", "refs/heads/factory-review/j", sha, cwd=wt)
         self.assert_parked("branch moved")
 
     def test_direct_ref_write(self):
         sha = self.sneak_commit_sha(self.wt("j"))
-        (self.root / ".git" / "refs" / "heads" / "factory-test" / "j").write_text(sha + "\n")
+        (self.root / ".git" / "refs" / "heads" / "factory-review" / "j").write_text(sha + "\n")
         self.assert_parked("branch moved")
 
     def test_unset_hooks_path_then_commit(self):

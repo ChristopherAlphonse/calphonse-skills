@@ -156,7 +156,7 @@ class TestPorts(AutoWatch):
         r = subprocess.run([sys.executable, "-I", str(JOB), "create", "k", "T", "main", "feature/k"], cwd=str(other),
                            env=env, capture_output=True, text=True, timeout=60)
         self.assertEqual(r.returncode, 0, r.stderr)
-        info = json.loads((other / ".planning" / "factory-test" / "watch.json").read_text())
+        info = json.loads((other / ".planning" / "factory-review" / "watch.json").read_text())
         self.addCleanup(lambda: os.kill(info["pid"], signal.SIGKILL))
         self.assertNotEqual(info["pid"], a["pid"])
         self.assertNotEqual(info["port"], a["port"])

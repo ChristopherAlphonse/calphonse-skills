@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(os.environ.get("FACTORY_ROOT", Path.cwd())).resolve()
-STATE = ROOT / ".planning" / "factory-test"
+STATE = ROOT / ".planning" / "factory-review"
 JOBS = STATE / "jobs"
 DASH_DIR = Path(__file__).resolve().parent.parent / "dashboard"
 STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript",
@@ -22,7 +22,7 @@ AUTH_LOCK = threading.Lock()
 HASH_FILE = "human.sha256"
 MAX_BODY = 64 * 1024
 CTX = threading.local()
-BRANCH_PREFIX = "factory-test"
+BRANCH_PREFIX = "factory-review"
 REVIEW_DIR = "reviews"
 BASE_REVIEWERS = ["code", "qa", "test"]
 EXTRA_REVIEWERS = {"security", "architecture"}
@@ -137,7 +137,7 @@ def kv(path):
     return out
 
 
-GUARD_MSG = "factory-test policy: needs the user's approval on the board"
+GUARD_MSG = "factory-review policy: needs the user's approval on the board"
 HOOK_HEAD = "#!/bin/sh\n"
 HOOK_FN = """human_ok() {
   [ -n "$FACTORY_HUMAN_KEY" ] || return 1
@@ -149,13 +149,13 @@ HOOK_FN = """human_ok() {
 """
 HOOK_PRE_COMMIT = HOOK_HEAD + HOOK_FN + 'human_ok || { echo "@@MSG@@" >&2; exit 1; }\nunset FACTORY_HUMAN_KEY\n'
 HOOK_PRE_PUSH = HOOK_HEAD + HOOK_FN + """in=$(cat)
-if ! human_ok && printf '%s' "$in" | grep -q 'refs/heads/factory-test/'; then echo "@@MSG@@" >&2; exit 1; fi
+if ! human_ok && printf '%s' "$in" | grep -q 'refs/heads/factory-review/'; then echo "@@MSG@@" >&2; exit 1; fi
 unset FACTORY_HUMAN_KEY
 """
 HOOK_REF_TX = HOOK_HEAD + HOOK_FN + """in=$(cat)
 if [ "$1" = "prepared" ] && ! human_ok; then
   printf '%s\\n' "$in" | while read old new ref; do
-    case "$ref" in refs/heads/factory-test/*) if [ "$new" != "0000000000000000000000000000000000000000" ]; then exit 1; fi;; esac
+    case "$ref" in refs/heads/factory-review/*) if [ "$new" != "0000000000000000000000000000000000000000" ]; then exit 1; fi;; esac
   done
   rc=$?
   [ $rc -eq 0 ] || { echo "@@MSG@@" >&2; exit $rc; }
@@ -452,7 +452,7 @@ def snapshot(job):
 
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
-COOKIE = "factory-test"
+COOKIE = "factory-review"
 
 
 class Handler(BaseHTTPRequestHandler):
