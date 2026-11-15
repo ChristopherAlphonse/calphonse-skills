@@ -397,6 +397,9 @@
             rr.append(chip(name + (v ? " " + v : " ..."), v || ""));
           c.append(rr);
         }
+        const last = (j.activity || []).slice(-1)[0];
+        if (last && j.stage !== "ready")
+          c.append(el("div", "id", "now: " + last.text));
         const [done, total] = j.progress;
         if (total) {
           const b = el("div", "bar"),
@@ -475,7 +478,7 @@
           if (sig !== lastSig) {
             lastSig = sig;
             render();
-            if (open && openFile) loadFile();
+            if (open) loadFile();
           } else
             document.getElementById("meta").textContent =
               jobs.length + " jobs, updated " + new Date().toLocaleTimeString();
@@ -645,7 +648,15 @@
         const body = document.getElementById("dbody");
         if (!openFile) {
           body.className = "raw";
-          body.textContent = "pick a file";
+          const j = jobs.find((x) => x.id === open);
+          const log = (j && j.activity) || [];
+          body.textContent = log.length
+            ? log
+                .slice()
+                .reverse()
+                .map((a) => a.ts.slice(11, 19) + "  " + a.text)
+                .join("\n")
+            : "No files or notes yet. This job has not written anything.";
           return;
         }
         const res = await api(

@@ -600,6 +600,19 @@ def cmd_progress(jid, done, total):
     audit("progress", jid, f"{done}/{total}")
 
 
+ACTIVITY_KEEP = 30
+
+
+def cmd_note(jid, text):
+    """Record what the agent is doing right now, so the board can show it between stage changes."""
+    need(text.strip(), "note text is empty")
+    job = load(jid)
+    log = job.get("activity", []) + [{"ts": now(), "text": text.strip()[:200]}]
+    job["activity"] = log[-ACTIVITY_KEEP:]
+    save(job)
+    audit("note", jid, text.strip()[:200])
+
+
 def human_only():
     need(is_human(), "this is a human action, use the board")
 
@@ -856,7 +869,7 @@ HUMAN_ONLY = {"approve", "commit", "unblock"}
 
 COMMANDS = {
     "create": (cmd_create, None), "advance": (cmd_advance, 2), "gate": (cmd_gate, 1), "stack": (cmd_stack, 1), "watch": (cmd_watch, 1),
-    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "queue": (cmd_queue, 0), "serve": (cmd_serve, 1),
+    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_serve, 1),
 }
 
 if __name__ == "__main__":

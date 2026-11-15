@@ -276,6 +276,18 @@ class TestIds(Factory):
     def test_progress_unknown_job_refused(self):
         self.no("progress", "nope", 1, 2)
 
+    def test_note_recorded_and_capped(self):
+        self.ok("create", "j", "T")
+        for i in range(35):
+            self.ok("note", "j", f"step {i}")
+        log = self.js("j")["activity"]
+        self.assertEqual((len(log), log[-1]["text"]), (30, "step 34"))
+
+    def test_note_empty_or_unknown_job_refused(self):
+        self.ok("create", "j", "T")
+        self.no("note", "j", "  ")
+        self.no("note", "nope", "x")
+
 
 class TestShapeSpec(Factory):
     def test_shape_needs_ready(self):
