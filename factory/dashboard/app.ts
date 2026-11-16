@@ -1,78 +1,6 @@
 import { el, chip } from "/static/dom.js";
 import { renderMarkdown } from "/static/markdown.js";
-
-// The /api/jobs payload: the job.json fields from cmd_create and the later stages, plus what snapshot() adds.
-interface Needs {
-  action: string;
-  files: string;
-  why: string;
-  todo: string;
-  command: string;
-}
-
-interface ReviewRange {
-  base_ref: string;
-  head_ref: string;
-  base: string;
-  head: string;
-}
-
-interface Activity {
-  ts: string;
-  text: string;
-}
-
-interface Job {
-  id: string;
-  title: string;
-  stage: string;
-  round: number;
-  round_limit: number;
-  reviewers: string[];
-  polished: boolean;
-  approvals: Record<string, string>;
-  progress: [number, number];
-  stack: string[];
-  branch: string | null;
-  worktree: string | null;
-  commit: string | null;
-  tip: string | null;
-  started: string;
-  ended: string | null;
-  note: string;
-  review?: ReviewRange;
-  activity?: Activity[];
-  base_commit?: string;
-  base_tip?: string;
-  hooks_path?: string;
-  hooks_sha?: string;
-  parked_from?: string;
-  kind: "build" | "review";
-  report: Record<string, string | undefined>;
-  gate: string | null;
-  reviews: Record<string, string | null>;
-  files: string[];
-  needs_human: boolean;
-  needs: Needs | null;
-  can_approve: boolean;
-  can_commit: boolean;
-}
-
-interface Column {
-  label: string;
-  stages: string[];
-  kinds?: Job["kind"][];
-  you?: boolean;
-  always?: boolean;
-}
-
-interface State {
-  jobs: Job[];
-  openId: string | null;
-  openFile: string | null;
-  lastSig: string;
-  loadToken: number;
-}
+import type { Column, Job, Needs, State } from "/static/types.js";
 
 const COLUMNS: Column[] = [
   { label: "Shape", stages: ["shape"], kinds: ["build"] },
@@ -111,21 +39,27 @@ const setMeta = (text: string): void => {
 const clock = (): string => new Date().toLocaleTimeString();
 const metaText = (): string => {
   const waiting = state.jobs.filter((j) => j.needs_human).length;
-  return `${state.jobs.length} jobs${waiting ? `, ${waiting} waiting on you` : ""}, updated ${clock()}`;
+  const waitingText = waiting ? `, ${waiting} waiting on you` : "";
+  return `${state.jobs.length} jobs${waitingText}, updated ${clock()}`;
 };
 const openJob = (): Job | undefined => state.jobs.find((j) => j.id === state.openId);
 
 async function post(path: string, body: unknown): Promise<void> {
-  const res = await api(path, { method: "POST", body: JSON.stringify(body) });
-  if (!res.ok) setMeta(`Refused: ${path.split("/").pop()} (${res.status})`);
-  poll();
+  const name = path.split("/").pop();
+  try {
+    const res = await api(path, { method: "POST", body: JSON.stringify(body) });
+    if (!res.ok) setMeta(`Refused: ${name} (${res.status})`);
+  } catch {
+    setMeta(`Failed: ${name} (offline)`);
+  }
+  await poll();
 }
 
 function actionButton(label: string, path: string, job: Job): HTMLButtonElement {
   const b = el("button", "", label);
-  b.onclick = (e) => {
+  b.onclick = async (e) => {
     e.stopPropagation();
-    post(path, { id: job.id });
+    await post(path, { id: job.id });
   };
   return b;
 }
@@ -163,7 +97,8 @@ function statusRows(j: Job): HTMLElement[] {
     rows.push(row(...chips));
   }
   if (j.stage === "review") {
-    rows.push(row(...Object.entries(j.reviews).map(([name, v]) => chip(v ? `${name} ${v}` : `${name} ...`, v || ""))));
+    const verdicts: [string, string | null][] = Object.entries(j.reviews);
+    rows.push(row(...verdicts.map(([name, v]) => chip(v ? `${name} ${v}` : `${name} ...`, v ?? ""))));
   }
   return rows;
 }
@@ -184,11 +119,11 @@ function card(j: Job): HTMLDivElement {
   if (j.can_commit) c.append(actionButton("Commit locally", "/api/commit", j));
   if (j.stage === "needs-human") c.append(actionButton("Unblock, grant more rounds", "/api/unblock", j));
 
-  c.onclick = () => showDrawer(j.id);
-  c.onkeydown = (e) => {
+  c.onclick = async () => await showDrawer(j.id);
+  c.onkeydown = async (e) => {
     if (e.target === c && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
-      showDrawer(j.id);
+      await showDrawer(j.id);
     }
   };
   return c;
@@ -240,7 +175,7 @@ async function fetchJobs(): Promise<void> {
     // shortcut: the payload is trusted, not validated, upgrade if the server stops being ours
     state.jobs = JSON.parse(text) as Job[];
     render();
-    if (state.openId) loadFile();
+    if (state.openId) await loadFile();
   } catch {
     setMeta("offline, retrying");
   }
@@ -254,10 +189,13 @@ async function pollLoop(): Promise<void> {
 function needsPanel(n: Needs): HTMLDivElement {
   const box = el("div", "needs");
   const copy = el("button", "", "Copy");
-  copy.onclick = () => {
-    navigator.clipboard.writeText(n.command).then(() => {
+  copy.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(n.command);
       copy.textContent = "Copied";
-    });
+    } catch {
+      copy.textContent = "Copy failed";
+    }
   };
   const cmd = el("div", "cmd");
   cmd.append(el("code", "", n.command), copy);
@@ -274,18 +212,16 @@ function needsPanel(n: Needs): HTMLDivElement {
 function renderDrawerHead(): void {
   const j = openJob();
   if (!j) return;
-  $("dhead").replaceChildren(
-    el("h3", "", j.title),
-    el("div", "id", `${j.id} at ${j.stage}${j.branch ? `, ${j.branch}` : ""}`),
-  );
+  const branch = j.branch ? `, ${j.branch}` : "";
+  $("dhead").replaceChildren(el("h3", "", j.title), el("div", "id", `${j.id} at ${j.stage}${branch}`));
   $("dneeds").replaceChildren(...(j.needs ? [needsPanel(j.needs)] : []));
   $("dfiles").replaceChildren(
     ...j.files.map((f) => {
       const c = chip(f, f === state.openFile ? "on" : "");
-      c.onclick = () => {
+      c.onclick = async () => {
         state.openFile = f;
         renderDrawerHead();
-        loadFile();
+        await loadFile();
       };
       return c;
     }),
@@ -328,12 +264,12 @@ async function loadFile(): Promise<void> {
   else showBody("raw", text);
 }
 
-function showDrawer(id: string): void {
+async function showDrawer(id: string): Promise<void> {
   state.openId = id;
   state.openFile = openJob()?.files.at(-1) ?? null;
   $("drawer").classList.add("open");
   renderDrawerHead();
-  loadFile();
+  await loadFile();
 }
 
 function closeDrawer(): void {
@@ -391,8 +327,8 @@ const saved = Number(localStorage.getItem(DRAWER_KEY));
 if (saved) setDrawerWidth(saved);
 
 $("close").onclick = closeDrawer;
-document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) poll();
+document.addEventListener("visibilitychange", async () => {
+  if (!document.hidden) await poll();
 });
-applyMode();
-pollLoop();
+await applyMode();
+await pollLoop();
