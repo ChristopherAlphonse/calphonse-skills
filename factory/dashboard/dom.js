@@ -1,8 +1,9 @@
-export const el = (tag, cls, text) => {
+// Generated from dom.ts by build.mjs. Do not edit.
+export const el =                                        (tag   , cls         , text                )                           => {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
   if (text != null) e.textContent = text;
   return e;
 };
 
-export const chip = (text, cls = "") => el("span", `chip ${cls}`, text);
+export const chip = (text        , cls = "")                  => el("span", `chip ${cls}`, text);

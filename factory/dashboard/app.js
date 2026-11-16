@@ -1,7 +1,81 @@
+// Generated from app.ts by build.mjs. Do not edit.
 import { el, chip } from "/static/dom.js";
 import { renderMarkdown } from "/static/markdown.js";
 
-const COLUMNS = [
+// The /api/jobs payload: the job.json fields from cmd_create and the later stages, plus what snapshot() adds.
+                 
+                 
+                
+              
+               
+                  
+ 
+
+                       
+                   
+                   
+               
+               
+ 
+
+                    
+             
+               
+ 
+
+               
+             
+                
+                
+                
+                      
+                      
+                    
+                                    
+                             
+                  
+                        
+                          
+                        
+                     
+                  
+                       
+               
+                       
+                        
+                       
+                    
+                      
+                     
+                       
+                           
+                                             
+                      
+                                         
+                  
+                       
+                      
+                       
+                      
+ 
+
+                  
+                
+                   
+                        
+                
+                   
+ 
+
+                 
+              
+                        
+                          
+                  
+                    
+ 
+
+const COLUMNS           = [
   { label: "Shape", stages: ["shape"], kinds: ["build"] },
   { label: "Spec", stages: ["spec"], kinds: ["build"] },
   { label: "Scope", stages: ["scope"], kinds: ["review"] },
@@ -18,33 +92,37 @@ const COLUMNS = [
 ];
 const POLL_MS = 2000;
 
-const $ = (id) => document.getElementById(id);
-const state = { jobs: [], openId: null, openFile: null, lastSig: "", loadToken: 0 };
+const $ = (id        )              => {
+  const node = document.getElementById(id);
+  if (!node) throw new Error(`missing element #${id}`);
+  return node;
+};
+const state        = { jobs: [], openId: null, openFile: null, lastSig: "", loadToken: 0 };
 
-const api = (path, opts = {}) =>
+const api = (path        , opts                                                                       = {}) =>
   fetch(path, {
     ...opts,
     credentials: "same-origin",
     headers: { ...opts.headers, "X-Factory": "1" },
   });
 
-const setMeta = (text) => {
+const setMeta = (text        )       => {
   $("meta").textContent = text;
 };
-const clock = () => new Date().toLocaleTimeString();
-const metaText = () => {
+const clock = ()         => new Date().toLocaleTimeString();
+const metaText = ()         => {
   const waiting = state.jobs.filter((j) => j.needs_human).length;
   return `${state.jobs.length} jobs${waiting ? `, ${waiting} waiting on you` : ""}, updated ${clock()}`;
 };
-const openJob = () => state.jobs.find((j) => j.id === state.openId);
+const openJob = ()                  => state.jobs.find((j) => j.id === state.openId);
 
-async function post(path, body) {
+async function post(path        , body         )                {
   const res = await api(path, { method: "POST", body: JSON.stringify(body) });
   if (!res.ok) setMeta(`Refused: ${path.split("/").pop()} (${res.status})`);
   poll();
 }
 
-function actionButton(label, path, job) {
+function actionButton(label        , path        , job     )                    {
   const b = el("button", "", label);
   b.onclick = (e) => {
     e.stopPropagation();
@@ -53,13 +131,13 @@ function actionButton(label, path, job) {
   return b;
 }
 
-function row(...chips) {
+function row(...chips               )                 {
   const r = el("div", "row");
   r.append(...chips);
   return r;
 }
 
-function progressBar(done, total) {
+function progressBar(done        , total        )                                   {
   const bar = el("div", "bar");
   const fill = el("i");
   fill.style.width = `${Math.round((100 * done) / total)}%`;
@@ -67,8 +145,8 @@ function progressBar(done, total) {
   return [bar, el("div", "id", `tasks ${done}/${total}`)];
 }
 
-function statusRows(j) {
-  const rows = [];
+function statusRows(j     )                {
+  const rows                = [];
   const stageChips = [chip(j.kind === "review" ? `review job: ${j.stage}` : j.stage)];
   if (j.round && j.kind !== "review") stageChips.push(chip(`round ${j.round}/${j.round_limit}`));
   if (j.stage === "gate" || j.gate) stageChips.push(chip(`gate ${j.gate || "pending"}`, j.gate || ""));
@@ -91,7 +169,7 @@ function statusRows(j) {
   return rows;
 }
 
-function card(j) {
+function card(j     )                 {
   const c = el("div", `card${j.needs_human ? " hold" : ""}${j.stage === "rejected" ? " rejected" : ""}`);
   c.tabIndex = 0;
   c.append(el("div", "t", j.title), el("div", "id", j.id), ...statusRows(j));
@@ -117,11 +195,11 @@ function card(j) {
   return c;
 }
 
-function isRelevant(col, mine) {
+function isRelevant(col        , mine       ) {
   return col.always || col.you || mine.length || state.jobs.some((j) => col.kinds?.includes(j.kind));
 }
 
-function column(col, mine) {
+function column(col        , mine       )              {
   const section = el("section", `col${col.you ? " you" : ""}${col.always ? " end" : ""}${mine.length ? " busy" : ""}`);
   const h = el("h2");
   h.append(el("span", "", col.label), el("span", "", String(mine.length)));
@@ -129,8 +207,8 @@ function column(col, mine) {
   return section;
 }
 
-function render() {
-  const columns = [];
+function render()       {
+  const columns                = [];
   for (const col of COLUMNS) {
     const mine = state.jobs.filter((j) => (col.you ? j.needs_human : col.stages.includes(j.stage) && !j.needs_human));
     if (isRelevant(col, mine)) columns.push(column(col, mine));
@@ -141,16 +219,16 @@ function render() {
   if (state.openId) renderDrawerHead();
 }
 
-let inflight = null;
+let inflight                       = null;
 
-function poll() {
+function poll()                {
   inflight ??= fetchJobs().finally(() => {
     inflight = null;
   });
   return inflight;
 }
 
-async function fetchJobs() {
+async function fetchJobs()                {
   try {
     const res = await api("/api/jobs");
     if (!res.ok) throw new Error(`status ${res.status}`);
@@ -160,7 +238,8 @@ async function fetchJobs() {
       return;
     }
     state.lastSig = text;
-    state.jobs = JSON.parse(text);
+    // shortcut: the payload is trusted, not validated, upgrade if the server stops being ours
+    state.jobs = JSON.parse(text)         ;
     render();
     if (state.openId) loadFile();
   } catch {
@@ -168,12 +247,12 @@ async function fetchJobs() {
   }
 }
 
-async function pollLoop() {
+async function pollLoop()                {
   if (!document.hidden) await poll();
   setTimeout(pollLoop, POLL_MS);
 }
 
-function needsPanel(n) {
+function needsPanel(n       )                 {
   const box = el("div", "needs");
   const copy = el("button", "", "Copy");
   copy.onclick = () => {
@@ -193,7 +272,7 @@ function needsPanel(n) {
   return box;
 }
 
-function renderDrawerHead() {
+function renderDrawerHead()       {
   const j = openJob();
   if (!j) return;
   $("dhead").replaceChildren(
@@ -214,7 +293,7 @@ function renderDrawerHead() {
   );
 }
 
-function activityText(j) {
+function activityText(j                 )         {
   const log = j?.activity ?? [];
   if (!log.length) return "No files or notes yet. This job has not written anything.";
   return log
@@ -223,22 +302,22 @@ function activityText(j) {
     .join("\n");
 }
 
-function showBody(className, content) {
+function showBody(className        , content               )       {
   const body = $("dbody");
   body.className = className;
   if (typeof content === "string") body.textContent = content;
   else body.replaceChildren(content);
 }
 
-async function loadFile() {
+async function loadFile()                {
   const token = ++state.loadToken;
   const name = state.openFile;
   if (!name) return showBody("raw", activityText(openJob()));
 
   let ok = false;
-  let text;
+  let text        ;
   try {
-    const res = await api(`/api/file?job=${encodeURIComponent(state.openId)}&name=${encodeURIComponent(name)}`);
+    const res = await api(`/api/file?job=${encodeURIComponent(String(state.openId))}&name=${encodeURIComponent(name)}`);
     ok = res.ok;
     text = ok ? await res.text() : "not found";
   } catch {
@@ -250,7 +329,7 @@ async function loadFile() {
   else showBody("raw", text);
 }
 
-function showDrawer(id) {
+function showDrawer(id        )       {
   state.openId = id;
   state.openFile = openJob()?.files.at(-1) ?? null;
   $("drawer").classList.add("open");
@@ -258,18 +337,18 @@ function showDrawer(id) {
   loadFile();
 }
 
-function closeDrawer() {
+function closeDrawer()       {
   state.openId = null;
   state.loadToken++;
   $("drawer").classList.remove("open");
 }
 
-async function applyMode() {
+async function applyMode()                {
   try {
-    const mode = await (await api("/api/mode")).json();
-    if (mode.readonly) {
-      document.querySelector(".policy").textContent =
-        "Read-only view. Approve, commit, and unblock stay in the terminal board.";
+    const mode                        = await (await api("/api/mode")).json();
+    const policy = document.querySelector(".policy");
+    if (mode.readonly && policy) {
+      policy.textContent = "Read-only view. Approve, commit, and unblock stay in the terminal board.";
     }
   } catch {
   }
@@ -278,10 +357,10 @@ async function applyMode() {
 const DRAWER_MIN = 320;
 const DRAWER_KEY = "factory.drawerWidth";
 
-function setDrawerWidth(px, save) {
+function setDrawerWidth(px        , save          )         {
   const w = Math.round(Math.min(Math.max(px, DRAWER_MIN), window.innerWidth));
   document.documentElement.style.setProperty("--drawer-w", w + "px");
-  if (save) localStorage.setItem(DRAWER_KEY, w);
+  if (save) localStorage.setItem(DRAWER_KEY, String(w));
   return w;
 }
 
@@ -298,12 +377,12 @@ grip.onpointerup = (e) => {
   setDrawerWidth(window.innerWidth - e.clientX, true);
 };
 grip.onkeydown = (e) => {
-  const dir = { ArrowLeft: 1, ArrowRight: -1 }[e.key];
+  const dir = ({ ArrowLeft: 1, ArrowRight: -1 }                                      )[e.key];
   if (!dir) return;
   e.preventDefault();
   setDrawerWidth($("drawer").offsetWidth + dir * 40, true);
 };
-function resetDrawerWidth() {
+function resetDrawerWidth()       {
   localStorage.removeItem(DRAWER_KEY);
   document.documentElement.style.removeProperty("--drawer-w");
 }
