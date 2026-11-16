@@ -1,7 +1,8 @@
 ---
 name: pr-body-style
 description: >
-  Draft or update pull request bodies in the user's preferred style.
+  Draft or update pull request bodies in the user's preferred style, then push the
+  branch and open the PR (or update the existing PR's body) with it.
   Use when an agent writes, rewrites, reviews, or updates a PR description/body,
   especially when the user asks whether the PR body is accurate, too technical,
   too long, business-focused, or ready for reviewers.
@@ -23,6 +24,18 @@ Never ask the user what to write the body for when the answer can be found. Work
 
 Ask only when two or more candidates remain after this (for example, several repos with unrelated changes), and then name the candidates in the question. Do not offer a menu of input types.
 
+## Publish the body
+
+Invoking this skill is the user's standing approval to publish. Do not stop at a draft and do not ask first. After writing the body:
+
+1. Push the branch if it has no upstream or is ahead of it: `git push -u origin <branch>`.
+2. If a PR for the branch exists, replace its body: `gh pr edit <n> --body-file <file>`. For GitLab use `glab mr update`.
+3. Otherwise open it against the default branch: `gh pr create --base <default> --head <branch> --title "<title>" --body-file <file>`. Use the latest commit's subject as the title when it is a good one.
+4. Write the body to a temp file and pass it with `--body-file`, so the shell doesn't mangle quotes or backticks.
+5. Reply with the PR link and the body.
+
+Skip publishing only when the user says "draft only" or similar, when the target is a PR in someone else's repo, or when this skill runs as a `factory` stage (factory forbids push and `gh`). If the push or `gh` fails, show the error and the body.
+
 ## Guardrails
 
 - Make every claim match the actual diff and current check status.
@@ -40,7 +53,7 @@ Ask only when two or more candidates remain after this (for example, several rep
 - Check the wording against the [unslop](../unslop/SKILL.md) skill.
 - Keep wording plain and direct. Prefer "Moves retry handling into the shared HTTP client" over deep root-cause prose.
 - Make every claim match the actual diff and current check status. Read the git host's CI status when a PR exists. Never run a test suite or build to write the body: it takes minutes and costs credits. If CI status is unavailable, list the steps a reviewer would follow under How to Test. Do not write "Not run" and do not flag unverified checks in the reply.
-- Writing a body is a read-only, quick task: read `git diff --stat` and the diff of the changed source files, then write. Do not run long commands. Finish in one or two tool calls after reading.
+- Writing a body is a quick task (only the publish step writes anything): read `git diff --stat` and the diff of the changed source files, then write. Do not run long commands. Finish in one or two tool calls after reading.
 - Keep "How to Test" concrete and minimal: commands run, user-visible checks, or CI status.
 - Use "Additional Information" only for high-signal context, risks, retained compatibility shims, or follow-up notes. Keep it empty or one sentence when possible.
 
