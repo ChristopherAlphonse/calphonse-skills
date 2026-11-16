@@ -187,6 +187,10 @@ State lives in the project, never in this repo.
 | `.planning/factory/hooks/<id>/` | the per-worktree git hooks |
 | `.worktrees/<id>/` | the job's branch, `factory/<id>`, checked out locally |
 
+## Dashboard source
+
+The board is written in TypeScript, in `dashboard/*.ts`. The server reads the generated `dashboard/*.js`, and both are committed. After you edit a `.ts` file, run `node factory/dashboard/build.mjs`, which needs Node 24 or later. `node factory/dashboard/build.mjs --check` fails when a `.js` is stale, and `tests/test_dashboard_build.py` runs it. Only erasable syntax is allowed: no `enum`, `namespace` or constructor parameter properties. `dashboard/tsconfig.json` is for running `tsc` by hand. Nothing runs it for you.
+
 ## Commands
 
 | Command | Does |
