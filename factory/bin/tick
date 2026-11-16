@@ -39,8 +39,8 @@ KIRO_WRAPPERS = ["env", "xargs", "eval", "exec", "nohup", "sudo", "command", "bu
 # `git --no-pager commit` and every other global option hide the verb, so match the verb anywhere after `git`.
 KIRO_GIT_ANYWHERE = [m for g in GIT_WRITES for m in (f"git * {g}", f"git * {g} *")]
 KIRO_TOOLS = ["read", "write", "shell", "grep", "glob", "subagent"]
-NO_WRITE = ["**/.kiro/**", "**/.claude/**", "**/.opencode/**", "**/opencode.json", "**/opencode.jsonc", "**/.git/**", "**/.planning/**/job.json", "**/.planning/**/audit.log",
-            "**/.planning/**/config.json"]
+# 2026-11-16: the user approved agents editing **/.planning/**/config.json, so it is deliberately absent here. Do not re-add it.
+NO_WRITE = ["**/.kiro/**", "**/.claude/**", "**/.opencode/**", "**/opencode.json", "**/opencode.jsonc", "**/.git/**", "**/.planning/**/job.json", "**/.planning/**/audit.log"]
 WRITE_ONLY = None
 KIRO_DESCRIPTION = "Software factory orchestrator. Runs one pass of the factory skill and never commits, pushes, or opens a PR or MR."
 KIRO_PROMPT = "Use the factory skill. Run one pass and stop. Never commit, push, merge, or create a PR or MR."
@@ -131,7 +131,7 @@ def shell_policy(harness):
 def project_allow():
     """Commands this project allowed on top of policy.yaml: `allow` patterns and the `checks` command.
 
-    The file is in NO_WRITE, so an agent cannot widen its own rules. A deny or ask still wins.
+    Agents may edit this file, so they can widen their own allow list. A deny or ask still wins.
     """
     path = ROOT / ".planning" / SKILL / "config.json"
     cfg = read_json(path) if path.exists() else {}
