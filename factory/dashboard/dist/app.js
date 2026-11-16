@@ -267,7 +267,7 @@ function needsPanel(n       )                 {
     el("p", "", n.why),
     el("p", "", n.todo),
     cmd,
-    el("p", "id", "Run this in your own terminal to get a link to the board with the buttons. This page is read-only."),
+    el("p", "id", "Run it in your own terminal. It prints a one-time link with the buttons. This read-only page cannot approve."),
   );
   return box;
 }

@@ -9,5 +9,6 @@
     "erasableSyntaxOnly": true,
     "paths": { "/static/*": ["./*"] }
   },
-  "include": ["*.ts"]
+  "include": ["*.ts"],
+  "exclude": ["dist"]
 }

@@ -189,7 +189,7 @@ State lives in the project, never in this repo.
 
 ## Dashboard source
 
-The board is written in TypeScript, in `dashboard/*.ts`. The server reads the generated `dashboard/*.js`, and both are committed. After you edit a `.ts` file, run `node factory/dashboard/build.mjs`, which needs Node 24 or later. `node factory/dashboard/build.mjs --check` fails when a `.js` is stale, and `tests/test_dashboard_build.py` runs it. Only erasable syntax is allowed: no `enum`, `namespace` or constructor parameter properties. `dashboard/tsconfig.json` is for running `tsc` by hand. Nothing runs it for you.
+The board is written in TypeScript, in `dashboard/*.ts`. The server reads the generated `dashboard/dist/*.js`, which is committed and never edited by hand. `serve` and `watch` rebuild `dist/` at start when Node is on PATH and a `.ts` is newer than its `.js`. When a source is newer or a dist file is missing, and Node is absent or the build fails, they print one `dashboard:` warning, log it in `audit.log`, and serve the committed `dist/`. To build by hand, run `node factory/dashboard/build.mjs`, which needs Node 24 or later. `node factory/dashboard/build.mjs --check` fails when a `dist/*.js` is stale, missing or has no `.ts`, and `tests/test_dashboard_build.py` runs it. A running board does not reload, so restart it after you edit a `.ts` file. Only erasable syntax is allowed: no `enum`, `namespace` or constructor parameter properties. `dashboard/tsconfig.json` is for running `tsc` by hand and needs TypeScript 5.8 or later (`erasableSyntaxOnly`). Nothing runs it for you.
 
 ## Commands
 
