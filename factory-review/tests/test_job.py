@@ -77,7 +77,7 @@ class TestStackDetection(Review):
         (self.root / "legacy.cs").write_text("x\n")
         self.git("add", "-A")
         self.git("commit", "-m", "legacy c#")
-        self.new_review("r", {"app.py": "x\n"})
+        self.new_review("r", {"notes.txt": "x\n"})
         self.assertEqual(self.js("r")["stack"], [])
 
     def test_the_queue_hint_names_the_stack_skills(self):

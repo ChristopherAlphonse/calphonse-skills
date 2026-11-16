@@ -103,7 +103,7 @@ class TestStackDetection(Review):
         (self.root / "legacy.cs").write_text("x\n")
         self.git("add", "-A")
         self.git("commit", "-m", "legacy c#")
-        self.assertEqual(self.stack({"app.py": "x\n"}), [])
+        self.assertEqual(self.stack({"notes.txt": "x\n"}), [])
 
     def test_the_queue_hint_names_the_stack_skills(self):
         self.new_review("r", {"Api/Program.cs": "x\n"})
@@ -111,12 +111,12 @@ class TestStackDetection(Review):
 
     def test_build_jobs_detect_the_stack_from_the_repo_and_can_refresh_it(self):
         self.to_build("b")
-        self.assertEqual(self.js("b")["stack"], [])
+        self.assertEqual(self.js("b")["stack"], ["python"])
         wt = self.wt("b")
         (wt / "Svc.cs").write_text("x\n")
         self.git("add", "Svc.cs", cwd=wt)
-        self.assertEqual(self.ok("stack", "b").stdout.strip(), "dotnet")
-        self.assertEqual(self.js("b")["stack"], ["dotnet"])
+        self.assertEqual(self.ok("stack", "b").stdout.strip(), "dotnet,python")
+        self.assertEqual(self.js("b")["stack"], ["dotnet", "python"])
 
 
 class TestStages(Review):
