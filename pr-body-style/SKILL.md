@@ -21,6 +21,7 @@ Never ask the user what to write the body for when the answer can be found. Work
 1. A PR/MR URL, branch, or draft body in the message or conversation.
 2. Otherwise the current branch of the repo in the working directory (or the repo the conversation has been about): diff against the default branch, and read the open PR/MR for it if one exists.
 3. If the branch has no diff against the default branch, say so in one line and stop.
+4. Also publish every factory branch that is ready: each `.planning/factory/jobs/*/job.json` with a non-empty `commit` (the user clicked **Commit locally**) whose `branch` has no PR yet. Use that job's `pr-body.md` as the body (fix it against the diff if needed) and the subject of its `commit.md` as the title. Open one PR per branch. Skip jobs with no `commit`.
 
 Ask only when two or more candidates remain after this (for example, several repos with unrelated changes), and then name the candidates in the question. Do not offer a menu of input types.
 
@@ -32,9 +33,11 @@ Invoking this skill is the user's standing approval to publish. Do not stop at a
 2. If a PR for the branch exists, replace its body: `gh pr edit <n> --body-file <file>`. For GitLab use `glab mr update`.
 3. Otherwise open it against the default branch: `gh pr create --base <default> --head <branch> --title "<title>" --body-file <file>`. Use the latest commit's subject as the title when it is a good one.
 4. Write the body to a temp file and pass it with `--body-file`, so the shell doesn't mangle quotes or backticks.
-5. Reply with the PR link and the body.
+5. Reply with the PR links, one line each. Do not paste the bodies back unless asked.
 
-Skip publishing only when the user says "draft only" or similar, when the target is a PR in someone else's repo, or when this skill runs as a `factory` stage (factory forbids push and `gh`). If the push or `gh` fails, show the error and the body.
+Factory branches live in `.worktrees/<id>/` and carry a pre-push hook that refuses any push without the board's key. When the user invoked this skill directly, that click already happened: push from the worktree with `git push --no-verify -u origin <branch>`, but only when `git rev-parse HEAD` equals the job's `commit`. If the tip differs, someone committed after the user's click: skip that branch and say why in one line. `--no-verify` also skips the repo's own pre-push hook, so run it first if `.git/hooks/pre-push` or the `core.hooksPath` of the main checkout has one.
+
+Never end by handing the user commands to push or open the PR. Do it. Skip publishing only when the user says "draft only" or similar, when the target is a PR in someone else's repo, or when this skill runs as a `factory` stage (factory forbids push and `gh`). If the push or `gh` fails for another reason, show the error and the body.
 
 ## Guardrails
 
