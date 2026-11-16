@@ -831,9 +831,8 @@ def needs_you(job):
     s = job["stage"]
     if s == "spec":
         action, files = "Approve spec", "spec.md"
-        why = ("The spec is written. The factory will not create the worktree or start building until you approve it. "
-               "Approval is tied to the file: if spec.md changes afterwards, you approve again.")
-        todo = "Read spec.md in this drawer. If it is right, click Approve spec on the board the command below opens."
+        why = "Nothing gets built until you approve the spec. Editing spec.md later cancels the approval."
+        todo = "Read spec.md in this drawer, then click Approve spec on the board the command below opens."
     elif s == "ship":
         action, files = "Commit locally", "pr-body.md and commit.md"
         why = "The gate passed and the PR body and commit message are written. Nothing is committed until you click."
