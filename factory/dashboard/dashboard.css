@@ -437,8 +437,11 @@ button:hover {
 #dneeds .cmd {
   display: flex;
   gap: 8px;
-  align-items: center;
+  align-items: stretch;
   margin: 8px 0;
+}
+#dneeds .cmd button {
+  margin-top: 0;
 }
 #dneeds .cmd code {
   flex: 1;
