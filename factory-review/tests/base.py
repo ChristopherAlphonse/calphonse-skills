@@ -169,9 +169,9 @@ class Review(unittest.TestCase):
         conn.putrequest(method, path, skip_host=True)
         conn.putheader("Host", host or f"127.0.0.1:{self.port}")
         if cookie is True:
-            conn.putheader("Cookie", f"factory-review={self.cookie}")
+            conn.putheader("Cookie", f"factory-review-{self.port}={self.cookie}")
         elif cookie:
-            conn.putheader("Cookie", f"factory-review={cookie}")
+            conn.putheader("Cookie", f"factory-review-{self.port}={cookie}")
         if xfactory:
             conn.putheader("X-Factory", "1")
         data = raw if raw is not None else (json.dumps(body).encode() if body is not None else b"")

@@ -1,4 +1,4 @@
-import json, re, subprocess, sys, unittest
+import http.client, json, re, subprocess, sys, unittest
 
 from test_job import JOB, Factory
 
@@ -110,6 +110,21 @@ class TestWatch(Watch):
         lines = [e for e in self.audit_lines() if e["action"] == "watch"]
         self.assertEqual(len(lines), 1)
         self.assertEqual(lines[0]["actor"], "agent")
+
+    def test_two_boards_on_one_host_stay_logged_in(self):
+        jar, ports = {}, []
+        for _ in range(2):
+            self.start_watch()
+            headers = self.http_full("GET", f"/?c={self.code}", cookie=False)[2]
+            name, value = headers["Set-Cookie"].split(";")[0].split("=", 1)
+            jar[name] = value  # one jar for both: browsers scope cookies by host, not port
+            ports.append(self.port)
+        cookies = "; ".join(f"{k}={v}" for k, v in jar.items())
+        for port in ports:
+            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=15)
+            self.addCleanup(conn.close)
+            conn.request("GET", "/api/jobs", headers={"Host": f"127.0.0.1:{port}", "Cookie": cookies, "X-Factory": "1"})
+            self.assertEqual(conn.getresponse().status, 200, f"board on port {port}")
 
 
 if __name__ == "__main__":
