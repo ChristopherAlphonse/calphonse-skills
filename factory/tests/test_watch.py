@@ -1,11 +1,12 @@
-import http.client, json, re, subprocess, sys, unittest
+import http.client, json, os, re, shutil, subprocess, sys, unittest
 
+from test_dashboard_build import NODE_24
 from test_job import JOB, Factory
 
 
 class Watch(Factory):
-    def start_watch(self):
-        p = subprocess.Popen([sys.executable, "-I", str(JOB), "watch", "0"], cwd=str(self.base), env=self.env,
+    def start_watch(self, job=JOB, env=None):
+        p = subprocess.Popen([sys.executable, "-I", str(job), "watch", "0"], cwd=str(self.base), env=env or self.env,
                              stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self.addCleanup(p.stderr.close)
         self.addCleanup(p.stdout.close)
@@ -125,6 +126,84 @@ class TestWatch(Watch):
             self.addCleanup(conn.close)
             conn.request("GET", "/api/jobs", headers={"Host": f"127.0.0.1:{port}", "Cookie": cookies, "X-Factory": "1"})
             self.assertEqual(conn.getresponse().status, 200, f"board on port {port}")
+
+
+class TestWatchRebuild(Watch):
+    """Each test runs a copy of bin/job and dashboard/ so the real repo is never written."""
+
+    def setUp(self):
+        super().setUp()
+        self.copy = self.base / "x"
+        (self.copy / "bin").mkdir(parents=True)
+        shutil.copy2(JOB, self.copy / "bin" / "job")
+        shutil.copytree(JOB.parent.parent / "dashboard", self.copy / "dashboard")
+        self.dist = self.copy / "dashboard" / "dist"
+        for name in ("app", "dom", "markdown"):  # fixed clock: sources older than dist
+            os.utime(self.copy / "dashboard" / f"{name}.ts", (1_000_000, 1_000_000))
+            os.utime(self.dist / f"{name}.js", (1_000_010, 1_000_010))
+
+    def start_copy(self, env=None):
+        return self.start_watch(self.copy / "bin" / "job", env)
+
+    def stale_source_with_failing_build(self, env):
+        os.utime(self.copy / "dashboard" / "app.ts", (1_000_100, 1_000_100))
+        old = (self.dist / "app.js").read_bytes()
+        p = self.start_copy(env)
+        status, body = self.http("GET", "/static/app.js")
+        self.assertEqual((status, body), (200, old))
+        p.kill()
+        p.wait()
+        warnings = [l for l in p.stderr.read().splitlines() if l.startswith("dashboard:")]
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertEqual(len([e for e in self.audit_lines() if e["action"] == "dashboard-build"]), 1)
+
+    def assert_node_never_runs(self):
+        marker = self.base / "node-ran"
+        (self.fakebin / "node").write_text(f"#!/bin/sh\necho ran >> {marker}\nexit 1\n")
+        (self.fakebin / "node").chmod(0o755)
+        p = self.start_copy()
+        p.kill()
+        p.wait()
+        self.assertEqual([l for l in p.stderr.read().splitlines() if l.startswith("dashboard:")], [])
+        self.assertEqual([e for e in self.audit_lines() if e["action"] == "dashboard-build"], [])
+        self.assertFalse(marker.exists())
+
+    def test_a_dist_newer_than_its_sources_is_not_rebuilt(self):
+        self.assert_node_never_runs()
+
+    def test_a_dist_with_the_same_mtime_as_its_sources_is_not_rebuilt(self):
+        for name in ("app", "dom", "markdown"):
+            os.utime(self.dist / f"{name}.js", (1_000_000, 1_000_000))
+        self.assert_node_never_runs()
+
+    @unittest.skipUnless(NODE_24, "needs node 24 or later")
+    def test_a_stale_source_rebuilds_dist_without_a_warning(self):
+        built = (self.dist / "app.js").read_bytes()
+        (self.dist / "app.js").write_bytes(built + b"// edited by hand\n")
+        os.utime(self.dist / "app.js", (1_000_010, 1_000_010))  # the write reset it to the real clock
+        os.utime(self.copy / "dashboard" / "app.ts", (1_000_100, 1_000_100))
+        p = self.start_copy()
+        self.assertEqual(self.http("GET", "/static/app.js"), (200, built))
+        p.kill()
+        p.wait()
+        self.assertEqual((self.dist / "app.js").read_bytes(), built)
+        self.assertEqual([l for l in p.stderr.read().splitlines() if l.startswith("dashboard:")], [])
+
+    @unittest.skipUnless(NODE_24, "needs node 24 or later")
+    def test_a_missing_dist_file_is_rebuilt_before_the_first_request(self):
+        old = (self.dist / "app.js").read_bytes()
+        (self.dist / "app.js").unlink()
+        self.start_copy()
+        self.assertEqual(self.http("GET", "/static/app.js"), (200, old))
+        self.assertEqual((self.dist / "app.js").read_bytes(), old)
+
+    def test_a_failed_rebuild_still_serves_the_committed_dist(self):
+        (self.fakebin / "node").write_text("#!/bin/sh\necho boom >&2\nexit 1\n")
+        (self.fakebin / "node").chmod(0o755)
+        self.stale_source_with_failing_build(self.env)
+
+    def test_a_missing_node_still_serves_the_committed_dist(self):
+        self.stale_source_with_failing_build({**self.env, "PATH": str(self.fakebin)})
 
 
 if __name__ == "__main__":
