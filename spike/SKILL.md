@@ -56,6 +56,10 @@ Read `references/evidence.md` before you build and before you report. It overrid
 - No real credentials, and no touching other shared systems without asking.
 - INVALIDATED and INCONCLUSIVE are honest outcomes. Report them plainly.
 
+## Voice
+
+Everything you write for the user reads like a person talking: the spike READMEs, the verdicts and the chat summary. Use short sentences, "we" and "I", contractions and plain words. Phrase headings as the question a person would ask ("Why did we do this?"), never "Why we did this" or "Background". Use sentences where a bullet fragment would sound like a slide. If you can't say it out loud without stumbling, rewrite it. This changes style only. The evidence rules above still win.
+
 ## Output
 
 - `spikes/` at the repo root (or the folder the repo already uses), one `NNN-name/` directory per spike.

@@ -46,7 +46,7 @@ Docs, memory and code reading never produce a verdict. Only a run does.
 ## Output
 
 - `spikes/` at the repo root (or the folder the repo already uses), with one numbered directory per spike, such as `spikes/001-websocket-streaming/`.
-- Each directory has a `README.md` built from `references/template.md`: objective, investigation, findings, evidence, options, recommendation, risks.
+- Each directory has a `README.md` built from `references/template.md`, written in a spoken voice and organized as the questions a person would ask: what we were trying to answer, why, what we looked at, what we learned, the proof, the options, the recommendation, what could go wrong, what happens next, and the answer.
 - A chat summary: one line per spike with its verdict, the overall recommendation, what was not tested, and the biggest remaining unknown.
 
 ## Defaults and Setup
