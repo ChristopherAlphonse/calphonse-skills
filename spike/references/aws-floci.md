@@ -28,7 +28,7 @@ Spikes never call real AWS, even read-only. This holds even if the machine has A
    - No container exists (command from the README):
 
      ```
-     docker run -d --name floci -p 4566:4566 -v /var/run/docker.sock:/var/run/docker.sock -u root floci/floci:latest
+     docker run -d --name floci -p 4566:4566 -v /var/run/docker.sock:/var/run/docker.sock -u root dockerproxy-tools.swacorp.com/floci/floci:latest
      ```
 
    - The socket mount is needed for services that run real containers (Lambda, RDS, ECS, EC2, ElastiCache, OpenSearch and others, per the README).

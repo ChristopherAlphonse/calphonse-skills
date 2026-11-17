@@ -21,9 +21,9 @@ explain this PR to stakeholders
 ## What Happens
 
 1. **Discover.** The skill reads the docs, repo, PR, ticket and notes. Merged code is the source of truth if the ticket and the code disagree.
-2. **Ask.** It asks one or two short questions, only for what is still missing: the audience, or how the process worked before.
+2. **Ask.** It asks up to four short questions, only for what the documents can't tell it: the audience, the links to show on screen, who you consulted and why you chose this approach, where things stand and what the next demo covers, and any number in the docs that is out of date.
 3. **Find the business reason.** It picks the one or two outcomes that are true for this change.
-4. **Write.** It writes the script in five parts: Previously, Now, Demonstration, Result, Business impact.
+4. **Write.** It writes one continuous spoken script: a greeting, how it worked before, what was asked or built, what you found, a stage direction with a link to show it, where things stand, and a close that invites questions.
 5. **Check.** It reads the script back for awkward phrasing and cuts what adds nothing.
 
 ## Rules
@@ -35,11 +35,7 @@ explain this PR to stakeholders
 
 ## Output
 
-- **Feature overview:** two or three sentences.
-- **Demo script:** the spoken script.
-- **Business value:** the problem and the value created.
-- **Metrics:** real measurements if provided, otherwise which ones would quantify the impact.
-- **Output location:** where the script goes, such as a shared doc, wiki page or Markdown file.
+One Markdown file with an Audience line, a Read line (minutes) and the script. The script has no headings or labels, only square-bracket stage directions with links. The chat reply notes anything it could not check.
 
 ## Layout
 
@@ -47,5 +43,5 @@ explain this PR to stakeholders
 | --------------------------- | -------------------------------------------------------------- |
 | `SKILL.md`                  | Guardrails, steps and output the agent follows                 |
 | `references/discovery.md`   | What to read and establish, and how to find the business reason |
-| `references/script.md`      | Script structure, spoken style and pre-delivery checks         |
+| `references/rules.md`       | Script structure, spoken style and pre-delivery checks         |
 | `references/example.md`     | A short fictional script showing the tone                      |

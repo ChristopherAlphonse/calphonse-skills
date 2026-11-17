@@ -19,19 +19,13 @@ Read the reference for each step when you reach it. Do not load them all up fron
 
 | Step                        | What you do                                                                | Read                      |
 | --------------------------- | -------------------------------------------------------------------------- | ------------------------- |
-| 1. Discover                 | Read docs, repo, PR, ticket and notes. Ask only for what is missing. | `references/discovery.md` |
+| 1. Discover                 | Read docs, repo, PR, ticket and notes. Then ask for what only the presenter knows: links to show, who they consulted, where it stands, corrections. | `references/discovery.md` |
 | 2. Find the business reason | Pick the one or two outcomes that are true here.                           | `references/discovery.md` |
-| 3. Write                    | Previously, Now, Demonstration, Result, Business impact. Spoken style.     | `references/script.md`    |
-| 4. Check                    | Read it aloud in your head, then cut.                                      | `references/script.md`    |
+| 3. Write                    | Greeting, before, change, findings, show it, where it stands, close. Spoken style. | `references/rules.md`     |
+| 4. Check                    | Read it aloud in your head, then cut.                                      | `references/rules.md`     |
 
 For a sample of the finished tone, read `references/example.md`.
 
 ## Output
 
-Deliver these parts:
-
-- **Feature overview:** two or three sentences on what the feature does.
-- **Demo script:** the spoken script in the structure above.
-- **Business value:** the problem addressed and the value created.
-- **Metrics:** real measurements if provided (time saved per task, manual steps removed, processing time, cost, errors). If none exist, name which measurements would quantify the impact.
-- **Output location:** where to output the script (for example, a shared doc, wiki page, or Markdown file).
+Write one Markdown file in the layout from `references/rules.md`: an Audience line, a Read line, and the spoken script. Ask where to save it if the user has not said. In chat, give one or two lines on anything you could not check or any number you left out. Offer a feature overview, business value or metrics only if the user asks.
