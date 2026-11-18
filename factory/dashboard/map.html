@@ -14,10 +14,10 @@
         <a href="/">Board</a>
         <span id="meta">connecting</span>
       </div>
-      <p class="policy">Hover or focus a node to see what feeds it and what it feeds. Lit nodes hold a job right now.</p>
+      <p class="policy">Hover a node to see what feeds it and what it feeds. Click it to read its files. Lit nodes hold a job right now.</p>
     </header>
     <main>
-      <svg id="map" viewBox="0 0 1600 490" role="group" aria-label="Build workflow stages and how they connect">
+      <svg id="map" viewBox="0 0 1600 560" role="group" aria-label="Build workflow stages and how they connect">
         <defs>
           <marker id="head-up" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="head up" /></marker>
           <marker id="head-down" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="head down" /></marker>
@@ -36,6 +36,15 @@
         <li><i class="ln down"></i>Hover: this feeds</li>
       </ul>
     </main>
+    <aside id="drawer" aria-label="Stage files">
+      <button class="x" id="close">Close</button>
+      <button class="x" id="reset" title="Reset drawer width">Reset width</button>
+      <div id="dhead"></div>
+      <div class="files" id="djobs"></div>
+      <div class="files" id="dfiles"></div>
+      <div id="dbody" class="raw"></div>
+    </aside>
+    <button id="grip" type="button" aria-label="Resize drawer"></button>
     <script type="module" src="/static/map.js"></script>
   </body>
 </html>

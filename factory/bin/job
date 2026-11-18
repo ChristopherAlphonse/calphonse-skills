@@ -13,7 +13,7 @@ JOBS = STATE / "jobs"
 DASH_DIR = Path(__file__).resolve().parent.parent / "dashboard"
 DIST_DIR = DASH_DIR / "dist"
 STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript",
-          "markdown.js": "text/javascript", "map.js": "text/javascript", "map.css": "text/css"}
+          "markdown.js": "text/javascript", "map.js": "text/javascript", "map.css": "text/css", "drawer.js": "text/javascript"}
 DEFAULTS = {
     "concurrency": 1, "max_rounds": 3, "checks": "", "base_branch": "main", "checks_timeout": 1800,
 }

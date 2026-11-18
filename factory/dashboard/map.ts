@@ -1,8 +1,11 @@
+import { chip, el } from "/static/dom.js";
+import { initDrawerResize } from "/static/drawer.js";
+import { renderMarkdown } from "/static/markdown.js";
 import type { Job } from "/static/types.js";
 
 type Kind = "agent" | "script" | "human" | "end";
 type Side = "left" | "right" | "top" | "bottom";
-interface Node { id: string; label: string; sub: string; kind: Kind; col: number; row: number; span?: number }
+interface MapNode { id: string; label: string; sub: string; kind: Kind; col: number; row: number; span?: number }
 interface Edge { from: string; to: string; label: string }
 interface Box { x: number; y: number; w: number; h: number; col: number; row: number }
 interface Pt { x: number; y: number }
@@ -14,7 +17,7 @@ const W = 136;
 const H = 62;
 const X0 = 20;
 const COL_STEP = 176;
-const Y0 = 110;
+const Y0 = 175;
 const ROW_STEP = 132;
 const MAX_PUSH = 90;
 const POLL_MS = 2000;
@@ -22,7 +25,7 @@ const SLOT_SPREAD = 0.65;
 
 const HEADS = ["Shape", "Spec", "Build", "Gate", "Review", "Polish", "Prove", "Ship", "Land"];
 // Stage names and the agents behind them mirror HINT in bin/job. Edges mirror TRANSITIONS, plus the user's three clicks.
-const NODES: Node[] = [
+const NODES: MapNode[] = [
   { id: "shape", label: "Shape", sub: "lets-talk-about-it", kind: "agent", col: 0, row: 0 },
   { id: "rejected", label: "Rejected", sub: "rejection.md", kind: "end", col: 0, row: 1 },
   { id: "spec", label: "Spec", sub: "prd-mode", kind: "agent", col: 1, row: 0 },
@@ -105,6 +108,13 @@ function drawStatic(): void {
     g.addEventListener("mouseleave", clear);
     g.addEventListener("focus", () => show(n.id));
     g.addEventListener("blur", clear);
+    g.addEventListener("click", () => openNode(n.id));
+    g.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openNode(n.id);
+      }
+    });
   }
 }
 
@@ -212,8 +222,13 @@ function show(id: string): void {
 
 // Draw each label on an opaque chip and push it down in steps until it clears every chip already placed.
 function placeLabels(chips: Chip[]): void {
-  // Nodes count as already placed, so a nudged label never lands on one.
+  // Nodes and job badges count as already placed, so a nudged label never lands on one.
   const placed = [...boxes.values()].map((b) => ({ x1: b.x, y1: b.y - 4, x2: b.x + b.w, y2: b.y + b.h + 4 }));
+  for (const t of badges.values()) {
+    if (!t.textContent) continue;
+    const b = t.getBBox();
+    placed.push({ x1: b.x - 4, y1: b.y - 2, x2: b.x + b.width + 4, y2: b.y + b.height + 2 });
+  }
   for (const c of chips.sort((a, b) => a.y - b.y)) {
     const t = mk("text", { x: c.x, y: c.y, class: `label ${c.kind}`, "text-anchor": c.start ? "start" : "middle" }, c.text);
     gLabels.append(t);
@@ -225,18 +240,125 @@ function placeLabels(chips: Chip[]): void {
     const b = box(dy);
     placed.push(b);
     t.setAttribute("y", String(c.y + dy));
-    gLabels.insertBefore(mk("rect", { x: b.x1, y: b.y1, width: b.x2 - b.x1, height: b.y2 - b.y1, rx: 3, class: "chip" }), t);
+    gLabels.insertBefore(mk("rect", { x: b.x1, y: b.y1, width: b.x2 - b.x1, height: b.y2 - b.y1, rx: 3, class: "label-bg" }), t);
   }
 }
 
 // Which node a job lights: the board's two click gates get their own node, every other stage is the node of the same name.
 const liveNode = (j: Job): string => (j.can_approve ? "approve" : j.can_commit ? "commit" : j.stage);
 
+const api = (path: string): Promise<Response> => fetch(path, { credentials: "same-origin", headers: { "X-Factory": "1" } });
+
+// The files each node's stage writes, matched against a job's file list (paths relative to the job folder).
+const FILE_MATCH: Record<string, RegExp> = {
+  shape: /^shape\.md$/,
+  spec: /^spec\.md$/,
+  approve: /^spec\.md$/,
+  build: /^build\.md$/,
+  gate: /^round-\d+\/checks\.md$/,
+  review: /^(round-\d+\/review-[a-z]+|reconcile)\.md$/,
+  polish: /^polish\.md$/,
+  prove: /^uat\.md$/,
+  ship: /^(pr-body|commit)\.md$/,
+  commit: /^commit\.md$/,
+  ready: /^(pr-body|commit)\.md$/,
+  rejected: /^rejection\.md$/,
+};
+
+const view: { jobs: Job[]; node: string | null; job: string | null; file: string | null; token: number; sig: string } = { jobs: [], node: null, job: null, file: null, token: 0, sig: "" };
+const drawer = $<HTMLElement>("drawer");
+const filesFor = (j: Job, node: string): string[] => j.files.filter((f) => FILE_MATCH[node]?.test(f));
+
+function openNode(id: string): void {
+  view.node = id;
+  // Jobs sitting at this node come first, so the likeliest file opens by default.
+  const here = view.jobs.filter((j) => liveNode(j) === id);
+  const withFiles = view.jobs.filter((j) => filesFor(j, id).length);
+  view.job = (here[0] ?? withFiles[0] ?? view.jobs[0])?.id ?? null;
+  view.file = null;
+  renderDrawer();
+}
+
+function closeNode(): void {
+  view.node = null;
+  view.token++;
+  drawer.classList.remove("open");
+  nodeEls.forEach((g) => g.classList.remove("selected"));
+}
+
+function renderDrawer(): void {
+  const node = NODES.find((n) => n.id === view.node);
+  if (!node) return;
+  drawer.classList.add("open");
+  nodeEls.forEach((g, id) => g.classList.toggle("selected", id === node.id));
+  const job = view.jobs.find((j) => j.id === view.job);
+  const files = job ? filesFor(job, node.id) : [];
+  if (job && !files.includes(view.file ?? "")) view.file = files.at(-1) ?? null;
+
+  $("dhead").replaceChildren(el("h3", "", node.label), el("div", "id", `${node.sub}, ${view.jobs.length} build jobs`));
+  $("djobs").replaceChildren(
+    ...view.jobs.map((j) => {
+      const c = chip(`${j.title} (${j.stage})`, j.id === view.job ? "on" : "");
+      c.onclick = () => {
+        view.job = j.id;
+        view.file = null;
+        renderDrawer();
+      };
+      return c;
+    }),
+  );
+  $("dfiles").replaceChildren(
+    ...files.map((f) => {
+      const c = chip(f, f === view.file ? "on" : "");
+      c.onclick = () => {
+        view.file = f;
+        renderDrawer();
+      };
+      return c;
+    }),
+  );
+  void loadFile(node, job);
+}
+
+function body(cls: string, content: string | Node): void {
+  const b = $("dbody");
+  b.className = cls;
+  if (typeof content === "string") b.textContent = content;
+  else b.replaceChildren(content);
+}
+
+async function loadFile(node: MapNode, job: Job | undefined): Promise<void> {
+  const token = ++view.token;
+  if (!job) return body("raw", "No build jobs yet.");
+  if (view.file) {
+    let text = "offline, retrying";
+    let ok = false;
+    try {
+      const res = await api(`/api/file?job=${encodeURIComponent(job.id)}&name=${encodeURIComponent(view.file)}`);
+      ok = res.ok;
+      text = ok ? await res.text() : "not found";
+    } catch {}
+    if (token === view.token) ok ? body("md", renderMarkdown(text)) : body("raw", text);
+    return;
+  }
+  // No file: say what the node is, and for the user's gate show what the job waits on.
+  const n = job.needs;
+  if (node.id === "needs-human" && n) return body("raw", `${n.action}\n\n${n.why}\n\n${n.todo}\n\n${n.command}`);
+  if (node.id === "needs-human") return body("raw", `${job.title} is not waiting on you.`);
+  const kinds: Record<string, string> = { human: "A click on the board, so it writes no file.", end: "An end state.", script: "A script, not an agent. Its result is in the gate file of each round." };
+  body("raw", `${job.title} has no ${node.label.toLowerCase()} file yet.${kinds[node.kind] ? "\n\n" + kinds[node.kind] : ""}`);
+}
+
 async function poll(): Promise<void> {
   try {
-    const res = await fetch("/api/jobs", { credentials: "same-origin", headers: { "X-Factory": "1" } });
+    const res = await api("/api/jobs");
     if (!res.ok) throw new Error(String(res.status));
-    const jobs: Job[] = (await res.json()).filter((j: Job) => j.kind === "build");
+    const text = await res.text();
+    const jobs: Job[] = (JSON.parse(text) as Job[]).filter((j) => j.kind === "build");
+    const changed = text !== view.sig;
+    view.sig = text;
+    view.jobs = jobs;
+    if (changed && view.node) renderDrawer();
     const counts = new Map<string, number>();
     for (const j of jobs) counts.set(liveNode(j), (counts.get(liveNode(j)) ?? 0) + 1);
     for (const [id, g] of nodeEls) {
@@ -250,6 +372,11 @@ async function poll(): Promise<void> {
   }
 }
 
+initDrawerResize();
+$("close").onclick = closeNode;
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeNode();
+});
 drawStatic();
 poll();
 setInterval(poll, POLL_MS);

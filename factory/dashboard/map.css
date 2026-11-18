@@ -38,7 +38,7 @@ main {
 }
 .node {
   --glow: var(--ok);
-  cursor: default;
+  cursor: pointer;
   outline: none;
 }
 .node rect {
@@ -101,6 +101,13 @@ main {
     filter: drop-shadow(0 0 5px var(--glow));
   }
 }
+.node.selected rect {
+  stroke: var(--acc);
+  stroke-width: 3.5;
+}
+#drawer .files {
+  margin: 8px 0;
+}
 .node:focus-visible rect {
   stroke: var(--acc);
   stroke-width: 3;
@@ -152,7 +159,7 @@ main {
 .label.down {
   fill: var(--down);
 }
-.chip {
+.label-bg {
   fill: var(--bg);
   stroke: var(--line);
   pointer-events: none;
