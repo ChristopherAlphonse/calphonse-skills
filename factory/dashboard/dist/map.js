@@ -10,10 +10,10 @@
                                                                                                                                                 
 
 const NS = "http://www.w3.org/2000/svg";
-const W = 116;
+const W = 112;
 const H = 46;
 const X0 = 20;
-const COL_STEP = 131;
+const COL_STEP = 160;
 const Y0 = 110;
 const ROW_STEP = 96;
 const MAX_PUSH = 90;
@@ -200,7 +200,10 @@ function show(id        )       {
     path.getBBox(); // force layout so the fade-in transition runs
     path.classList.add("visible");
     const m = mid(p1, r.fromSide, p2, r.toSide);
-    chips.push({ text: r.label, x: m.x, y: m.y, kind: r.kind });
+    // Side-by-side neighbours leave a narrow gap, so their labels ride above (forward) or below (back) the row instead.
+    const gap = r.fromSide === "right" ? -12 : r.fromSide === "left" ? H + 14 : null;
+    const y = gap === null ? m.y : (boxes.get(r.fromSide === "right" ? r.from : r.to)       ).y + gap;
+    chips.push({ text: r.label, x: m.x, y, kind: r.kind });
   }
   placeLabels(chips);
 }
