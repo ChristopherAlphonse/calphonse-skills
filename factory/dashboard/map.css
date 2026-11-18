@@ -18,12 +18,12 @@ main {
 }
 #map {
   width: 100%;
-  max-width: 1300px;
+  max-width: 1800px;
   height: auto;
   display: block;
 }
 .head-label {
-  font: 700 13px var(--display);
+  font: 700 19px var(--display);
   fill: var(--mute);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -53,15 +53,15 @@ main {
   fill: var(--well);
 }
 .node .name {
-  font: 600 12.5px var(--body);
+  font: 600 18px var(--body);
   fill: var(--ink);
 }
 .node .sub {
-  font: 10px var(--mono);
+  font: 13.5px var(--body);
   fill: var(--mute);
 }
 .node .badge {
-  font: 700 10.5px var(--body);
+  font: 700 14px var(--body);
   fill: var(--ink);
 }
 .node.live rect {
@@ -99,7 +99,7 @@ main {
 
 .edge {
   fill: none;
-  stroke-width: 1.7;
+  stroke-width: 2.2;
   opacity: 0;
   transition: opacity 0.18s;
   pointer-events: none;
@@ -120,7 +120,7 @@ main {
   fill: var(--down);
 }
 .label {
-  font: 500 10px var(--body);
+  font: 500 14px var(--body);
   pointer-events: none;
 }
 .label.up {

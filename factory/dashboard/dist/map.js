@@ -10,12 +10,12 @@
                                                                                                                                                 
 
 const NS = "http://www.w3.org/2000/svg";
-const W = 112;
-const H = 46;
+const W = 140;
+const H = 50;
 const X0 = 20;
-const COL_STEP = 160;
+const COL_STEP = 176;
 const Y0 = 110;
-const ROW_STEP = 96;
+const ROW_STEP = 84;
 const MAX_PUSH = 90;
 const POLL_MS = 2000;
 const SLOT_SPREAD = 0.65;
@@ -85,7 +85,7 @@ const nodeEls = new Map                     ();
 const badges = new Map                        ();
 
 function drawStatic()       {
-  HEADS.forEach((h, i) => $             ("heads").append(mk("text", { x: X0 + i * COL_STEP + W / 2, y: 30, class: "head-label", "text-anchor": "middle" }, h)));
+  HEADS.forEach((h, i) => $             ("heads").append(mk("text", { x: X0 + i * COL_STEP + W / 2, y: 24, class: "head-label", "text-anchor": "middle" }, h)));
   for (const n of NODES) {
     const w = n.span ? (n.span - 1) * COL_STEP + W : W;
     const b = { x: X0 + n.col * COL_STEP, y: Y0 + n.row * ROW_STEP, w, h: H, col: n.col, row: n.row };
@@ -93,8 +93,8 @@ function drawStatic()       {
     const g = mk("g", { class: `node ${n.kind}`, tabindex: 0, "data-id": n.id, role: "img", "aria-label": `${n.label}, ${n.sub}` });
     g.append(
       mk("rect", { x: b.x, y: b.y, width: b.w, height: H, rx: 6 }),
-      mk("text", { x: b.x + b.w / 2, y: b.y + 20, class: "name", "text-anchor": "middle" }, n.label),
-      mk("text", { x: b.x + b.w / 2, y: b.y + 35, class: "sub", "text-anchor": "middle" }, n.sub),
+      mk("text", { x: b.x + b.w / 2, y: b.y + 21, class: "name", "text-anchor": "middle" }, n.label),
+      mk("text", { x: b.x + b.w / 2, y: b.y + 38, class: "sub", "text-anchor": "middle" }, n.sub),
     );
     const badge = mk("text", { x: b.x + b.w - 6, y: b.y - 6, class: "badge", "text-anchor": "end" });
     g.append(badge);
