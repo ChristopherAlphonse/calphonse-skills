@@ -37,6 +37,7 @@ main {
   text-transform: uppercase;
 }
 .node {
+  --glow: var(--ok);
   cursor: default;
   outline: none;
 }
@@ -48,6 +49,12 @@ main {
 }
 .node.agent rect {
   stroke: var(--ok);
+}
+.node.script {
+  --glow: var(--acc);
+}
+.node.human {
+  --glow: var(--andon);
 }
 .node.script rect {
   stroke: var(--acc);
@@ -74,16 +81,24 @@ main {
 }
 .node.live rect {
   stroke-width: 3;
-  animation: pulse 1.6s ease-in-out infinite;
+  fill: color-mix(in srgb, var(--glow) 22%, var(--card));
 }
-@keyframes pulse {
+.node.live {
+  animation: glow 1.8s ease-in-out infinite;
+}
+@keyframes glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 2px var(--glow));
+  }
   50% {
-    stroke-opacity: 0.35;
+    filter: drop-shadow(0 0 9px var(--glow));
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .node.live rect {
+  .node.live {
     animation: none;
+    filter: drop-shadow(0 0 5px var(--glow));
   }
 }
 .node:focus-visible rect {
