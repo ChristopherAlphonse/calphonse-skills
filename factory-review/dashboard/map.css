@@ -1,0 +1,211 @@
+/* Factory map. Reuses the board's theme variables. Classes only: the CSP allows no inline style. */
+:root {
+  --up: #1b7f9a;
+  --down: #c2561d;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --up: #5fd0e6;
+    --down: #ff9a6b;
+  }
+}
+:root[data-theme="dark"] {
+  --up: #5fd0e6;
+  --down: #ff9a6b;
+}
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 20px 24px;
+}
+#map {
+  width: 100%;
+  max-width: 1800px;
+  height: auto;
+  display: block;
+}
+.head-label {
+  font: 700 19px var(--display);
+  fill: var(--mute);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.node {
+  --glow: var(--ok);
+  cursor: pointer;
+  outline: none;
+}
+.node rect {
+  fill: var(--card);
+  stroke: var(--line);
+  stroke-width: 1.5;
+  transition: opacity 0.18s;
+}
+.node.agent rect {
+  stroke: var(--ok);
+}
+.node.script {
+  --glow: var(--acc);
+}
+.node.human {
+  --glow: var(--andon);
+}
+.node.script rect {
+  stroke: var(--acc);
+  stroke-dasharray: 5 3;
+}
+.node.human rect {
+  stroke: var(--andon);
+  stroke-width: 2;
+}
+.node.end rect {
+  fill: var(--well);
+}
+.node .name {
+  font: 600 16px var(--body);
+  fill: var(--ink);
+}
+.node .sub {
+  font: 13.5px var(--body);
+  fill: var(--mute);
+}
+.node .badge {
+  font: 700 14px var(--body);
+  fill: var(--ink);
+}
+.node.live rect {
+  stroke-width: 3;
+  fill: color-mix(in srgb, var(--glow) 22%, var(--card));
+}
+.node.live {
+  animation: glow 1.8s ease-in-out infinite;
+}
+@keyframes glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 2px var(--glow));
+  }
+  50% {
+    filter: drop-shadow(0 0 9px var(--glow));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .node.live {
+    animation: none;
+    filter: drop-shadow(0 0 5px var(--glow));
+  }
+}
+.node.selected rect {
+  stroke: var(--acc);
+  stroke-width: 3.5;
+}
+#drawer .files {
+  margin: 8px 0;
+}
+.node:focus-visible rect {
+  stroke: var(--acc);
+  stroke-width: 3;
+}
+
+/* Hover: fade what is not connected, outline what is */
+#map.hover-mode .node:not(.related) {
+  opacity: 0.2;
+}
+#map.hover-mode .head-label {
+  opacity: 0.4;
+}
+#map.hover-mode .node.hovered rect {
+  stroke-width: 3;
+}
+#map.hover-mode .node.related rect {
+  stroke-width: 2.4;
+}
+
+.edge {
+  fill: none;
+  stroke-width: 2.2;
+  opacity: 0;
+  transition: opacity 0.18s;
+  pointer-events: none;
+}
+.edge.visible {
+  opacity: 0.95;
+}
+.edge.up {
+  stroke: var(--up);
+}
+.edge.down {
+  stroke: var(--down);
+}
+.head.up {
+  fill: var(--up);
+}
+.head.down {
+  fill: var(--down);
+}
+.label {
+  font: 500 14px var(--body);
+  pointer-events: none;
+}
+.label.up {
+  fill: var(--up);
+}
+.label.down {
+  fill: var(--down);
+}
+.label-bg {
+  fill: var(--bg);
+  stroke: var(--line);
+  pointer-events: none;
+}
+
+#legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  list-style: none;
+  margin: auto 0 0;
+  padding: 24px 0 0;
+  font: 12px var(--mono);
+  color: var(--mute);
+}
+#legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sw {
+  width: 16px;
+  height: 12px;
+  border-radius: 3px;
+  border: 2px solid var(--line);
+}
+.sw.agent {
+  border-color: var(--ok);
+}
+.sw.script {
+  border: 2px dashed var(--acc);
+}
+.sw.human {
+  border-color: var(--andon);
+}
+.sw.end {
+  background: var(--well);
+}
+.ln {
+  width: 24px;
+  height: 0;
+  border-top: 2px solid;
+}
+.ln.up {
+  border-color: var(--up);
+}
+.ln.down {
+  border-color: var(--down);
+}

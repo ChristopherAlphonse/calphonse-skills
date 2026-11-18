@@ -228,3 +228,7 @@ The allow list is a set of command patterns. It cannot see what a command does i
 - The ask rules are enforced by the harness, and no human is there to answer one in an unattended pass. That is the intent. Only Claude Code's handling is known to me from its documentation. Kiro refuses an `ask` in a headless run. Under `--trust-all-tools` the `kiro-guard` hook blocks it. OpenCode's handling is unmeasured.
 - A command the allow list permits can still write a file through shell redirection (`echo x > file`). The file-write rules cover the harness's edit tools, not the shell. For a review, the integrity check catches a changed tracked file and parks the job. It detects, it does not prevent.
 - The deny-rule measurement was done on `factory`. The list is the same, but the probe has not been rerun for `factory-review`.
+
+## Board source
+
+The board and the `/map` page are the same UI as `factory`, written in TypeScript in `dashboard/*.ts`. The server reads the generated `dashboard/dist/*.js`, which is committed and never edited by hand. `serve` and `watch` rebuild `dist/` at start when Node 24 or later is on PATH and a `.ts` is newer. Otherwise they warn once, log it in `audit.log`, and serve the committed `dist/`. To build by hand, run `node factory-review/dashboard/build.mjs`. Add `--check` to fail on a stale `dist/`, as `tests/test_dashboard_build.py` does. A running board does not reload, so restart it after you edit a `.ts` file.

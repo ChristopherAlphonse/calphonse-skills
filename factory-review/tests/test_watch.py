@@ -53,7 +53,7 @@ class TestWatch(Review):
         self.start_watch()
         status, page = self.http("GET", "/")
         self.assertEqual(status, 200)
-        self.assertIn(b"Factory-review Board", page)
+        self.assertIn(b"Factory review", page)
         self.assertEqual(json.loads(self.http("GET", "/api/mode")[1]), {"readonly": True})
         self.assertEqual([j["id"] for j in json.loads(self.http("GET", "/api/jobs")[1])], ["r"])
 

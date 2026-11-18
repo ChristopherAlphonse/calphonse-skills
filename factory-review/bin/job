@@ -10,8 +10,10 @@ ROOT = Path(os.environ.get("FACTORY_ROOT", Path.cwd())).resolve()
 STATE = ROOT / ".planning" / "factory-review"
 JOBS = STATE / "jobs"
 DASH_DIR = Path(__file__).resolve().parent.parent / "dashboard"
+DIST_DIR = DASH_DIR / "dist"
 JS = "text/javascript"
-STATIC = {"dashboard.css": "text/css", "app.js": JS, "dom.js": JS, "markdown.js": JS}
+STATIC = {"dashboard.css": "text/css", "map.css": "text/css", "app.js": JS, "dom.js": JS,
+          "markdown.js": JS, "map.js": JS, "drawer.js": JS}
 HOOKS_PATH_KEY = "core.hooksPath"
 DEFAULTS = {"concurrency": 1}
 READONLY = False
@@ -464,7 +466,7 @@ def snapshot(job):
     d = jobdir(job["id"])
     reviews = {r: kv(d / REVIEW_DIR / f"review-{r}.md").get("VERDICT") for r in job["reviewers"]}
     waiting = job["stage"] in HUMAN_STAGES
-    return {**job, "report": kv(d / "report.md"), "reviews": reviews,
+    return {**job, "kind": "review", "report": kv(d / "report.md"), "reviews": reviews,
             "files": sorted(str(p.relative_to(d)) for p in d.rglob("*.md")),
             "needs_human": waiting, "needs": needs_you(job), "can_unblock": waiting and not READONLY}
 
@@ -530,7 +532,8 @@ class Handler(BaseHTTPRequestHandler):
     def get_static(self, name):
         if not (self.host_ok() and self.session_ok()) or name not in STATIC:
             return self.send(403, "{}")
-        return self.send(200, (DASH_DIR / name).read_bytes(), STATIC[name])
+        base = DIST_DIR if name.endswith(".js") else DASH_DIR
+        return self.send(200, (base / name).read_bytes(), STATIC[name])
 
     def get_file(self, jid, name):
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", jid):
@@ -549,6 +552,10 @@ class Handler(BaseHTTPRequestHandler):
         q = parse_qs(u.query)
         if u.path == "/":
             return self.get_root(q)
+        if u.path == "/map":
+            if not (self.host_ok() and self.session_ok()):
+                return self.send(403, "{}")
+            return self.send(200, (DASH_DIR / "map.html").read_bytes(), "text/html; charset=utf-8")
         if u.path.startswith("/static/"):
             return self.get_static(u.path[len("/static/"):])
         if not self.trusted():
@@ -587,11 +594,37 @@ class Handler(BaseHTTPRequestHandler):
         self.send(200, "{}")
 
 
+def rebuild_dashboard():
+    """Regenerate dist/ when a .ts is newer. The committed dist is the fallback, so this never raises."""
+    def warn(msg):
+        print(f"dashboard: {msg}; serving the committed dist", file=sys.stderr)
+        audit("dashboard-build", "", msg)
+
+    try:
+        stale = any(not (DIST_DIR / f"{src.stem}.js").exists()
+                    or src.stat().st_mtime > (DIST_DIR / f"{src.stem}.js").stat().st_mtime
+                    for src in DASH_DIR.glob("*.ts"))
+    except OSError as e:
+        return warn(f"cannot compare sources with dist/ ({e})")
+    if not stale:
+        return
+    node = shutil.which("node")
+    if not node:
+        return warn("a source is newer than dist/ but node is not on PATH")
+    try:
+        r = subprocess.run([node, str(DASH_DIR / "build.mjs")], cwd=DASH_DIR, capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError) as e:
+        return warn(f"rebuild failed ({e})")
+    if r.returncode:
+        warn(f"rebuild failed ({(r.stderr.strip().splitlines() or ['no output'])[-1]})")
+
+
 def cmd_serve(port):
     """The only place human actions run. The key and session live in this process's memory only."""
     global KEY, SESSION, CODE, CODE_EXP
     need(sys.stdin.isatty() and sys.stdout.isatty(),
          "serve needs an interactive terminal: the board belongs to the user, not to an agent")
+    rebuild_dashboard()
     KEY, SESSION, CODE = (secrets.token_urlsafe(n) for n in (32, 32, 24))
     CODE_EXP = time.time() + 300
     STATE.mkdir(parents=True, exist_ok=True)
@@ -626,6 +659,7 @@ def bind_watch(port):
 def cmd_watch(port):
     """Read-only board. It holds no key and has no action routes, so an agent may start it."""
     global READONLY, SESSION, CODE, CODE_EXP
+    rebuild_dashboard()
     READONLY = True
     SESSION, CODE = secrets.token_urlsafe(32), secrets.token_urlsafe(24)
     CODE_EXP = float("inf")

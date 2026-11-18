@@ -66,7 +66,7 @@ class TestWatch(Watch):
         self.start_watch()
         status, page = self.http("GET", "/")
         self.assertEqual(status, 200)
-        self.assertIn(b"Factory Board", page)
+        self.assertIn(b"<h1>Factory</h1>", page)
         self.assertEqual(json.loads(self.http("GET", "/api/mode")[1]), {"readonly": True})
         jobs = json.loads(self.http("GET", "/api/jobs")[1])
         self.assertEqual([j["id"] for j in jobs], ["s"])

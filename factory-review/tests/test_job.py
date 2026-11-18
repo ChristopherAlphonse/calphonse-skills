@@ -285,7 +285,7 @@ class TestServer(Review):
     def test_root_needs_a_session_and_the_code_is_single_use(self):
         st, body = self.http("GET", "/")
         self.assertEqual(st, 200)
-        self.assertIn(b"Factory-review Board", body)
+        self.assertIn(b"Factory review", body)
         self.assertEqual(self.http("GET", "/", cookie=False)[0], 403)
         self.assertEqual(self.http("GET", "/", cookie="wrong")[0], 403)
         self.assertEqual(self.http("GET", f"/?c={self.code}", cookie=False)[0], 403)
@@ -304,6 +304,14 @@ class TestServer(Review):
         self.assertEqual(self.http_full("GET", "/static/nope.js")[0], 403)
         status, _, headers = self.http_full("GET", "/static/app.js", xfactory=False)
         self.assertEqual((status, headers["Content-Type"]), (200, "text/javascript"))
+
+    def test_the_map_page_and_its_assets_need_a_session(self):
+        self.assertEqual(self.http_full("GET", "/map", cookie=False)[0], 403)
+        status, body, _ = self.http_full("GET", "/map")
+        self.assertEqual(status, 200)
+        self.assertIn(b"Factory review map", body)
+        for name in ("map.js", "drawer.js", "map.css"):
+            self.assertEqual(self.http_full("GET", f"/static/{name}")[0], 200, name)
 
     def test_the_api_needs_the_cookie_the_header_and_a_loopback_host(self):
         self.new_review()

@@ -3,25 +3,28 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Factory-review Board</title>
+    <title>Factory review</title>
     <link rel="stylesheet" href="/static/dashboard.css" />
   </head>
   <body>
     <header>
-      <h1>Factory-review Board</h1>
-      <span id="meta">connecting</span>
-      <span class="policy">local only: factory-review never edits code, commits, pushes, or posts a comment</span>
+      <div class="title">
+        <h1>Factory review</h1>
+        <a href="/map">Map</a>
+        <span id="meta">connecting</span>
+      </div>
+      <p class="policy">Local only. Factory-review never edits code, commits, pushes, or posts a comment.</p>
     </header>
     <main id="board"></main>
     <aside id="drawer">
-      <button class="x" id="close">close</button>
-      <button class="x" id="reset" title="Reset drawer width">reset width</button>
+      <button class="x" id="close">Close</button>
+      <button class="x" id="reset" title="Reset drawer width">Reset width</button>
       <div id="dhead"></div>
       <div id="dneeds"></div>
       <div class="files" id="dfiles"></div>
       <div id="dbody" class="raw"></div>
     </aside>
-    <div id="grip" role="separator" aria-orientation="vertical" aria-label="Resize drawer" tabindex="0"></div>
+    <button id="grip" type="button" aria-label="Resize drawer"></button>
     <script type="module" src="/static/app.js"></script>
   </body>
 </html>
