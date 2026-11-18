@@ -9,12 +9,12 @@ interface Pt { x: number; y: number }
 interface Route { fromSide: Side; toSide: Side; fromFrac: number; toFrac: number; kind: "up" | "down"; label: string; from: string; to: string }
 
 const NS = "http://www.w3.org/2000/svg";
-const W = 140;
-const H = 50;
+const W = 136;
+const H = 62;
 const X0 = 20;
 const COL_STEP = 176;
-const Y0 = 110;
-const ROW_STEP = 84;
+const Y0 = 140;
+const ROW_STEP = 104;
 const MAX_PUSH = 90;
 const POLL_MS = 2000;
 const SLOT_SPREAD = 0.65;
@@ -92,8 +92,8 @@ function drawStatic(): void {
     const g = mk("g", { class: `node ${n.kind}`, tabindex: 0, "data-id": n.id, role: "img", "aria-label": `${n.label}, ${n.sub}` });
     g.append(
       mk("rect", { x: b.x, y: b.y, width: b.w, height: H, rx: 6 }),
-      mk("text", { x: b.x + b.w / 2, y: b.y + 21, class: "name", "text-anchor": "middle" }, n.label),
-      mk("text", { x: b.x + b.w / 2, y: b.y + 38, class: "sub", "text-anchor": "middle" }, n.sub),
+      mk("text", { x: b.x + b.w / 2, y: b.y + 26, class: "name", "text-anchor": "middle" }, n.label),
+      mk("text", { x: b.x + b.w / 2, y: b.y + 47, class: "sub", "text-anchor": "middle" }, n.sub),
     );
     const badge = mk("text", { x: b.x + b.w - 6, y: b.y - 6, class: "badge", "text-anchor": "end" });
     g.append(badge);
@@ -200,7 +200,7 @@ function show(id: string): void {
     path.classList.add("visible");
     const m = mid(p1, r.fromSide, p2, r.toSide);
     // Side-by-side neighbours leave a narrow gap, so their labels ride above (forward) or below (back) the row instead.
-    const gap = r.fromSide === "right" ? -12 : r.fromSide === "left" ? H + 14 : null;
+    const gap = r.fromSide === "right" ? -18 : r.fromSide === "left" ? H + 22 : null;
     const y = gap === null ? m.y : (boxes.get(r.fromSide === "right" ? r.from : r.to) as Box).y + gap;
     chips.push({ text: r.label, x: m.x, y, kind: r.kind });
   }
@@ -214,10 +214,10 @@ function placeLabels(chips: { text: string; x: number; y: number; kind: Route["k
     const t = mk("text", { x: c.x, y: c.y, class: `label ${c.kind}`, "text-anchor": "middle" }, c.text);
     gLabels.append(t);
     const bb = t.getBBox();
-    const box = (dy: number) => ({ x1: bb.x - 5, y1: bb.y - 2 + dy, x2: bb.x + bb.width + 5, y2: bb.y + bb.height + 2 + dy });
+    const box = (dy: number) => ({ x1: bb.x - 8, y1: bb.y - 4 + dy, x2: bb.x + bb.width + 8, y2: bb.y + bb.height + 4 + dy });
     const hit = (a: ReturnType<typeof box>) => placed.some((p) => a.x1 < p.x2 && a.x2 > p.x1 && a.y1 < p.y2 && a.y2 > p.y1);
     let dy = 0;
-    for (let i = 1; hit(box(dy)) && i <= 16; i++) dy = (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 13;
+    for (let i = 1; hit(box(dy)) && i <= 16; i++) dy = (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 18;
     const b = box(dy);
     placed.push(b);
     t.setAttribute("y", String(c.y + dy));

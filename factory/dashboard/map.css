@@ -13,7 +13,15 @@
   --up: #5fd0e6;
   --down: #ff9a6b;
 }
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   padding: 0 20px 24px;
 }
 #map {
@@ -53,7 +61,7 @@ main {
   fill: var(--well);
 }
 .node .name {
-  font: 600 18px var(--body);
+  font: 600 16px var(--body);
   fill: var(--ink);
 }
 .node .sub {
@@ -140,8 +148,8 @@ main {
   flex-wrap: wrap;
   gap: 8px 22px;
   list-style: none;
-  margin: 12px 0 0;
-  padding: 0;
+  margin: auto 0 0;
+  padding: 24px 0 0;
   font: 12px var(--mono);
   color: var(--mute);
 }
