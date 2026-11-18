@@ -7,6 +7,7 @@
                                                           
                                                                                       
                                      
+                                                                                           
                                                                                                                                                 
 
 const NS = "http://www.w3.org/2000/svg";
@@ -15,7 +16,7 @@ const H = 62;
 const X0 = 20;
 const COL_STEP = 176;
 const Y0 = 140;
-const ROW_STEP = 104;
+const ROW_STEP = 132;
 const MAX_PUSH = 90;
 const POLL_MS = 2000;
 const SLOT_SPREAD = 0.65;
@@ -191,7 +192,7 @@ function show(id        )       {
     });
   }
 
-  const chips                                                                = [];
+  const chips         = [];
   for (const r of routes) {
     const p1 = anchor(r.from, r.fromSide, r.fromFrac);
     const p2 = anchor(r.to, r.toSide, r.toFrac);
@@ -201,18 +202,21 @@ function show(id        )       {
     path.classList.add("visible");
     const m = mid(p1, r.fromSide, p2, r.toSide);
     // Side-by-side neighbours leave a narrow gap, so their labels ride above (forward) or below (back) the row instead.
-    const gap = r.fromSide === "right" ? -18 : r.fromSide === "left" ? H + 22 : null;
+    const gap = r.fromSide === "right" ? -36 : r.fromSide === "left" ? H + 22 : null;
     const y = gap === null ? m.y : (boxes.get(r.fromSide === "right" ? r.from : r.to)       ).y + gap;
-    chips.push({ text: r.label, x: m.x, y, kind: r.kind });
+    // A label on a short vertical arrow would hide it, so it sits to the right of the line.
+    const beside = boxes.get(r.from)?.col === boxes.get(r.to)?.col;
+    chips.push({ text: r.label, x: beside ? m.x + 12 : m.x, y, kind: r.kind, start: beside });
   }
   placeLabels(chips);
 }
 
 // Draw each label on an opaque chip and push it down in steps until it clears every chip already placed.
-function placeLabels(chips                                                               )       {
-  const placed                                                       = [];
+function placeLabels(chips        )       {
+  // Nodes count as already placed, so a nudged label never lands on one.
+  const placed = [...boxes.values()].map((b) => ({ x1: b.x, y1: b.y - 4, x2: b.x + b.w, y2: b.y + b.h + 4 }));
   for (const c of chips.sort((a, b) => a.y - b.y)) {
-    const t = mk("text", { x: c.x, y: c.y, class: `label ${c.kind}`, "text-anchor": "middle" }, c.text);
+    const t = mk("text", { x: c.x, y: c.y, class: `label ${c.kind}`, "text-anchor": c.start ? "start" : "middle" }, c.text);
     gLabels.append(t);
     const bb = t.getBBox();
     const box = (dy        ) => ({ x1: bb.x - 8, y1: bb.y - 4 + dy, x2: bb.x + bb.width + 8, y2: bb.y + bb.height + 4 + dy });
