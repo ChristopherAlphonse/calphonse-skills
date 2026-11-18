@@ -457,3 +457,8 @@ button:hover {
   font-family: var(--mono, monospace);
   font-size: 13px;
 }
+
+.title a {
+  color: var(--acc);
+  font-size: 14px;
+}
