@@ -379,6 +379,8 @@ def cmd_run(harness, dry):
     if not shutil.which(need):
         die(f"{need} is not on PATH")
     log(harness, "start")
+    if sys.platform == "darwin" and shutil.which("caffeinate"):
+        argv = ["caffeinate", "-i", *argv]
     code = subprocess.run(argv, cwd=ROOT).returncode
     log(harness, f"exit {code}")
     sys.exit(code)

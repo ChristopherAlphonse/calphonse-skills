@@ -720,6 +720,27 @@ def ensure_watcher():
         return m.group(1)
 
 
+def keep_awake():
+    """Stop macOS idle sleep while a review runs: a sleep mid-run expires the Kiro login and forces a re-login.
+
+    Detached `caffeinate -i` for 2 hours, restarted by any job command once it is gone. Off with `keep_awake: false`.
+    """
+    if sys.platform != "darwin" or not shutil.which("caffeinate") or config().get("keep_awake") is False:
+        return
+    STATE.mkdir(parents=True, exist_ok=True)
+    with open(STATE / "awake.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            pid = int((STATE / "awake.pid").read_text())
+        except (OSError, ValueError):
+            pid = 0
+        if pid > 0 and pid_alive(pid):
+            return
+        child = subprocess.Popen(["caffeinate", "-i", "-t", "7200"], stdin=subprocess.DEVNULL,
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        (STATE / "awake.pid").write_text(str(child.pid))
+
+
 def announce_serve():
     """Tell the user the exact command to run when a job waits on them, so they never have to ask for it."""
     if any(j["stage"] in HUMAN_STAGES for j in all_jobs()):
@@ -756,6 +777,8 @@ def main():
     fn, arity = COMMANDS[name]
     if name in ("serve", "watch") and not args:
         args = ["8765" if name == "serve" else str(WATCH_FIRST_PORT)]
+    if name in ("create", "advance", "route", "note", "queue"):
+        keep_awake()
     need(len(args) == arity, f"{name} takes {arity} args" + (": <id> <title> <base> <head>" if name == "create" else ""))
     fn(*args)
 
