@@ -31,7 +31,7 @@ main {
   display: block;
 }
 .head-label {
-  font: 700 19px var(--display);
+  font: 700 calc(19px * var(--k, 1)) var(--display);
   fill: var(--mute);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -68,15 +68,15 @@ main {
   fill: var(--well);
 }
 .node .name {
-  font: 600 16px var(--body);
+  font: 600 calc(16px * var(--k, 1)) var(--body);
   fill: var(--ink);
 }
 .node .sub {
-  font: 13.5px var(--body);
+  font: calc(13.5px * var(--k, 1)) var(--body);
   fill: var(--mute);
 }
 .node .badge {
-  font: 700 14px var(--body);
+  font: 700 calc(14px * var(--k, 1)) var(--body);
   fill: var(--ink);
 }
 .node.live rect {
@@ -150,7 +150,7 @@ main {
   fill: var(--down);
 }
 .label {
-  font: 500 14px var(--body);
+  font: 500 calc(14px * var(--k, 1)) var(--body);
   pointer-events: none;
 }
 .label.up {
