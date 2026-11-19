@@ -725,7 +725,7 @@ def keep_awake():
 
     Detached `caffeinate -i` for 2 hours, restarted by any job command once it is gone. Off with `keep_awake: false`.
     """
-    if sys.platform != "darwin" or not shutil.which("caffeinate") or config().get("keep_awake") is False:
+    if os.environ.get("FACTORY_NO_AWAKE") == "1" or sys.platform != "darwin" or not shutil.which("caffeinate") or config().get("keep_awake") is False:
         return
     STATE.mkdir(parents=True, exist_ok=True)
     with open(STATE / "awake.lock", "w") as lock:
