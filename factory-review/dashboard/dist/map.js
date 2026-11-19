@@ -18,7 +18,7 @@ const W = 136;
 const H = 62;
 const X0 = 20;
 const COL_STEP = 176;
-const Y0 = 175;
+const Y0 = 115;
 const ROW_STEP = 132;
 const MAX_PUSH = 90;
 const POLL_MS = 2000;
@@ -354,6 +354,14 @@ async function poll()                {
     $("meta").textContent = "offline";
   }
 }
+
+// Text keeps a readable screen size: the svg scales with the window, so counter-scale fonts, within a clamp so they still fit the nodes.
+const fitFonts = () => {
+  const s = svg.clientWidth / svg.viewBox.baseVal.width;
+  if (s > 0) svg.style.setProperty("--k", String(Math.min(Math.max(s, 0.7), 1.15) / s));
+};
+new ResizeObserver(fitFonts).observe(svg);
+fitFonts();
 
 initDrawerResize();
 $("close").onclick = closeNode;
