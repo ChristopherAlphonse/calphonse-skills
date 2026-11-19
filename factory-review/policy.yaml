@@ -29,8 +29,6 @@ rules:
       - git -C * commit*
       - git config*
       - git -C * config*
-      - git fetch*
-      - git -C * fetch*
       - git gc*
       - git -C * gc*
       - git init*
