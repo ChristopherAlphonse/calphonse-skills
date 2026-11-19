@@ -20,6 +20,8 @@ Build one table per topic, not one summary per document:
 - **Differ**: same topic, different severity or opposite conclusion. Show each document's verdict and the evidence behind it. A measured result beats a code-reading guess; say so.
 - **Only one document**: flag as unverified unless that document reproduced it.
 - Cross-check the facts the documents quote (test counts, file counts, include counts). A mismatch is worth one line.
+- **Not checked**: list every item any document says it did not check, and every claim of "fine" that rests on code outside the diff. Do not carry these into a footer. Each one that the change's correctness depends on becomes an open question in the ranked list: what to look at, where, and who can answer. Where the real definition is reachable (another repo in the mirror, a schema file), open it now and settle the item.
+- **Claims of fine**: reread the lines each "X is handled" or "X is safe" sentence cites. A claim about the wrong function is a misreading, so drop it and say so. See [review-blind-spots](../review-blind-spots/SKILL.md).
 
 ## 3. Rank "most concerning"
 
@@ -30,6 +32,8 @@ Order by, in this order:
 3. Code-reading claim with a plausible data-loss path, not yet reproduced (mark "needs a check").
 4. Scale limits that do not bite at measured sizes.
 5. Style and hygiene.
+
+An open question on external behavior ranks with a reproduced defect when the change's correctness depends on it, and the recommendation cannot be "safe to merge" until it is answered.
 
 Do not promote a claim because several documents repeat it if none of them measured it. If a document's severity contradicts measurements at real sizes, say which one you trust and why. Keep a finding the user insists on, but state at what size it starts to matter.
 

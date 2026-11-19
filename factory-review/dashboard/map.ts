@@ -31,7 +31,7 @@ const NODES: MapNode[] = [
   { id: "review", label: "Review", sub: "code, qa, test reviewers", kind: "agent", col: 1, row: 0 },
   { id: "reconcile", label: "Reconcile", sub: "reconcile-reviews", kind: "agent", col: 2, row: 0 },
   { id: "verify", label: "Verify", sub: "prove-it-works", kind: "agent", col: 3, row: 0 },
-  { id: "report", label: "Report", sub: "unslop", kind: "agent", col: 4, row: 0 },
+  { id: "report", label: "Report", sub: "simplify", kind: "agent", col: 4, row: 0 },
   { id: "ready", label: "Ready", sub: "report + comments", kind: "end", col: 5, row: 0 },
   { id: "needs-human", label: "Needs you", sub: "Unblock on the board", kind: "human", col: 1, row: 2, span: 3 },
 ];

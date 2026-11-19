@@ -39,11 +39,11 @@ TRANSITIONS = {
     "report": {"ready", "needs-human"},
 }
 HINT = {
-    "scope": "code-review-frontend step 0 (find lint, type, and test tooling) -> scope.md (STATUS: READY, or reject with rejection.md); add security or architecture reviewers with `job route`",
-    "review": "code (code-review-frontend, plus dotnet for C# and python for Python), qa (qa-review), test (test-review), and routed extras -> reviews/review-<name>.md; read-only, never edit",
+    "scope": "find the repo's own lint, type, and test tooling (CI config, Makefile, pyproject, package scripts, whatever it uses) -> scope.md (STATUS: READY, or reject with rejection.md); add security or architecture reviewers with `job route`",
+    "review": "code (lens chosen from the stack skills below: python for Python, dotnet for C#, typescript-strict-style and vercel-react-best-practices for TS/JS/React; code-review-frontend ONLY when TS/JS/React files are in the diff; for any other language the repo's own tooling alone, never a frontend skill), qa (qa-review), test (test-review), and routed extras -> reviews/review-<name>.md; read-only, never edit",
     "reconcile": "reconcile-reviews -> reconcile.md (STATUS: READY), one ranked list with file and line",
     "verify": "prove-it-works: rerun every VERIFIED (ran) command and check every cited line -> verified.md (STATUS: READY), drop what does not reproduce",
-    "report": "unslop -> report.md (STATUS: READY, FINDINGS: n, BLOCKERS: n) and comments.md to paste by hand; post only if the user says so, once",
+    "report": "simplify -> report.md (STATUS: READY, FINDINGS: n, BLOCKERS: n) and comments.md to paste by hand; post only if the user says so, once",
 }
 STACK_RULES = [
     ("typescript-strict-style", {".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"}, set()),

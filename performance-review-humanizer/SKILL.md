@@ -32,7 +32,7 @@ Rewrite the user's own write-up in a warmer, reflective voice. Change the voice 
 - Use only facts in the source. Never invent a role, number, outcome, or feeling the source does not support.
 - Work still in progress stays in progress. Never present it as delivered.
 - Drop sections that only the original format needed (values sections, SMART summaries) unless the user asks to keep them.
-- Write the reply following the same plain style: no filler, no puffery. Check the draft against the [unslop](../unslop/SKILL.md) skill, mainly rules 7, 27, and 32.
+- Write the reply following the same plain style: no filler, no puffery. Check the draft against the [simplify](../simplify/SKILL.md) skill.
 - Before output, reread each sentence. If it is clearer in the source, restore the source's wording. The result must read at least as clearly as the source.
 - Make sure accomplishments aren't undersold.
 - Better handle attached files.

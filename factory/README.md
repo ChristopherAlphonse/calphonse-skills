@@ -64,8 +64,8 @@ Each stage runs the skill that owns it. A fresh subagent does the work and write
 | spec | `prd-mode` | `spec.md` | your approval on the board |
 | build | `swe` plus stack skills | `build.md` | `STATUS: READY`, changes left uncommitted |
 | gate | `bin/job gate` (a script) | `round-N/checks.md` | `GATE: PASS` |
-| review | `code-review-frontend`, `qa-review`, `test-review`, plus `security-review` or `architecture-review` when the diff calls for them | `round-N/review-<name>.md`, then `reconcile.md` if anything is CHANGES | `VERDICT: PASS` from every reviewer |
-| polish | `comment-sicko`, then `unslop` | `polish.md` | `STATUS: DONE`, then a fresh gate run |
+| review | a `code` reviewer whose skill follows the diff (`code-review-frontend` for TS/JS/React only, `python`, `dotnet`, `aws`), `qa-review`, `test-review`, plus `security-review` or `architecture-review` when the diff calls for them | `round-N/review-<name>.md`, then `reconcile.md` if anything is CHANGES | `VERDICT: PASS` from every reviewer |
+| polish | `comment-sicko`, then `simplify` | `polish.md` | `STATUS: DONE`, then a fresh gate run |
 | prove | `prove-it-works` | `uat.md` | `STATUS: PASS` |
 | ship | `pr-body-style` | `pr-body.md` and `commit.md` | your Commit locally click |
 

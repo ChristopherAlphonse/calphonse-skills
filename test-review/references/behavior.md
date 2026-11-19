@@ -28,12 +28,18 @@ For each changed function, check whether any test covers:
 
 Use coverage output for the changed lines when the project has it. Coverage that reaches a line without asserting on it does not count.
 
+## Requirement parity and untested outputs
+
+- When the story or PR says "keep the output identical" or "no behavior change", pick one input of each type the changed code handles and compare old and new output per field (value, type, precision, timezone, name). A passing suite does not answer this. Report each type with no test that pins the old output.
+- For every catch-all branch (`else`, `default`, `str(value)`, fallback conversion), list the input types that reach it and the output each produces. Report any type that no test reaches or whose output is not valid for the destination. `bytes`, `Decimal`, JSON values, and `datetime` are the usual ones.
+- A test that fakes the clock, the database, or the arguments cannot prove behavior that depends on the real one (column types, timezones, year-pinned names). Report it as a gap and name what the real check needs. See [review-blind-spots](../../review-blind-spots/SKILL.md).
+
 ## Mocks
 
 Report a test that mocks the code it claims to test, or mocks what it could run locally. A mock is fine for what cannot run in the test environment.
 
 ## Severity
 
-- `HIGH`: a changed branch or failure path with no test reaching it, or a test that still passes after the behavior is broken.
+- `HIGH`: a changed branch or failure path with no test reaching it, a catch-all branch whose output is wrong for a reachable type, an output-parity claim with no comparison, or a test that still passes after the behavior is broken.
 - `MEDIUM`: a test pinned to the implementation, or a missing boundary case.
 - `LOW`: a loose assertion that a stricter one in the same test would fix.

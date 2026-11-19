@@ -19,6 +19,7 @@ the diff, a config file, or declared as an [ASSUMPTION]. This skill does not fix
 - Do not recommend broad rewrites, abstractions, or style churn unless they prevent a verified bug.
 - If evidence is weak, label the assumption or omit the finding.
 - Prefer findings with a concrete repro, failing test, config violation, or line-level reasoning.
+- Apply [review-blind-spots](../review-blind-spots/SKILL.md) to every changed line, in every agent. Reading only the diff does not verify the database, schema, other repo, or consumer it talks to. Those gaps become findings, not footnotes.
 
 ## Evidence tiers
 

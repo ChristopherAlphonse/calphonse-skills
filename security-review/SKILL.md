@@ -12,6 +12,7 @@ Find and prevent vulnerabilities that cross a real trust boundary. Four modes, o
 
 - Define assets, actors, trust boundaries, and assumptions before recommending controls.
 - A finding names the lower-trust principal, the input or action, the control that should stop it, the boundary crossed, and the concrete result. A missing best practice, guessed deployment behavior, or self-impact is not a finding.
+- A sentence that approves behavior ("errors are logged safely", "secrets are not exposed") names the function and lines read, and covers every call site and `except` or `catch` the diff touches. A claim true of a neighboring helper is a misreading. See [review-blind-spots](../review-blind-spots/SKILL.md) check 5.
 - Prefer the smallest mitigation that closes the verified risk. Do not add speculative security machinery.
 - Do not rewrite unrelated auth, validation, or persistence code while fixing one issue.
 - Verify security claims with tests, config checks, dependency evidence, or threat-model reasoning. Do not assume deployment facts that are not in the source: report them as needing validation with the exact missing fact.

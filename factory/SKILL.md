@@ -87,7 +87,7 @@ Each stage's agent writes the file named here with the status line first. `JOB a
 | build | `swe` plus stack skills, one task at a time, no commits | `build.md` with `STATUS: READY` or `BLOCKED`. Run `JOB progress <id> <done> <total>` after each task | to `gate`, or `needs-human` when blocked |
 | gate | `JOB gate <id>` (a script, not an agent) | `round-N/checks.md` with `GATE: PASS` or `FAIL` | to `review` on pass, `build` on fail |
 | review | see Reviewers | `round-N/review-<name>.md` with `VERDICT: PASS` or `CHANGES`, then `reconcile.md` from `reconcile-reviews` when anything is CHANGES | to `polish` when all pass, else `build` |
-| polish | `comment-sicko`, then `unslop` on prose touched | `polish.md` with `STATUS: DONE` or `REWORK`. No commit | to `gate` when done (the gate reruns), `build` when comment-sicko condemns workaround code that needs a real fix |
+| polish | `comment-sicko`, then `simplify` on prose touched | `polish.md` with `STATUS: DONE` or `REWORK`. No commit | to `gate` when done (the gate reruns), `build` when comment-sicko condemns workaround code that needs a real fix |
 | gate again | `JOB gate <id>` | `round-N/checks.md` | to `prove` on pass |
 | prove | `prove-it-works` | `uat.md` with `STATUS: PASS` or `FAIL` | to `ship` on pass, `build` on fail |
 | ship | `pr-body-style` (+ `demo-script` optional) | `pr-body.md`, and `commit.md` holding the commit message | **user clicks Commit locally on the board**, then to `ready` |
@@ -107,7 +107,7 @@ For a build job the files are the whole repo. Review jobs (see `factory-review`)
 
 ### Reviewers
 
-`code-review-frontend`, `qa-review`, and `test-review` always. Add `security-review` when the diff touches auth, input handling, secrets, or headers, and `architecture-review` when it crosses service or module boundaries. Register the extras with `JOB route <id> security,architecture` before spawning. Review names on disk are `code`, `qa`, `test`, `security`, `architecture`.
+`qa-review` and `test-review` always, and a `code` reviewer whose skill follows the files in the diff: `code-review-frontend` for TypeScript, JavaScript, and React only, `python` for Python, `dotnet` for C#, `aws` for Terraform and CDK, and the repo's own tooling for any other language. Never use a frontend skill on backend code. Add `security-review` when the diff touches auth, input handling, secrets, or headers, and `architecture-review` when it crosses service or module boundaries. Register the extras with `JOB route <id> security,architecture` before spawning. Review names on disk are `code`, `qa`, `test`, `security`, `architecture`.
 
 ## Run
 

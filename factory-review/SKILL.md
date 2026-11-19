@@ -86,19 +86,29 @@ Each stage's agent writes the file named here with the status line first. `JOB a
 
 | Stage | Skill | Writes | Advance when |
 | --- | --- | --- | --- |
-| scope | `code-review-frontend` step 0 (find the repo's lint, type, and test tooling), plus `whats-going-on` if `.planning/` has no map | `scope.md` with `STATUS: READY`, or `rejection.md` for a diff not worth reviewing | to `review`, or `rejected` |
-| review | see Reviewers | `reviews/review-<name>.md` with `VERDICT: PASS` or `VERDICT: CHANGES`, findings with severity, file and line, evidence, and tag | every reviewer has a verdict |
-| reconcile | `reconcile-reviews`, merge step only | `reconcile.md` with `STATUS: READY`, one ranked list | to `verify` |
+| scope | discover the repo's own lint, type, and test tooling for its language, plus `whats-going-on` if `.planning/` has no map, plus the Boundary map below | `scope.md` with `STATUS: READY`, or `rejection.md` for a diff not worth reviewing | to `review`, or `rejected` |
+| review | see Reviewers, each applying `review-blind-spots` | `reviews/review-<name>.md` with `VERDICT: PASS` or `VERDICT: CHANGES`, findings with severity, file and line, evidence, and tag, and a `Blind spots` section | every reviewer has a verdict |
+| reconcile | `reconcile-reviews`, merge step only | `reconcile.md` with `STATUS: READY`, one ranked list that includes every open question from the Boundary map | to `verify` |
 | verify | `prove-it-works` applied to the findings | `verified.md` with `STATUS: READY` | to `report` |
-| report | `unslop` | `report.md` and `comments.md` | to `ready` |
+| report | `simplify` | `report.md` and `comments.md` | to `ready` |
 
 A reviewer that cannot proceed writes `blocked.md` with `STATUS: BLOCKED`. `JOB advance <id> needs-human` then parks the job, and the user resumes it with Unblock.
+
+### Boundary map
+
+The scope agent reads the story, PR or MR text, and linked ticket if they are in the job folder or the repo, and writes a `Boundary map` section in `scope.md`:
+
+- Every outside system the diff reads or writes: database tables, columns, and views, schema or infra repos, shared libraries, queues, files other jobs consume. For each, the path where its real definition lives (a repo under `$GITLAB_MIRROR_ROOT`, a migration file, a schema file) and whether it is reachable from this machine.
+- Every requirement of the form "keep the output identical", "no behavior change", or "backward compatible", quoted.
+- Every year, version, or name pinned in the diff, with the date it stops being right.
+
+Reviewers open each reachable definition and read it. Reviewers raise each unreachable one as an `UNCHECKED: <what> in <where>` finding, not a footnote. Reviewers do not describe "identical" output. They compare it, per [review-blind-spots](../review-blind-spots/SKILL.md) check 4.
 
 ### Reviewers
 
 | Name | Skill | Always |
 | --- | --- | --- |
-| `code` | `code-review-frontend` for TypeScript and React, plus `dotnet` for C# files and `python` for Python files | yes |
+| `code` | the stack's own skill, see Code reviewer lens | yes |
 | `qa` | `qa-review` | yes |
 | `test` | `test-review` | yes |
 | `security` | `security-review` | when the diff touches auth, input handling, secrets, headers, or file uploads |
@@ -106,7 +116,21 @@ A reviewer that cannot proceed writes `blocked.md` with `STATUS: BLOCKED`. `JOB 
 
 Register the extras before the review stage with `JOB route <id> security,architecture`. Review names on disk are `code`, `qa`, `test`, `security`, and `architecture`.
 
-Each reviewer does an independent review and does not copy `scope.md`. It writes only its own file.
+Each reviewer does an independent review and does not copy `scope.md`, except the Boundary map, which it must work through. Every reviewer's brief includes [review-blind-spots](../review-blind-spots/SKILL.md) and the Boundary map path. A review file with no `Blind spots` section, or with a blank row in it, is sent back once. It writes only its own file.
+
+### Code reviewer lens
+
+The `code` reviewer's skill follows the files in the diff. Never use a frontend skill on non-frontend code.
+
+| Files in the diff | `code` reviewer uses |
+| --- | --- |
+| `.ts`, `.tsx`, `.js`, `.jsx` and variants | `code-review-frontend`, with `typescript-strict-style`, plus `vercel-react-best-practices` for React |
+| `.py`, `.pyi`, `pyproject.toml` | `python` (its anti-pattern checklist and the sub-skill that fits the change), not `code-review-frontend` |
+| `.cs`, `.csproj`, `.cshtml`, `.razor` | `dotnet`, not `code-review-frontend` |
+| `.tf`, `cdk.json`, `serverless.yml` | `aws`, not `code-review-frontend` |
+| Any other language | The repo's own lint, type, and test tooling, and `review-blind-spots`. No frontend skill |
+
+A mixed diff gets each row that matches, applied only to its own files. `review-blind-spots` applies in every row. The scope stage discovers tooling from the repo's own config for every language, so it never depends on a frontend skill.
 
 ### Stack skills
 
@@ -131,11 +155,13 @@ The verifier did not write the reviews and must not trust them. For each ranked 
 2. Reruns every behavior or `VERIFIED (ran)` claim with its own command in a scratch copy, and records the command and the real output.
 3. Marks the finding `CONFIRMED`, `DROPPED` (does not reproduce, or is wrong), or `UNVERIFIABLE` (cannot be run here, with the reason).
 
-It ends `verified.md` with `CONFIRMED: n, DROPPED: n, UNVERIFIABLE: n`.
+It also rereads every sentence in the reviews that approves behavior ("handled", "safe", "correct", "by design") against the lines it cites. A sentence about the wrong function, or one that skips a call site, is recorded as `MISREAD` and returns to the ranked list as a finding. Finally it checks each Boundary map entry has either a read definition or an `UNCHECKED` finding.
+
+It ends `verified.md` with `CONFIRMED: n, DROPPED: n, UNVERIFIABLE: n, MISREAD: n`.
 
 ### Report
 
-`report.md` starts with exactly three lines: `STATUS: READY`, `FINDINGS: <n>`, and `BLOCKERS: <n>`. `FINDINGS` counts the confirmed findings it includes. Then a one-paragraph summary with a recommendation, and the ranked findings with file, line, and one sentence of evidence.
+`report.md` starts with exactly three lines: `STATUS: READY`, `FINDINGS: <n>`, and `BLOCKERS: <n>`. `FINDINGS` counts the confirmed findings it includes. `UNCHECKED` findings and `UNVERIFIABLE` ones count as findings and appear in the ranked list, never only in a footer. Then a one-paragraph summary with a recommendation, and the ranked findings with file, line, and one sentence of evidence. The recommendation may say "safe to merge" only when no `UNCHECKED` finding on a behavior the change depends on is open. Otherwise it says "merge after answering" and lists them. The report ends with `Not checked`, where each item names the owner and the file or system to look at.
 
 `comments.md` holds one paste-ready comment per finding. Each starts with `file:line` on its own line, then one to three short sentences. The user pastes them into the MR by hand, or tells you to post them (see Enterprise policy).
 

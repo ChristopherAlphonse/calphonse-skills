@@ -1,6 +1,6 @@
 # STYLE RULES
 
-Check every draft against the [unslop](../../unslop/SKILL.md) skill. The rules below add to it.
+Check every draft against the [simplify](../../simplify/SKILL.md) skill. The rules below add to it.
 
 - **No em dashes (—).** Use periods, commas, or colons to break up sentences instead. This includes text already in a file you edit: before finishing, search the file for the character and replace every one.
 - **No passive voice** where active is possible.

@@ -24,13 +24,13 @@ All skills live at the repository root as `{skill-name}/SKILL.md`. `AGENTS.md` i
 | [python](python/SKILL.md) | Index and router for Python work: asyncio, background jobs, code style, configuration, design patterns, error handling, observability, packaging, performance, project structure, resilience, resource management, pytest, type safety, uv, and an anti-pattern checklist |
 | [qa-review](qa-review/SKILL.md) | Strict maintainability review of the author's changes only: abstraction quality, giant files, spaghetti-condition growth |
 | [reconcile-reviews](reconcile-reviews/SKILL.md) | Merge several review documents of one PR/MR into a ranked fix list with file and line numbers (agree/differ, evidence-weighted), then optionally post it as inline MR comments |
+| [review-blind-spots](review-blind-spots/SKILL.md) | Seven checks every code review applies beyond the diff: real database, schema, and other-repo definitions, catch-all branches, year-pinned values, output-parity requirements, traced "this is fine" claims, and open questions that block "safe to merge" |
 | [security-review](security-review/SKILL.md) | Secure-coding checklist, focused security guidance, OWASP scans of source and running apps you own (Semgrep, ZAP), and full evidence-based codebase audits (recon, hunting, independent validation, schema-checked findings and reports), with OWASP Top 10, cloud, and attack-class references |
 | [simplify](simplify/SKILL.md) | Restate the last message in plain human language, with no jargon |
 | [spike](spike/SKILL.md) | Throwaway experiments, sized in story points, that answer a feasibility question before committing to a real build; the deliverable is the verdict, not the code |
 | [swe](swe/SKILL.md) | Pragmatic dev mode: smallest change that fully solves the task, and a reply a busy human reads once |
 | [test-review](test-review/SKILL.md) | Judge whether a diff is adequately tested: sequential sub-agents for regression, behavior, concurrency, and mutation, reporting with proof and never editing the repo |
 | [typescript-strict-style](typescript-strict-style/SKILL.md) | Strict TS/JS discipline: assertion safety, exhaustive error handling, function size, naming, performance, dependency minimalism |
-| [unslop](unslop/SKILL.md) | Cut AI tells from any writing, with stable rule numbers other skills cite |
 | [vercel-react-best-practices](vercel-react-best-practices/SKILL.md) | React and Next.js performance rules from Vercel Engineering, plus general frontend patterns (components, hooks, state, forms, a11y) |
 | [whats-going-on](whats-going-on/SKILL.md) | One-pass codebase intelligence sweep: produces architecture.md, onboard.md (stack, conventions, concerns, use cases), and simplify-onboarding.md |
 

@@ -13,7 +13,6 @@ Rules:
 - Aim for 1-3 sentences unless the original had several distinct points or decisions.
 - No analogies unless the idea can't be said plainly.
 - Don't add new information or re-argue the original.
-- Check the result against the [unslop](../unslop/SKILL.md) skill, mainly rules 26 to 33.
 
 If the user gives you their own sentence and asks whether it reads correctly, read `references/sentence-check.md` instead.
 

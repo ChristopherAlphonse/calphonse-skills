@@ -99,7 +99,7 @@ flowchart LR
     gate1 -->|"fail"| build
     gate1-->|"pass"| review["review<br/>code, qa, test<br/>+ security, architecture"]
     review -->|"changes"| build
-    review -->|"all pass"| polish["polish<br/>comment-sicko, unslop"]
+    review -->|"all pass"| polish["polish<br/>comment-sicko, simplify"]
     polish --> gate2["gate again"]
     gate2 --> prove["prove<br/>prove-it-works"]
     prove -->|"fail"| build
@@ -158,7 +158,7 @@ A skill is a Markdown file the agent reads when a task matches. You can name it 
 
 Skills are small on purpose, and some call others:
 
-- `unslop` is the shared writing check. `swe`, `simplify`, `pr-body-style`, `documentation-writer`, `performance-review-humanizer`, `factory`, and `factory-review` all point at it.
+- `simplify` is the shared writing check. `swe`, `pr-body-style`, `documentation-writer`, `performance-review-humanizer`, `factory`, and `factory-review` all point at it.
 - `security-review` runs `lets-talk-about-it` before it signs off.
 - `code-review-frontend` falls back to `whats-going-on` when a repo has no codebase map.
 - `factory` and `factory-review` call most of the others as stages.
@@ -185,7 +185,6 @@ Skills are small on purpose, and some call others:
 | Write a short, accurate PR description                     | [pr-body-style](pr-body-style/SKILL.md)                                                                                                                                                                                                             | "Write the PR body"                                 |
 | Explain a change out loud to stakeholders                  | [demo-script](demo-script/SKILL.md)                                                                                                                                                                                                                 | "Write a demo script for this"                      |
 | Write or fix documentation                                 | [documentation-writer](documentation-writer/SKILL.md)                                                                                                                                                                                               | "Write a how-to for X"                              |
-| Make writing sound less like AI                            | [unslop](unslop/SKILL.md)                                                                                                                                                                                                                           | "Unslop this"                                       |
 | Get a plain-language version of a reply                    | [simplify](simplify/SKILL.md)                                                                                                                                                                                                                       | "ELI5"                                              |
 | Turn a self-review into warmer first-person prose          | [performance-review-humanizer](performance-review-humanizer/SKILL.md)                                                                                                                                                                               | "Humanize my performance review"                    |
 | Work with AWS, .NET, React, TypeScript, or a Next.js proxy | [aws](aws/SKILL.md), [dotnet](dotnet/SKILL.md), [vercel-react-best-practices](vercel-react-best-practices/SKILL.md), [typescript-strict-style](typescript-strict-style/SKILL.md), [nextjs-proxy-csp-hardening](nextjs-proxy-csp-hardening/SKILL.md) | Name the stack in your task                         |
@@ -245,7 +244,6 @@ Review skills report. They do not edit your code.
 | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | [documentation-writer](documentation-writer/SKILL.md)                 | Writes docs in one of four Diátaxis modes (tutorial, how-to, reference, explanation) and never mixes them. Includes product copy principles.       | You write or restructure documentation.                                 |
 | [demo-script](demo-script/SKILL.md)                                   | Writes a short spoken script: previously, now, the demonstration, the result, and the business impact. Never invents metrics.                      | You present a change to people who care about the outcome.              |
-| [unslop](unslop/SKILL.md)                                             | A numbered list of AI writing tells to find and cut. The numbers are stable so other skills can cite them.                                         | You draft or edit any prose and want it to read like a person wrote it. |
 | [simplify](simplify/SKILL.md)                                         | Restates the last message in plain language: the outcome first, then the one reason that matters.                                                  | You say "I don't follow" or "ELI5".                                     |
 | [performance-review-humanizer](performance-review-humanizer/SKILL.md) | Rewrites your first-person self-review in a warmer voice. Keeps every fact and number. Can borrow the style of a sample without copying its words. | You have a draft self-review that reads stiff.                          |
 

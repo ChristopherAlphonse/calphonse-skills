@@ -53,7 +53,7 @@ Never end by handing the user commands to push or open the PR. Do it. Skip publi
 - Keep the description to 1 short paragraph plus 2-4 bullets when bullets help scanning.
 - Mention technical details only when they clarify behavior, reviewer risk, compatibility, CI impact, or deployment impact.
 - Avoid method-by-method or file-by-file narration unless the user explicitly asks for implementation detail.
-- Check the wording against the [unslop](../unslop/SKILL.md) skill.
+- Check the wording against the [simplify](../simplify/SKILL.md) skill.
 - Keep wording plain and direct. Prefer "Moves retry handling into the shared HTTP client" over deep root-cause prose.
 - Make every claim match the actual diff and current check status. Read the git host's CI status when a PR exists. Never run a test suite or build to write the body: it takes minutes and costs credits. If CI status is unavailable, list the steps a reviewer would follow under How to Test. Do not write "Not run" and do not flag unverified checks in the reply.
 - Writing a body is a quick task (only the publish step writes anything): read `git diff --stat` and the diff of the changed source files, then write. Do not run long commands. Finish in one or two tool calls after reading.

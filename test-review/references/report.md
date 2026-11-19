@@ -16,6 +16,8 @@ Read this in stage 6. Verify the handoff file, then write the verdict.
 - `REQUEST TESTS`: any other `HIGH` finding, or several `MEDIUM` findings.
 - `APPROVE`: no `HIGH` findings, and the stages that applied did run. A skipped or gap stage prevents `APPROVE` unless the reason is that it does not apply.
 
+A behavior that depends on the real database, a schema, or another repo and was only faked in tests is a gap, listed under what was not tested. It prevents `APPROVE` when the change's correctness rests on it.
+
 Do not approve because the suite is green. A green suite that cannot fail proves nothing.
 
 ## Format
