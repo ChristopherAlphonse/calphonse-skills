@@ -2,7 +2,7 @@
 
 Factory-review reviews a branch with the review and QA skills in this repo. It scopes the change, runs independent reviewers, merges their findings into one ranked list, checks every finding by rerunning the evidence, and writes a report with comments you paste by hand. A script moves each job from stage to stage and checks the evidence before every move. You follow the work on a kanban board.
 
-It is read-only. It never edits the code under review, never commits, and never posts to a forge.
+It is read-only. It never edits the code under review and never commits. It posts `comments.md` to the MR only when you tell it to, once.
 
 To build a feature, use the separate `factory` skill. The two have the same layout (`bin/job`, `bin/tick`, `dashboard/`, `tests/`) and differ in the workflow: `factory` builds, `factory-review` reviews. Each has its own engine and its own state folder, so neither needs the other installed.
 
@@ -148,7 +148,8 @@ Use `watch` to see what an agent is doing. Use `serve` only to unblock a parked 
 | Read and run the reviewed code | yes, in the worktree or a scratch copy | |
 | Edit the reviewed code | no | |
 | Unblock a parked job | no | yes |
-| Post a comment, push, open or comment on a PR or MR | no | your own step, outside factory-review |
+| Post `comments.md` to the MR | only after you say so, once | or paste it yourself |
+| Push, open a PR or MR, approve | no | your own step, outside factory-review |
 
 `unblock` is not a CLI command. It runs only inside `bin/job serve`. The board starts only in an interactive terminal. It binds to localhost and prints a one-time code that is valid for 5 minutes. The code becomes a session cookie. Every action also needs a custom header and a loopback `Host`. The key lives only in the server's memory, and the git hooks check its hash.
 

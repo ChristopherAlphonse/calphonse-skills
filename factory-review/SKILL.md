@@ -1,6 +1,6 @@
 ---
 name: factory-review
-description: Run a code review through the review and QA skills in this repo as a staged workflow, with a kanban board, a scripted state machine, and a headless tick. Point it at a branch or diff and it scopes the change, runs independent reviewers in parallel, reconciles them into one ranked list, verifies every finding by rerunning the evidence, and writes a report with paste-ready comments. Picks skills for the codebase automatically (TypeScript and React get typescript-strict-style and vercel-react-best-practices, C# gets dotnet, Python gets python). Use when the user wants a branch, PR, or MR reviewed end to end, a verified review, or a review pipeline. Read-only. Never edits the code under review, commits, pushes, or posts comments. To build a feature, use factory instead.
+description: Run a code review through the review and QA skills in this repo as a staged workflow, with a kanban board, a scripted state machine, and a headless tick. Point it at a branch or diff and it scopes the change, runs independent reviewers in parallel, reconciles them into one ranked list, verifies every finding by rerunning the evidence, and writes a report with paste-ready comments. Picks skills for the codebase automatically (TypeScript and React get typescript-strict-style and vercel-react-best-practices, C# gets dotnet, Python gets python). Use when the user wants a branch, PR, or MR reviewed end to end, a verified review, or a review pipeline. Read-only. Never edits the code under review, commits, or pushes. Posts `comments.md` to the MR only after the user explicitly says so. To build a feature, use factory instead.
 ---
 
 # Factory-review
@@ -38,7 +38,7 @@ These hold in every harness and are enforced by structure, not by this text.
 - **Baseline shell rules.** `policy.yaml` is the human-in-the-loop baseline for every harness (Claude Code, Kiro, OpenCode). It denies `git push`, `aws s3 rm`, and `curl -X POST`, asks before every git verb that changes a repository, and allows a list of read-only commands. Deny beats ask, and ask beats allow. A command no rule names is not allowed, so it waits for a human. `TICK` turns the file into each harness's format and refuses a headless pass until the project's policy covers it. The factory's own denies below are stricter, never looser.
 - **Read-only.** Reviewers read and run code. They never edit, create, or delete anything inside the job's worktree. The only files a reviewer may write are under `.planning/factory-review/`: its review file, scratch copies, and the final report. The harness's file-write rules enforce that, and `.worktrees/` is denied. The worktree is at the exact reviewed commit. A changed tracked file, a moved branch, or changed hooks parks the job on the user.
 - **No commit, push, PR, or MR.** Nothing is ever committed. The worktree's hooks refuse every commit and every push of the review branch.
-- **Never post.** No comments, reviews, or approvals reach any forge. `reconcile-reviews` can post inline MR comments, and this workflow never uses that path. Use only its merge step.
+- **Never post, unless the user says so.** No comments, reviews, or approvals reach any forge on the agent's own initiative, and never in a headless `TICK` pass. The one exception is the job's own `comments.md` (for example `.planning/factory-review/jobs/mr-95-r2/comments.md`), after the user explicitly tells you in this session to post it. Post each comment once, through the forge MCP tool (never `glab`, `curl`, or `wget`), then write `posted.md` in the job folder listing what went out. If `posted.md` exists, do not post again unless the user asks. Approvals and reviews are never posted. `reconcile-reviews` is used only for its merge step.
 - **Never run** `git commit`, `git push`, `git merge`, `git rebase`, `git config`, `git -c`, `git -C`, `gh`, `glab`, `curl`, or `wget`. Never use the network.
 - **Never** try to run `unblock`, or to start `JOB serve`. They belong to the user, and the CLI refuses them. `JOB watch` is the exception: it is a read-only board with no key and no action routes, and you may start it so the user can follow along.
 - **Audit.** Every state change is one line in `.planning/factory-review/audit.log`.
@@ -137,7 +137,7 @@ It ends `verified.md` with `CONFIRMED: n, DROPPED: n, UNVERIFIABLE: n`.
 
 `report.md` starts with exactly three lines: `STATUS: READY`, `FINDINGS: <n>`, and `BLOCKERS: <n>`. `FINDINGS` counts the confirmed findings it includes. Then a one-paragraph summary with a recommendation, and the ranked findings with file, line, and one sentence of evidence.
 
-`comments.md` holds one paste-ready comment per finding. Each starts with `file:line` on its own line, then one to three short sentences. The user pastes them into the MR by hand.
+`comments.md` holds one paste-ready comment per finding. Each starts with `file:line` on its own line, then one to three short sentences. The user pastes them into the MR by hand, or tells you to post them (see Enterprise policy).
 
 ## Run
 
@@ -160,4 +160,4 @@ Columns: Scope, Review, Reconcile, Verify, Report, Needs you, Ready to land. A c
 
 ## Out of scope
 
-This workflow does not fix what it finds. For code changes, use `factory`. It never posts to a forge, merges, or deploys. `ready` means the report and the paste-ready comments are written.
+This workflow does not fix what it finds. For code changes, use `factory`. It never posts to a forge on its own, merges, or deploys. It posts `comments.md` only after the user's explicit permission. `ready` means the report and the paste-ready comments are written.

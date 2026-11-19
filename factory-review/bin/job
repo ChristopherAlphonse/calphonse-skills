@@ -43,7 +43,7 @@ HINT = {
     "review": "code (code-review-frontend, plus dotnet for C# and python for Python), qa (qa-review), test (test-review), and routed extras -> reviews/review-<name>.md; read-only, never edit",
     "reconcile": "reconcile-reviews -> reconcile.md (STATUS: READY), one ranked list with file and line",
     "verify": "prove-it-works: rerun every VERIFIED (ran) command and check every cited line -> verified.md (STATUS: READY), drop what does not reproduce",
-    "report": "unslop -> report.md (STATUS: READY, FINDINGS: n, BLOCKERS: n) and comments.md to paste by hand; never post",
+    "report": "unslop -> report.md (STATUS: READY, FINDINGS: n, BLOCKERS: n) and comments.md to paste by hand; post only if the user says so, once",
 }
 STACK_RULES = [
     ("typescript-strict-style", {".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"}, set()),
