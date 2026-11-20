@@ -107,7 +107,7 @@ For a build job the files are the whole repo. Review jobs (see `factory-review`)
 
 ### Reviewers
 
-`qa-review` and `test-review` always, and a `code` reviewer whose skill follows the files in the diff: `code-review-frontend` for TypeScript, JavaScript, and React only, `python` for Python, `dotnet` for C#, `aws` for Terraform and CDK, and the repo's own tooling for any other language. Never use a frontend skill on backend code. Add `security-review` when the diff touches auth, input handling, secrets, or headers, and `architecture-review` when it crosses service or module boundaries. Register the extras with `JOB route <id> security,architecture` before spawning. Review names on disk are `code`, `qa`, `test`, `security`, `architecture`.
+`qa-review` and `test-review` always, and a `code` reviewer whose skill follows the files in the diff: `code-review-frontend` for TypeScript, JavaScript, and React only, `python` for Python, `dotnet` for C#, `aws` for Terraform and CDK, and the repo's own tooling for any other language. Never use a frontend skill on backend code. Add `architecture-review` when it crosses service or module boundaries. Register the extra with `JOB route <id> architecture` before spawning. Review names on disk are `code`, `qa`, `test`, `architecture`.
 
 ## Run
 

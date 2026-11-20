@@ -64,7 +64,7 @@ Each stage runs the skill that owns it. A fresh subagent does the work and write
 | spec | `prd-mode` | `spec.md` | your approval on the board |
 | build | `swe` plus stack skills | `build.md` | `STATUS: READY`, changes left uncommitted |
 | gate | `bin/job gate` (a script) | `round-N/checks.md` | `GATE: PASS` |
-| review | a `code` reviewer whose skill follows the diff (`code-review-frontend` for TS/JS/React only, `python`, `dotnet`, `aws`), `qa-review`, `test-review`, plus `security-review` or `architecture-review` when the diff calls for them | `round-N/review-<name>.md`, then `reconcile.md` if anything is CHANGES | `VERDICT: PASS` from every reviewer |
+| review | a `code` reviewer whose skill follows the diff (`code-review-frontend` for TS/JS/React only, `python`, `dotnet`, `aws`), `qa-review`, `test-review`, plus `architecture-review` when the diff calls for it | `round-N/review-<name>.md`, then `reconcile.md` if anything is CHANGES | `VERDICT: PASS` from every reviewer |
 | polish | `comment-sicko`, then `simplify` | `polish.md` | `STATUS: DONE`, then a fresh gate run |
 | prove | `prove-it-works` | `uat.md` | `STATUS: PASS` |
 | ship | `pr-body-style` | `pr-body.md` and `commit.md` | your Commit locally click |
@@ -201,7 +201,7 @@ The board is written in TypeScript, in `dashboard/*.ts`. The server reads the ge
 | `bin/job queue` | list jobs as `action id stage hint` |
 | `bin/job advance <id> <stage>` | move a job if the evidence allows it |
 | `bin/job gate <id>` | run `checks` in the worktree and record the result and tree hash |
-| `bin/job route <id> security,architecture` | add reviewers |
+| `bin/job route <id> architecture` | add a reviewer |
 | `bin/job progress <id> <done> <total>` | set the task progress bar |
 | `bin/job note <id> "<text>"` | record what the agent is doing now; the card shows the latest note |
 | `bin/job serve [port]` | start the board with the approve, commit, and unblock buttons (needs your terminal, default port 8765) |

@@ -675,6 +675,6 @@ REPORT FORMAT:
 With both reports in hand, verify yourself: do not delegate this step:
 
 1. For each Blue Team fix, confirm it actually closes the matching Red Team finding (re-read the diff, don't trust the agent's own claim).
-2. Cross-check the resulting policy against `security-review/references/owasp-top-10.md`: CSP work maps mainly to A03 (Injection/XSS) and A05 (Security Misconfiguration): confirm the fix doesn't leave either open.
+2. Cross-check the resulting policy against OWASP A03 (Injection/XSS) and A05 (Security Misconfiguration): confirm the fix doesn't leave either open.
 3. Confirm the four no-fallback directives (`base-uri`, `object-src`, `form-action`, `frame-ancestors`) are present and not weakened by the fix.
 4. Report: findings count, fixes applied, any finding left open and why, and the OWASP mapping checked. Apply the diff only after the user confirms.

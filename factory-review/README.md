@@ -10,7 +10,7 @@ To build a feature, use the separate `factory` skill. The two have the same layo
 
 ## Quick start
 
-1. Link `factory-review` and the skills it calls into `~/.claude/skills`: `code-review-frontend`, `qa-review`, `test-review`, `security-review`, `architecture-review`, `reconcile-reviews`, `prove-it-works`, `simplify`, `whats-going-on`, plus `typescript-strict-style`, `vercel-react-best-practices`, `dotnet`, and `python` for those stacks.
+1. Link `factory-review` and the skills it calls into `~/.claude/skills`: `code-review-frontend`, `qa-review`, `test-review`, `architecture-review`, `reconcile-reviews`, `prove-it-works`, `simplify`, `whats-going-on`, plus `typescript-strict-style`, `vercel-react-best-practices`, `dotnet`, and `python` for those stacks.
 2. Install the policy for your harness in the project: `bin/tick install claude`. It comes from `policy.yaml`.
 3. Fetch the branch you want reviewed. The review never reaches a forge:
 
@@ -65,7 +65,7 @@ Each stage runs the skill that owns it. A fresh subagent does the work and write
 | Stage | Skill | File it writes |
 | --- | --- | --- |
 | scope | the repo's own tooling discovery | `scope.md` |
-| review | a `code` reviewer whose skill follows the diff (`code-review-frontend` for TS/JS/React only, `python`, `dotnet`, `aws`), `qa-review`, `test-review`, and `security-review` or `architecture-review` when routed | `reviews/review-<name>.md` |
+| review | a `code` reviewer whose skill follows the diff (`code-review-frontend` for TS/JS/React only, `python`, `dotnet`, `aws`), `qa-review`, `test-review`, and `architecture-review` when routed | `reviews/review-<name>.md` |
 | reconcile | `reconcile-reviews` (merge step only) | `reconcile.md` |
 | verify | `prove-it-works` on the findings | `verified.md` |
 | report | `simplify` | `report.md` and `comments.md` |

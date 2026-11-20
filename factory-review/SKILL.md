@@ -111,10 +111,9 @@ Reviewers open each reachable definition and read it. Reviewers raise each unrea
 | `code` | the stack's own skill, see Code reviewer lens | yes |
 | `qa` | `qa-review` | yes |
 | `test` | `test-review` | yes |
-| `security` | `security-review` | when the diff touches auth, input handling, secrets, headers, or file uploads |
 | `architecture` | `architecture-review` | when the diff crosses service or module boundaries |
 
-Register the extras before the review stage with `JOB route <id> security,architecture`. Review names on disk are `code`, `qa`, `test`, `security`, and `architecture`.
+Register the extra before the review stage with `JOB route <id> architecture`. Review names on disk are `code`, `qa`, `test`, and `architecture`.
 
 Each reviewer does an independent review and does not copy `scope.md`, except the Boundary map, which it must work through. Every reviewer's brief includes [review-blind-spots](../review-blind-spots/SKILL.md) and the Boundary map path. A review file with no `Blind spots` section, or with a blank row in it, is sent back once. It writes only its own file.
 

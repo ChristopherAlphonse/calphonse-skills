@@ -97,7 +97,7 @@ flowchart LR
     approve --> build["build<br/>swe + stack skills"]
     build --> gate1["gate<br/>your checks command"]
     gate1 -->|"fail"| build
-    gate1-->|"pass"| review["review<br/>code, qa, test<br/>+ security, architecture"]
+    gate1-->|"pass"| review["review<br/>code, qa, test<br/>+ architecture"]
     review -->|"changes"| build
     review -->|"all pass"| polish["polish<br/>comment-sicko, simplify"]
     polish --> gate2["gate again"]
@@ -138,7 +138,7 @@ flowchart LR
         r1["code"]
         r2["qa"]
         r3["test"]
-        r4["security / architecture<br/>only when the diff calls for them"]
+        r4["architecture<br/>only when the diff calls for it"]
     end
     review --> reconcile["reconcile<br/>one ranked list"]
     reconcile --> verify["verify<br/>rerun every claim"]
@@ -159,7 +159,6 @@ A skill is a Markdown file the agent reads when a task matches. You can name it 
 Skills are small on purpose, and some call others:
 
 - `simplify` is the shared writing check. `swe`, `pr-body-style`, `documentation-writer`, `performance-review-humanizer`, `factory`, and `factory-review` all point at it.
-- `security-review` runs `lets-talk-about-it` before it signs off.
 - `code-review-frontend` falls back to `whats-going-on` when a repo has no codebase map.
 - `factory` and `factory-review` call most of the others as stages.
 
@@ -179,7 +178,6 @@ Skills are small on purpose, and some call others:
 | Review a React or TypeScript PR                            | [code-review-frontend](code-review-frontend/SKILL.md)                                                                                                                                                                                               | "Review this PR"                                    |
 | Review a branch end to end and get paste-ready comments    | [factory-review](factory-review/SKILL.md)                                                                                                                                                                                                           | "/factory-review main my-branch"                    |
 | Merge several reviews into one fix list                    | [reconcile-reviews](reconcile-reviews/SKILL.md)                                                                                                                                                                                                     | "Reconcile these reviews"                           |
-| Check code for vulnerabilities                             | [security-review](security-review/SKILL.md)                                                                                                                                                                                                         | "Security review the auth changes"                  |
 | Confirm work is really done                                | [prove-it-works](prove-it-works/SKILL.md)                                                                                                                                                                                                           | "Prove it works"                                    |
 | Strip noisy comments from a diff                           | [comment-sicko](comment-sicko/SKILL.md)                                                                                                                                                                                                             | "Run comment-sicko on this branch"                  |
 | Write a short, accurate PR description                     | [pr-body-style](pr-body-style/SKILL.md)                                                                                                                                                                                                             | "Write the PR body"                                 |
@@ -225,7 +223,6 @@ Review skills report. They do not edit your code.
 | [qa-review](qa-review/SKILL.md)                       | A strict maintainability review of the lines you changed, and only those. Looks for abstraction problems, oversized files, and growing condition chains. Ends with approve or block.                                         | You want a hard look at your own diff before it goes to review.  |
 | [test-review](test-review/SKILL.md)                   | Asks whether the tests would notice if the diff were wrong. Runs five focused checks in order (scope, regression, behavior, concurrency, mutation) in a throwaway worktree. Writes to `.planning/reviews/test-review/`.      | You want proof the tests are good, not a count of them.          |
 | [code-review-frontend](code-review-frontend/SKILL.md) | Finds the repo's lint, type, and test tooling, then runs specialist reviewers in parallel: a base checklist, TypeScript and React, frontend patterns, and Vercel performance. Every finding is `VERIFIED` or `[ASSUMPTION]`. | You review a frontend PR.                                        |
-| [security-review](security-review/SKILL.md)           | Four modes: a secure-coding checklist, focused guidance and threat modeling, OWASP scans (Semgrep and ZAP) of an app you own, and a full evidence-based audit with independently validated findings.                         | You add auth, input handling, or secrets, or you want an audit.  |
 | [reconcile-reviews](reconcile-reviews/SKILL.md)       | Compares several reviews of one PR, checks their claims against the code, ranks by evidence, and pins each fix to `path:line`. Can post inline MR comments when you ask.                                                     | Two or more reviewers disagree, and you need one list to act on. |
 | [factory-review](factory-review/SKILL.md)             | Runs the review skills above as a pipeline and verifies every finding. See [How factory-review works](#how-factory-review-works).                                                                                            | You want a whole branch reviewed and reported.                   |
 
@@ -300,5 +297,3 @@ Leave `~/.agents/skills` alone: it belongs to the Skills CLI and its lockfile.
 ## Notes
 
 Skills come from a mix of sources. Some are original, some are adapted from other repos with small changes.
-
-Some skills cross-reference siblings that live in other collections rather than this repo. The CSP bypass reference under `nextjs-proxy-csp-hardening` links to an upstream security set. Those links are informational; the skill still works standalone.
