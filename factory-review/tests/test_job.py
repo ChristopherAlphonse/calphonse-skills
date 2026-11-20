@@ -130,11 +130,9 @@ class TestStages(Review):
     def test_routed_reviewers_are_required_too(self):
         self.new_review()
         self.to_stage("r", "review")
-        self.ok("route", "r", "security,architecture")
+        self.ok("route", "r", "architecture")
         for r in ("code", "qa", "test"):
             self.wf("r", f"reviews/review-{r}.md", "VERDICT: PASS\n")
-        self.no("advance", "r", "reconcile")
-        self.wf("r", "reviews/review-security.md", "VERDICT: PASS\n")
         self.no("advance", "r", "reconcile")
         self.wf("r", "reviews/review-architecture.md", "VERDICT: CHANGES\n")
         self.adv("r", "reconcile")
@@ -142,7 +140,7 @@ class TestStages(Review):
     def test_route_refuses_unknown_names_and_accepts_known_ones(self):
         self.new_review()
         self.no("route", "r", "nonsense")
-        self.assertEqual(self.ok("route", "r", "security").stdout.strip(), "code,qa,test,security")
+        self.assertEqual(self.ok("route", "r", "architecture").stdout.strip(), "code,qa,test,architecture")
         self.assertEqual(self.ok("route", "r", "").stdout.strip(), "code,qa,test")
 
     def test_nothing_to_review_can_be_rejected_but_only_with_a_reason_on_file(self):
@@ -244,7 +242,7 @@ class TestReadOnly(Review):
 class TestAudit(Review):
     def test_every_move_is_logged_as_an_agent_action(self):
         self.new_review()
-        self.ok("route", "r", "security")
+        self.ok("route", "r", "architecture")
         self.ok("note", "r", "scoping")
         self.to_stage("r", "ready")
         lines = [e for e in self.audit_lines() if e["job"] == "r"]

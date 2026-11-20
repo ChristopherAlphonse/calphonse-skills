@@ -190,7 +190,7 @@ State lives in the project, never in this repo.
 | `bin/job create <id> "<title>" <base> <head>` | start a review job at scope |
 | `bin/job queue` | list jobs as `action id stage hint` |
 | `bin/job advance <id> <stage>` | move a job if the evidence allows it |
-| `bin/job route <id> security,architecture` | add reviewers |
+| `bin/job route <id> architecture` | add a reviewer |
 | `bin/job note <id> "<text>"` | record what the agent is doing now; the card shows the latest note |
 | `bin/job board` | print the link of the read-only board, starting it if needed |
 | `bin/job serve [port]` | start the board with the Unblock button (needs your terminal, default port 8765) |

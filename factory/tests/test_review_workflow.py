@@ -159,11 +159,9 @@ class TestStages(Review):
     def test_routed_reviewers_are_required_too(self):
         self.new_review()
         self.to_stage("r", "review")
-        self.ok("route", "r", "security,architecture")
+        self.ok("route", "r", "architecture")
         for r in ("code", "qa", "test"):
             self.wf("r", f"round-1/review-{r}.md", "VERDICT: PASS\n")
-        self.no("advance", "r", "reconcile")
-        self.wf("r", "round-1/review-security.md", "VERDICT: PASS\n")
         self.no("advance", "r", "reconcile")
         self.wf("r", "round-1/review-architecture.md", "VERDICT: CHANGES\n")
         self.adv("r", "reconcile")

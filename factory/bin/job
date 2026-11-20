@@ -34,7 +34,7 @@ HASH_FILE = "human.sha256"
 MAX_BODY = 64 * 1024
 CTX = threading.local()
 BASE_REVIEWERS = ["code", "qa", "test"]
-EXTRA_REVIEWERS = {"security", "architecture"}
+EXTRA_REVIEWERS = {"architecture"}
 CHECKS_FILE = "checks.md"
 SPEC_FILE = "spec.md"
 HUMAN_STAGES = {"needs-human"}
@@ -67,7 +67,7 @@ REVIEW_TRANSITIONS = {
     "report": {"ready", "needs-human"},
 }
 HINT_REVIEW = {
-    "scope": "find the repo's own lint, type, and test tooling (CI config, Makefile, pyproject, package scripts, whatever it uses) -> scope.md (STATUS: READY, or reject with rejection.md); add security or architecture reviewers with `job route`",
+    "scope": "find the repo's own lint, type, and test tooling (CI config, Makefile, pyproject, package scripts, whatever it uses) -> scope.md (STATUS: READY, or reject with rejection.md); add an architecture reviewer with `job route`",
     "review": "code (lens chosen from the stack skills below: python for Python, dotnet for C#, typescript-strict-style and vercel-react-best-practices for TS/JS/React; code-review-frontend ONLY when TS/JS/React files are in the diff; for any other language the repo's own tooling alone, never a frontend skill), qa (qa-review), test (test-review), and routed extras -> round-1/review-<name>.md; read-only, never edit",
     "reconcile": "reconcile-reviews -> reconcile.md (STATUS: READY), one ranked list with file and line",
     "verify": "prove-it-works: rerun every VERIFIED (ran) command and check every cited line -> verified.md (STATUS: READY), drop what does not reproduce",

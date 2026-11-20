@@ -538,19 +538,17 @@ class TestReview(Factory):
 
     def test_route_adds_required_reviewers(self):
         self.to_review("j")
-        self.ok("route", "j", "security,architecture")
+        self.ok("route", "j", "architecture")
         self.pass_reviews("j")
-        self.no("advance", "j", "polish")
-        self.pass_reviews("j", ("security",))
         self.no("advance", "j", "polish")
         self.pass_reviews("j", ("architecture",))
         self.adv("j", "polish")
 
     def test_route_unknown_refused_known_ok(self):
         self.to_review("j")
-        self.no("route", "j", "security,bogus")
+        self.no("route", "j", "architecture,bogus")
         self.no("route", "j", "code")
-        self.ok("route", "j", "security")
+        self.ok("route", "j", "architecture")
 
     def test_changes_block_polish_and_need_reconcile(self):
         self.to_review("j")
@@ -849,7 +847,7 @@ class TestAudit(Factory):
     def test_actions_logged_with_fields_and_actors(self):
         self.ok("create", "j", "T")
         self.ok("progress", "j", 1, 2)
-        self.ok("route", "j", "security")
+        self.ok("route", "j", "architecture")
         self.wf("j", "shape.md", "STATUS: READY\n")
         self.ok("advance", "j", "spec")
         self.wf("j", "spec.md", "s\n")

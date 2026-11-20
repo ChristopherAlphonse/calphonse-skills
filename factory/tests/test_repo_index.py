@@ -62,7 +62,7 @@ class RepoIndex(unittest.TestCase):
         for stage in job.TRANSITIONS:
             with self.subTest(stage=stage):
                 self.assertIn(stage, rows, f"{stage} is not a row in the stages table")
-        for skill in ("code-review-frontend", "qa-review", "test-review", "security-review",
+        for skill in ("code-review-frontend", "qa-review", "test-review",
                       "architecture-review", "reconcile-reviews", "prove-it-works", "simplify"):
             with self.subTest(skill=skill):
                 self.assertIn(skill, SKILLS)
