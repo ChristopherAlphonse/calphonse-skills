@@ -49,8 +49,9 @@ always runs, on its own sub-agent.
    - `architecture.md`: the component table, data/control flow for the traced flows, integration points, and new-engineer navigation. Follow [references/architecture.md](references/architecture.md) for the full mandated structure (system overview diagram, component catalog, integration points, navigation guide, selection guidelines).
    - `onboard.md`: in this order: **Stack**, **Conventions**, **Concerns**, **What's Doing What** (core use cases, each with a one-line description and evidence files).
    - Only include detail beyond what already exists in README/AGENTS/steering docs: link to those rather than duplicating them.
-6. **Simplify, always:** After `onboard.md` is written, spawn a sub-agent pinned to a Haiku model to rewrite it in plain language:
-   - Check for `.kiro/agents/onboarding-simplifier.md` in the target repo. If missing, create it:
+6. **Simplify, always:** After `onboard.md` is written, spawn a sub-agent on the harness's smallest model to rewrite it in plain language. Its brief: activate the `simplify` skill, read `.planning/system/onboard.md`, restate it for a reader who does not know the codebase or its vocabulary, write the result to `.planning/system/simplify-onboarding.md`, and edit nothing else.
+   - Claude Code: use the Agent tool with `model: haiku` and that brief. Create no agent file.
+   - Kiro: check for `.kiro/agents/onboarding-simplifier.md` in the target repo. If missing, create it:
      ```markdown
      ---
      name: onboarding-simplifier
@@ -62,7 +63,7 @@ always runs, on its own sub-agent.
      reader who does not know the codebase or its vocabulary, and write the result to
      .planning/system/simplify-onboarding.md. Do not edit onboard.md or any source file.
      ```
-   - Invoke it with `invoke_sub_agent` (name `onboarding-simplifier`). It must not edit `onboard.md`, `architecture.md`, or any source file.
+   - In Kiro, invoke it with `invoke_sub_agent` (name `onboarding-simplifier`). In any harness it must not edit `onboard.md`, `architecture.md`, or any source file.
    - Mention `simplify-onboarding.md` in your reply.
 
 ## Output Shape
@@ -98,7 +99,7 @@ always runs, on its own sub-agent.
 - [ ] Conventions reflect patterns actually observed in code, not assumptions
 - [ ] Concerns are each tied to a specific file or area, not generic
 - [ ] No source code was modified
-- [ ] `simplify-onboarding.md` exists and was produced by the `onboarding-simplifier` sub-agent, not written directly
+- [ ] `simplify-onboarding.md` exists and was produced by the simplify sub-agent, not written directly
 
 ## Common Pitfalls
 
@@ -107,7 +108,7 @@ always runs, on its own sub-agent.
 | Re-deriving info that's already in README/AGENTS/steering docs | Read those first; link to them instead of duplicating |
 | Producing an exhaustive file-by-file listing | Favor a small number of traced, representative flows and components |
 | Spawning parallel agents for a small repo | Only fan out for genuinely large/multi-module repos |
-| Skipping the simplify sub-agent, or writing it yourself | Always spawn `onboarding-simplifier`; it must do that rewrite |
+| Skipping the simplify sub-agent, or writing it yourself | Always spawn the simplify sub-agent; it must do that rewrite |
 
 ## Teaching The Map
 

@@ -5,7 +5,8 @@ description: |
   CI), then spawns specialized agents in parallel to surface real issues in the git diff.
   Agents report findings only: no fixes. Every finding is VERIFIED or tagged [ASSUMPTION].
   Includes a TypeScript + React 19 reviewer (anti-patterns, state management, type safety, useEffect abuse).
-  Use when: "review this PR", "code review", "check my diff", "/review", "review React code"
+  Use when the PR or diff changes TypeScript, JavaScript, or React code. For other languages, use
+  factory-review, which picks the reviewer by file type.
 ---
 
 # Multi-Agent Pre-Landing PR Review
@@ -196,7 +197,7 @@ YOUR TASK:
 3. Review diff against every checklist category.
 4. Do NOT fix anything. Report findings only.
 
-EVIDENCE RULES (critical: follow exactly):
+EVIDENCE RULES:
 - VERIFIED: You can point to the exact diff line or config line that proves the issue.
 - [ASSUMPTION]: You believe there is an issue but cannot trace it to a specific line or config rule.
   State what you assumed and why. The human will validate.

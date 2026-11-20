@@ -71,8 +71,6 @@ Use AI tools to generate the majority of technical documentation so product mana
 - **PRD Review Checklist (derived from Lenny's critiques)** (Examples and templates of 1-Pagers and PRDs) - A checklist derived from Lenny's evaluation of the four real-world examples, identifying common pitfalls to check for
 - **Duolingo One-Pager Template** (How Duolingo builds product) - The template Duolingo uses for early-stage product review one-pagers to get feedback on feature ideas
 
-See `references/artifacts.md` for the full list with details.
-
 ## Questions to Help Users
 
 - "What is the single most important problem this project is solving for the user?"
@@ -92,7 +90,3 @@ See `references/artifacts.md` for the full list with details.
 ## From PRD to Tasks
 
 When the user has a PRD and wants an implementation task list, follow `references/task-generation.md`. It runs two phases with a user checkpoint between them and writes `.planning/tasks/tasks-[prd-file-name].md`.
-
-## Deep Dive
-
-For all 24 sourced insights from 14 guests, see `references/guest-insights.md`

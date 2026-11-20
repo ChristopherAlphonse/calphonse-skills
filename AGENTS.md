@@ -35,7 +35,7 @@ All skills live at the repository root as `{skill-name}/SKILL.md`. `AGENTS.md` i
 
 ## Conventions
 
-- Front-matter `name:` should match the folder name.
+- Front-matter holds `name` and `description` only (Kiro requires that), and `name` matches the folder name. Exceptions: `qa-review` keeps `disable-model-invocation` so it runs only on request, and `vercel-react-best-practices` keeps its upstream `license` and `metadata`.
 - Durable output belongs under `.planning/*` in the *target* project, never in this repo.
 - Prefer referencing another skill in this repo over duplicating its content.
 - If a skill links to `references/*.md`, commit those files. A link to a missing file silently disables the workflow that depends on it.

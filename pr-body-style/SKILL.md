@@ -27,7 +27,7 @@ Ask only when two or more candidates remain after this (for example, several rep
 
 ## Publish the body
 
-Invoking this skill is the user's standing approval to publish. Do not stop at a draft and do not ask first. After writing the body:
+A request to write or update a body is the user's standing approval to publish it: do not stop at a draft and do not ask first. A question about an existing body (is it accurate, too long, ready) gets the answer and a corrected body, and publishes only if the user then says so. After writing the body:
 
 1. Push the branch if it has no upstream or is ahead of it: `git push -u origin <branch>`.
 2. If a PR for the branch exists, replace its body: `gh pr edit <n> --body-file <file>`. For GitLab use `glab mr update`.
@@ -41,10 +41,8 @@ Never end by handing the user commands to push or open the PR. Do it. Skip publi
 
 ## Guardrails
 
-- Make every claim match the actual diff and current check status.
 - Do not mention speculative benefits, future work, or unrelated cleanup.
 - Keep validation concrete: commands, CI status, screenshots, or manual checks.
-- Never run anything to verify the body, and do not worry about unverified checks.
 
 ## Style Rules
 

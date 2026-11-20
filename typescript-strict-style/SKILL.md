@@ -5,7 +5,7 @@ description: Enforces a strict TS/JS coding discipline prioritized as safety, pe
 
 # TypeScript Strict Style
 
-A coding discipline for TypeScript/JavaScript application code derived from Tigger style.
+A coding discipline for TypeScript/JavaScript application code derived from TigerStyle.
 
 ## Guardrails
 

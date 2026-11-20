@@ -11,7 +11,7 @@ description: >
 
 # SKILL: Next.js Proxy CSP Hardening
 
-> **AI LOAD INSTRUCTION**: Use this skill when the user asks for a secure `proxy.ts`, CSP headers, nonce-based script handling, security headers, or migration from `middleware.ts` to `proxy.ts` in a Next.js application. Prioritize defensive configuration. Do not weaken CSP unless the user clearly identifies a real framework or third-party integration requirement. Always include the no-fallback CSP directives: `base-uri`, `object-src`, `form-action`, and `frame-ancestors`.
+Prioritize defensive configuration. Do not weaken CSP unless the user clearly identifies a real framework or third-party integration requirement. Always include the no-fallback CSP directives: `base-uri`, `object-src`, `form-action`, and `frame-ancestors`.
 
 ---
 
@@ -33,21 +33,7 @@ This skill is defensive. It is for hardening a Next.js app, not for bypassing CS
 
 ---
 
-## 1. WHEN TO USE THIS SKILL
-
-Use this skill when the user asks for:
-
-- A Next.js `proxy.ts` file.
-- A secure CSP for Next.js.
-- A nonce-based CSP.
-- Help migrating `middleware.ts` to `proxy.ts`.
-- Security headers for a Next.js app.
-- Protection against XSS.
-- Protection against clickjacking.
-- Protection against unsafe forms.
-- Protection against untrusted embedded content.
-- A safer replacement for `unsafe-inline`.
-- A production-ready security header setup.
+## 1. OUT OF SCOPE
 
 Do not use this skill for:
 
@@ -427,9 +413,9 @@ default-src 'self';
 frame-ancestors 'none'
 ```
 
-### Mistake 5: Using Node APIs in proxy.ts
+### Mistake 5: Generating the nonce with Node-only APIs
 
-Avoid this in `proxy.ts`:
+Web Crypto works on every runtime `proxy.ts` and the older `middleware.ts` can run on. Avoid:
 
 ```ts
 import crypto from "node:crypto";
@@ -536,26 +522,6 @@ frame-ancestors 'none'
 
 ---
 
-## 15. FINAL OUTPUT TEMPLATE
-
-When asked for the full file, return this structure:
-
-```txt
-Here is the full proxy.ts:
-```
-
-Then provide the complete code.
-
-When asked for a reusable skill, return:
-
-```txt
-Here is the full SKILL.md:
-```
-
-Then provide the complete markdown.
-
----
-
 ## 16. BEST DEFAULT
 
 If the user does not provide app-specific requirements, use this default policy:
@@ -587,17 +553,7 @@ connect-src 'self' ws: wss:
 
 ## 17. QUALITY BAR
 
-A good answer using this skill should be:
-
-- Complete.
-- Defensive.
-- Practical.
-- Copy-paste ready.
-- Strict by default.
-- Clear about tradeoffs.
-- Honest about third-party integrations.
-- Compatible with the Edge Runtime.
-- Focused on production safety.
+A good answer is a copy-paste-ready file, strict by default, that names each tradeoff and each third-party integration it had to allow.
 
 A bad answer using this skill:
 
@@ -608,7 +564,6 @@ A bad answer using this skill:
 - Omits `object-src`.
 - Omits `form-action`.
 - Omits `frame-ancestors`.
-- Uses Node-only APIs inside `proxy.ts`.
 - Gives offensive CSP bypass steps instead of defensive hardening, unless the user is testing their own policy (see Related).
 
 ## Related
@@ -620,7 +575,7 @@ A bad answer using this skill:
 
 Use this when the user wants the policy attacked and fixed, not just reviewed, e.g. "pen-test my CSP", "red team this", "find and fix CSP flaws". Scope: CSP only: this is not a general pen test. Only run against an app the user owns or is explicitly authorized to test (localhost or a site they confirm is theirs).
 
-You are the orchestrator. Do not find or fix flaws yourself: spawn the two agents below with `invoke_sub_agent` (`general-task-execution`), one after the other (blue team needs red team's findings), then check both against OWASP yourself.
+You are the orchestrator. Do not find or fix flaws yourself: spawn the two agents below with your harness's sub-agent tool (Claude Code: the Agent tool, `subagent_type: general-purpose`; Kiro: `invoke_sub_agent` with `general-task-execution`), one after the other (blue team needs red team's findings), then check both against OWASP yourself.
 
 ### Step 1: Red Team
 

@@ -1,6 +1,6 @@
 ---
 name: documentation-writer
-description: "Diátaxis Documentation Expert with product copy guidance. An expert technical writer specializing in creating high-quality software documentation, guided by the Diátaxis framework and product copy principles."
+description: "Write or restructure software documentation with the Diátaxis framework (tutorials, how-to guides, reference, explanation) and product copy principles. Use when drafting, reviewing, or reorganizing docs, READMEs, guides, or UI and customer-facing copy."
 ---
 
 # Diátaxis Documentation Expert
