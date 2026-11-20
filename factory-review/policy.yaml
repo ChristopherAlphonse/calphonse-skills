@@ -131,6 +131,8 @@ rules:
       - git describe *
       - git diff
       - git diff *
+      - git fetch*
+      - git -C * fetch*
       - git log
       - git log *
       - git ls-files *

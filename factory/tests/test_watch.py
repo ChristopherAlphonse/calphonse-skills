@@ -147,9 +147,9 @@ class TestWatchRebuild(Watch):
         shutil.copy2(JOB, self.copy / "bin" / "job")
         shutil.copytree(JOB.parent.parent / "dashboard", self.copy / "dashboard")
         self.dist = self.copy / "dashboard" / "dist"
-        for name in ("app", "dom", "markdown"):  # fixed clock: sources older than dist
-            os.utime(self.copy / "dashboard" / f"{name}.ts", (1_000_000, 1_000_000))
-            os.utime(self.dist / f"{name}.js", (1_000_010, 1_000_010))
+        for src in (self.copy / "dashboard").glob("*.ts"):  # fixed clock: every source older than its dist
+            os.utime(src, (1_000_000, 1_000_000))
+            os.utime(self.dist / f"{src.stem}.js", (1_000_010, 1_000_010))
 
     def start_copy(self, env=None):
         return self.start_watch(self.copy / "bin" / "job", env)
@@ -181,8 +181,8 @@ class TestWatchRebuild(Watch):
         self.assert_node_never_runs()
 
     def test_a_dist_with_the_same_mtime_as_its_sources_is_not_rebuilt(self):
-        for name in ("app", "dom", "markdown"):
-            os.utime(self.dist / f"{name}.js", (1_000_000, 1_000_000))
+        for built in self.dist.glob("*.js"):
+            os.utime(built, (1_000_000, 1_000_000))
         self.assert_node_never_runs()
 
     @unittest.skipUnless(NODE_24, "needs node 24 or later")
