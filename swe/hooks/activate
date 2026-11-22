@@ -1,0 +1,6 @@
+#!/bin/sh
+# Print the swe skill body (front-matter stripped) so a harness hook can inject it as session context.
+# Claude Code SessionStart and Kiro agentSpawn hooks add this stdout to the conversation.
+here=$(cd "$(dirname "$0")" && pwd -P)
+printf 'Mode "swe" is active for this whole session. Follow it on every task.\n\n'
+awk 'BEGIN{n=0} /^---$/ && n<2 {n++; next} n>=2' "$here/../SKILL.md"
