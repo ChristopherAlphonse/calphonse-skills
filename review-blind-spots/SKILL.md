@@ -1,11 +1,11 @@
 ---
 name: review-blind-spots
-description: Seven checks every code review applies beyond the diff: behavior that depends on a real database, schema, view, other repo, or external consumer, catch-all branches, dates and names pinned to a year, "keep the output identical" requirements, and "this is fine" claims never traced to the line. Use as the lens for every reviewer in a code review, a PR or MR review, or factory-review.
+description: Eight checks every code review applies beyond the diff: behavior that depends on a real database, schema, view, other repo, or external consumer, catch-all branches, dates and names pinned to a year, "keep the output identical" requirements, "this is fine" claims never traced to the line, and migrations slotted inside an existing release tag. Use as the lens for every reviewer in a code review, a PR or MR review, or factory-review.
 ---
 
 # Review blind spots
 
-A review that passes the diff but misses what a human reviewer finds in one read has usually skipped one of these seven checks. Apply all of them to every changed line. Each one ends in a finding or in a stated, specific open question. Never end in silence.
+A review that passes the diff but misses what a human reviewer finds in one read has usually skipped one of these eight checks. Apply all of them to every changed line. Each one ends in a finding or in a stated, specific open question. Never end in silence.
 
 ## Evidence rule
 
@@ -58,6 +58,14 @@ For each new input source, ask what happens when it is empty, late, malformed, o
 
 Anything the reviewer could not check goes into the report as an open question with an owner and the exact thing to look at. The report may recommend merge only with those open questions stated beside the recommendation. A review that lists "real PostgreSQL behavior: not checked" and still says "safe to merge" has contradicted itself.
 
+## 8. Migrations go after the last release tag
+
+When the diff adds a Liquibase changeset, Flyway or Alembic migration, or any ordered schema change, find the last release marker in the changelog (`tagDatabase`, a version label, a release folder) and check where the new change sits.
+
+- A new change goes after the last existing tag, followed by a new tag. Never insert it before or inside a tag that already exists, even when that tag only exists on the target branch and has not shipped. A database already stamped with that tag will not match the changelog, and rolling back to that tag will not undo the new change.
+- Compare against the target branch, not just the diff: `git show <target>:<changelog>` shows which tags already exist there. A tag that moved, or a change that landed above a tag the target already has, is a HIGH finding.
+- Check that the new tag's version follows the last one, and that nothing else (seed changelogs, docs, MR description) still says the change sits under the old tag.
+
 ## Output
 
 Add a short `Blind spots` section to the review file:
@@ -71,5 +79,6 @@ Add a short `Blind spots` section to the review file:
 | 5 Traced claims | each approving sentence with the lines read | `file:line` |
 | 6 Silent failure | each new input and what happens | `file:line` |
 | 7 Open questions | each with owner | none or list |
+| 8 Migration order | each new migration, the tag before it and the new tag after it, or `no migrations` | `file:line` and target-branch tag |
 
 A row left blank means the check was not done.
