@@ -1,6 +1,7 @@
 import { el, chip } from "/static/dom.js";
 import { renderMarkdown } from "/static/markdown.js";
 import { attachAnnotate } from "/static/annotate.js";
+import { openEditor } from "/static/editor.js";
 import type {
   BoardDef,
   Filter,
@@ -164,11 +165,7 @@ let active = "";
 let scale = 1;
 let loadToken = 0;
 
-// The file shown in the panel, and an edit in progress on it. `base` is the hash the edit started from; the server refuses a save if the file has moved on.
-type Loaded = { job: string; name: string; text: string; base: string };
-type Edit = { job: string; name: string; l1?: number; l2?: number; text: string; base: string; error?: string };
-let loaded: Loaded | null = null;
-let edit: Edit | null = null;
+
 let sideCollapsed = false;
 
 const view = (): View => {
@@ -813,91 +810,62 @@ async function loadFile(): Promise<void> {
         : "No files or notes yet.",
     );
   }
-  let ok = false;
-  let text: string;
-  let base = "";
-  try {
-    const res = await api(
-      `/api/${v.def.id}/file?job=${encodeURIComponent(String(v.openId))}&name=${encodeURIComponent(name)}`,
-    );
-    ok = res.ok;
-    text = ok ? await res.text() : "not found";
-    base = res.headers.get("X-Base") ?? "";
-  } catch {
-    text = "offline, retrying";
-  }
+  const file = await readFile(v.def.id, String(v.openId), name);
   if (token !== loadToken) return;
-  loaded = ok && base ? { job: String(v.openId), name, text, base } : null;
-  if (ok && /\.(md|markdown)$/i.test(name)) {
-    if (edit && edit.job === loaded?.job && edit.name === name)
-      return showBody("edit", editor(edit));
+  if (file && /\.(md|markdown)$/i.test(name)) {
     const page = document.createDocumentFragment();
     const bar = el("div", "fbar");
-    if (loaded) bar.append(button("Edit file", "", () => startEdit()));
-    page.append(bar, renderMarkdown(text));
+    bar.append(button("Open editor", "", () => void openFileEditor()));
+    page.append(bar, renderMarkdown(file.text));
     showBody("md", page);
-  } else showBody("raw", text);
+  } else showBody("raw", file?.text ?? "not found");
 }
 
-function startEdit(l1?: number, l2?: number): void {
-  if (!loaded) return;
-  const lines = loaded.text.split("\n");
-  edit = {
-    job: loaded.job,
-    name: loaded.name,
-    l1,
-    l2,
-    base: loaded.base,
-    text: l1 && l2 ? lines.slice(l1 - 1, l2).join("\n") : loaded.text,
-  };
-  void loadFile();
+type FileRead = { text: string; base: string };
+async function readFile(board: string, job: string, name: string): Promise<FileRead | null> {
+  try {
+    const res = await api(
+      `/api/${board}/file?job=${encodeURIComponent(job)}&name=${encodeURIComponent(name)}`,
+    );
+    return res.ok ? { text: await res.text(), base: res.headers.get("X-Base") ?? "" } : null;
+  } catch {
+    return null;
+  }
 }
 
 const SAVE_ERRORS: Record<number, string> = {
-  409: "The file changed on disk after you opened it. Copy your text, cancel, and edit again.",
+  409: "The file changed on disk after you opened it. Reload, then edit again.",
   422: "Lines like STATUS: and VERDICT: steer the board. They cannot be edited here.",
   400: "That edit was refused.",
 };
 
-async function saveEdit(e: Edit): Promise<void> {
-  const { job, name, base, text, l1, l2 } = e;
-  try {
-    const res = await api(`/api/${view().def.id}/save`, {
-      method: "POST",
-      body: JSON.stringify({ id: job, name, base, text, l1, l2 }),
-    });
-    e.error = res.ok ? undefined : (SAVE_ERRORS[res.status] ?? `Refused (${res.status}).`);
-    if (res.ok) edit = null;
-  } catch {
-    e.error = "offline";
-  }
-  await loadFile();
-}
-
-function editor(e: Edit): HTMLElement {
-  const box = el("div", "editor");
-  const where = e.l1 && e.l2 ? `${e.name}:${e.l1 === e.l2 ? e.l1 : `${e.l1}-${e.l2}`}` : e.name;
-  const area = el("textarea");
-  area.value = e.text;
-  area.spellcheck = false;
-  area.rows = Math.min(24, Math.max(6, e.text.split("\n").length + 1));
-  area.oninput = () => {
-    e.text = area.value;
-  };
-  area.onkeydown = (k) => {
-    if (k.key === "Enter" && (k.metaKey || k.ctrlKey)) void saveEdit(e);
-  };
-  const row = el("div", "row");
-  row.append(
-    button("Cancel", "", () => {
-      edit = null;
-      void loadFile();
-    }),
-    button("Save", "go", () => void saveEdit(e)),
-  );
-  box.append(el("div", "ref", where), area, el("div", "emsg", e.error ?? ""), row);
-  queueMicrotask(() => area.focus());
-  return box;
+async function openFileEditor(select?: [number, number]): Promise<void> {
+  const v = view();
+  const board = v.def.id;
+  const job = String(v.openId);
+  const name = v.openFile;
+  const file = name ? await readFile(board, job, name) : null;
+  if (!name || !file) return;
+  openEditor({
+    job,
+    name,
+    ...file,
+    select,
+    load: () => readFile(board, job, name),
+    save: async (text, base) => {
+      try {
+        const res = await api(`/api/${board}/save`, {
+          method: "POST",
+          body: JSON.stringify({ id: job, name, base, text }),
+        });
+        if (!res.ok) return { ok: false, error: SAVE_ERRORS[res.status] ?? `Refused (${res.status}).` };
+        return { ok: true, base: (await readFile(board, job, name))?.base ?? "" };
+      } catch {
+        return { ok: false, error: "offline" };
+      }
+    },
+    comment: (text) => ask(text),
+  });
 }
 
 function openJobPanel(id: string): void {
@@ -991,7 +959,7 @@ $("ask-form").onsubmit = (e) => {
   if (!question) return;
   composer.value = "";
   composer.style.height = "auto";
-  return ask(question);
+  void ask(question);
 };
 
 attachAnnotate(
@@ -1002,10 +970,10 @@ attachAnnotate(
       : null;
   },
   (text) => void ask(text),
-  (r) => startEdit(r.l1, r.l2),
+  (r) => void openFileEditor([r.l1, r.l2]),
 );
 
-async function ask(question: string): Promise<void> {
+async function ask(question: string): Promise<string> {
   const v = view();
   $("ask-q").textContent = `${v.def.label}: ${question.split("\n")[0]}`;
   bubble("me", question);
@@ -1026,11 +994,14 @@ async function ask(question: string): Promise<void> {
     const out: { answer?: string; session?: string; error?: string } =
       await res.json();
     v.session = out.session ?? v.session;
-    bubble(out.error ? "err" : "bot", out.error ?? out.answer ?? "");
+    const reply = out.error ?? out.answer ?? "";
+    bubble(out.error ? "err" : "bot", reply);
+    await pollOne(v.def.id);
+    return reply;
   } catch {
     bubble("err", "offline");
+    return "offline";
   }
-  await pollOne(v.def.id);
 }
 
 function showEngine(): void {

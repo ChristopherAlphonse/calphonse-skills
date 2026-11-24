@@ -72,7 +72,7 @@ export function attachAnnotate(
     go.type = "button";
     const cancel = el("button", "", "Cancel");
     cancel.type = "button";
-    const editLines = el("button", "", "Edit lines");
+    const editLines = el("button", "", "Open in editor");
     editLines.type = "button";
     editLines.onclick = () => {
       close();

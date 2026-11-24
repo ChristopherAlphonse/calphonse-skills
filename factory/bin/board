@@ -18,7 +18,7 @@ SKILLS = HERE.parent.parent
 DASH_DIR = HERE.parent / "dashboard"
 DIST_DIR = DASH_DIR / "dist"
 STATE = ROOT / ".planning" / "factory-board"
-STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript", "markdown.js": "text/javascript", "annotate.js": "text/javascript"}
+STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript", "markdown.js": "text/javascript", "annotate.js": "text/javascript", "editor.js": "text/javascript"}
 ENGINE_FILE = HERE / "job"
 # board id -> (label, which of the engine's jobs it shows)
 BOARD_SPECS = {"build": ("Build", lambda job: not job.get("review")), "review": ("Review", lambda job: bool(job.get("review")))}
@@ -140,17 +140,9 @@ def ask(board, jid, question, session, engine, model, effort):
 GUARDED_LINE = re.compile(r"^[A-Z]{3,}:.*$", re.M)
 
 
-def edit_file(old, text, l1=None, l2=None):
-    """The file after an edit, or (None, reason). Lines such as STATUS: READY steer the stage machine, so they may not change here."""
-    new = text
-    if l1 is not None:
-        lines = old.split("\n")
-        if not (isinstance(l1, int) and isinstance(l2, int) and 1 <= l1 <= l2 <= len(lines)):
-            return None, "range"
-        new = "\n".join(lines[:l1 - 1] + text.split("\n") + lines[l2:])
-    if GUARDED_LINE.findall(old) != GUARDED_LINE.findall(new):
-        return None, "guarded"
-    return new, None
+def edit_file(old, new):
+    """Whether `new` may replace `old`. Lines such as STATUS: READY steer the stage machine, so they may not change here."""
+    return GUARDED_LINE.findall(old) == GUARDED_LINE.findall(new)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -228,25 +220,24 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(404, "{}")
 
     def post_save(self, board, jid, body):
-        """Save an edit to a job file: the whole file, or lines l1..l2 replaced. `base` must still match the file on disk."""
+        """Replace a job file with edited text. `base` must still match the file on disk."""
         p = self.job_file(board, jid, body.get("name") if isinstance(body.get("name"), str) else "")
-        text, base, l1, l2 = body.get("text"), body.get("base"), body.get("l1"), body.get("l2")
+        text, base = body.get("text"), body.get("base")
         if not p:
             return self.send(404, "{}")
-        if not isinstance(text, str) or not isinstance(base, str) or (l1 is None) != (l2 is None):
+        if not isinstance(text, str) or not isinstance(base, str):
             return self.send(400, "{}")
         try:
             old = p.read_bytes()
             if not hmac.compare_digest(hashlib.sha256(old).hexdigest(), base):
                 return self.send(409, json.dumps({"error": "changed"}))
-            new, refused = edit_file(old.decode(), text, l1, l2)
-            if refused:
-                return self.send(422 if refused == "guarded" else 400, json.dumps({"error": refused}))
+            if not edit_file(old.decode(), text):
+                return self.send(422, json.dumps({"error": "guarded"}))
             fd, tmp = tempfile.mkstemp(dir=p.parent, prefix=".edit-")
             with os.fdopen(fd, "w") as f:
-                f.write(new)
+                f.write(text)
             os.replace(tmp, p)
-            return self.send(200, json.dumps({"base": hashlib.sha256(new.encode()).hexdigest()}))
+            return self.send(200, json.dumps({"base": hashlib.sha256(text.encode()).hexdigest()}))
         except (OSError, UnicodeDecodeError):
             return self.send(500, "{}")
 
