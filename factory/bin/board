@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""One board for the factory skills. It loads each skill's engine (factory builds, factory-review reviews),
-serves their jobs as tabs on one page, runs their button actions, and answers the chat bar.
+"""The factory board. It loads the factory engine (bin/job) and shows its jobs as two boards on one page:
+Build (jobs that write code) and Review (read-only code reviews). It runs the button actions and answers the chat bar.
 
   board watch [port|auto]   run the board in the foreground
   board ensure              print the link of the running board, starting one if needed
@@ -19,15 +19,31 @@ DASH_DIR = HERE.parent / "dashboard"
 DIST_DIR = DASH_DIR / "dist"
 STATE = ROOT / ".planning" / "factory-board"
 STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript", "markdown.js": "text/javascript"}
-ENGINE_FILES = {"build": SKILLS / "factory" / "bin" / "job", "review": SKILLS / "factory-review" / "bin" / "job"}
+ENGINE_FILE = HERE / "job"
+# board id -> (label, which of the engine's jobs it shows)
+BOARD_SPECS = {"build": ("Build", lambda job: not job.get("review")), "review": ("Review", lambda job: bool(job.get("review")))}
 WATCH_FILE = "watch.json"
 FIRST_PORT = 8766
 PORT_TRIES = 11
 MAX_BODY = 64 * 1024
 ASK_TIMEOUT = 300
 COOKIE = "factory-board"
-CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
+CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; "
        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+# Tab icons: a rounded square with a board glyph. The amber dot means something waits on the user.
+FAVICON_GLYPH = {
+    "factory": ("#e8e8e8", '<path d="M5 18V9l5 3V9l5 3V6h4v12z"/>'),
+    "build": ("#7aa7ff", '<path d="M12 5l7 4-7 4-7-4zM5 13l7 4 7-4"/>'),
+    "review": ("#6fd7a8", '<circle cx="11" cy="11" r="4.5"/><path d="M14.5 14.5L19 19"/>'),
+}
+
+
+def favicon_svg(board, dot):
+    color, glyph = FAVICON_GLYPH.get(board, FAVICON_GLYPH["factory"])
+    stroke = f'fill="none" stroke="{color}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"'
+    badge = '<circle cx="19" cy="5" r="4" fill="#f0c36b" stroke="#161616" stroke-width="1.2"/>' if dot else ""
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#161616"/>'
+            f'<g {stroke}>{glyph}</g>{badge}</svg>')
 SESSION = ""
 CODE = ""
 KEYS = {}
@@ -38,21 +54,16 @@ MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@#-]{0,99}")
 CLAUDE_MODELS = ["opus", "sonnet", "haiku", "claude-fable-5-2", "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]
 
 
-def load_boards():
-    """Import each skill's bin/job as a module. They are scripts with a main guard, so importing runs nothing."""
-    boards = {}
-    for name, path in ENGINE_FILES.items():
-        if not path.exists():
-            continue
-        loader = importlib.machinery.SourceFileLoader(f"factory_{name}", str(path))
-        spec = importlib.util.spec_from_loader(loader.name, loader)
-        mod = importlib.util.module_from_spec(spec)
-        loader.exec_module(mod)
-        boards[name] = mod
-    return boards
+def load_engine():
+    """Import bin/job as a module. It is a script with a main guard, so importing runs nothing."""
+    loader = importlib.machinery.SourceFileLoader("factory_engine", str(ENGINE_FILE))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    mod = importlib.util.module_from_spec(spec)
+    loader.exec_module(mod)
+    return mod
 
 
-BOARDS = {}
+ENGINE = None
 
 
 def engines():
@@ -97,8 +108,7 @@ def ask_args(engine, exe, me, system, question, session, model, effort):
 
 def ask(board, jid, question, session, engine, model, effort):
     """One chat turn through the chosen CLI for one board."""
-    mod = BOARDS.get(board)
-    if not mod:
+    if board not in BOARD_SPECS:
         return {"error": f"no board {board!r}"}
     engine = engine if engine in ENGINES else "claude"
     exe = shutil.which(ENGINES[engine])
@@ -106,7 +116,7 @@ def ask(board, jid, question, session, engine, model, effort):
         return {"error": f"{ENGINES[engine]} was not found on PATH"}
     if model and not MODEL_NAME.fullmatch(model):
         return {"error": f"bad model name {model!r}"}
-    args, stdin = ask_args(engine, exe, str(mod.SELF), mod.ask_system(jid), question, session, model, effort if effort in EFFORTS else "")
+    args, stdin = ask_args(engine, exe, str(ENGINE.SELF), ENGINE.ask_system(jid, board), question, session, model, effort if effort in EFFORTS else "")
     try:
         r = subprocess.run(args, input=stdin, capture_output=True, text=True, timeout=ASK_TIMEOUT,
                            cwd=str(ROOT), env={**os.environ, "FACTORY_ROOT": str(ROOT)})
@@ -177,12 +187,14 @@ class Handler(BaseHTTPRequestHandler):
         base = DIST_DIR if name.endswith(".js") else DASH_DIR
         return self.send(200, (base / name).read_bytes(), STATIC[name])
 
-    def get_file(self, mod, jid, name):
+    def get_file(self, board, jid, name):
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", jid):
             return self.send(404, "{}")
         try:
-            p = (mod.jobdir(jid) / name).resolve()
-            if mod.jobdir(jid).resolve() not in p.parents or p.suffix != ".md" or not p.is_file():
+            if not any(j["id"] == jid and BOARD_SPECS[board][1](j) for j in ENGINE.all_jobs()):
+                return self.send(404, "{}")
+            p = (ENGINE.jobdir(jid) / name).resolve()
+            if ENGINE.jobdir(jid).resolve() not in p.parents or p.suffix != ".md" or not p.is_file():
                 return self.send(404, "{}")
             return self.send(200, p.read_text(), "text/plain; charset=utf-8")
         except (ValueError, OSError):
@@ -193,21 +205,26 @@ class Handler(BaseHTTPRequestHandler):
         q = parse_qs(u.query)
         if u.path == "/":
             return self.get_root(q)
+        icon = re.fullmatch(r"/favicon-([a-z]+)\.svg", u.path)
+        if icon:
+            if not self.host_ok():
+                return self.send(403, "{}")
+            return self.send(200, favicon_svg(icon.group(1), q.get("dot", ["0"])[0] == "1"), "image/svg+xml")
         if u.path.startswith("/static/"):
             return self.get_static(u.path[len("/static/"):])
         if not self.trusted():
             return self.send(403, "{}")
         if u.path == "/api/boards":
-            return self.send(200, json.dumps([{"id": b, "label": m.LABEL} for b, m in BOARDS.items()]))
+            return self.send(200, json.dumps([{"id": b, "label": spec[0]} for b, spec in BOARD_SPECS.items()]))
         if u.path == "/api/engines":
             return self.send(200, json.dumps(model_choices()))
         m = re.fullmatch(r"/api/([a-z]+)/(jobs|file)", u.path)
-        mod = BOARDS.get(m.group(1)) if m else None
-        if not mod:
+        if not m or m.group(1) not in BOARD_SPECS:
             return self.send(404, "{}")
+        board = m.group(1)
         if m.group(2) == "jobs":
-            return self.send(200, json.dumps([mod.snapshot(j) for j in mod.all_jobs()]))
-        return self.get_file(mod, q.get("job", [""])[0], q.get("name", [""])[0])
+            return self.send(200, json.dumps([ENGINE.snapshot(j) for j in ENGINE.all_jobs() if BOARD_SPECS[board][1](j)]))
+        return self.get_file(board, q.get("job", [""])[0], q.get("name", [""])[0])
 
     def do_POST(self):
         if not self.trusted():
@@ -230,11 +247,10 @@ class Handler(BaseHTTPRequestHandler):
             out = ask(text("board"), jid, text("question"), text("session"), text("engine"), text("model"), text("effort"))
             return self.send(200, json.dumps(out))
         m = re.fullmatch(r"/api/([a-z]+)/([a-z]+)", self.path)
-        mod = BOARDS.get(m.group(1)) if m else None
-        action = mod.ACTIONS.get(m.group(2)) if mod else None
+        action = ENGINE.ACTIONS.get(m.group(2)) if m and m.group(1) in BOARD_SPECS else None
         if not action:
             return self.send(404, "{}")
-        mod.CTX.human = True
+        ENGINE.CTX.human = True
         try:
             action(jid, body)
         except SystemExit:
@@ -245,7 +261,7 @@ class Handler(BaseHTTPRequestHandler):
             print(f"board request {self.path} failed: {e!r}", file=sys.stderr)
             return self.send(500, "{}")
         finally:
-            mod.CTX.human = False
+            ENGINE.CTX.human = False
         self.send(200, "{}")
 
 
@@ -293,19 +309,17 @@ def write_private(path, text):
 
 
 def cmd_watch(port):
-    """Run the board. Each engine gets the one key, whose hash its git hooks check."""
-    global SESSION, CODE, BOARDS
-    BOARDS = load_boards()
+    """Run the board. The engine gets the one key, whose hash its git hooks check."""
+    global SESSION, CODE, ENGINE
+    ENGINE = load_engine()
     rebuild_dashboard()
     SESSION, CODE = secrets.token_urlsafe(32), secrets.token_urlsafe(24)
     key = secrets.token_urlsafe(32)
-    for mod in BOARDS.values():
-        mod.KEY = key
-        mod.STATE.mkdir(parents=True, exist_ok=True)
-        write_private(mod.STATE / mod.HASH_FILE, hashlib.sha256(key.encode()).hexdigest() + "\n")
+    ENGINE.KEY = key
+    ENGINE.STATE.mkdir(parents=True, exist_ok=True)
+    write_private(ENGINE.STATE / ENGINE.HASH_FILE, hashlib.sha256(key.encode()).hexdigest() + "\n")
     srv = bind(port)
-    for mod in BOARDS.values():
-        mod.audit("watch", "", f"port {srv.server_port}")
+    ENGINE.audit("watch", "", f"port {srv.server_port}")
     print(f"watch: 127.0.0.1:{srv.server_port}/?c={CODE}", flush=True)
     srv.serve_forever()
 

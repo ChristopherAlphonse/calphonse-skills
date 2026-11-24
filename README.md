@@ -10,7 +10,7 @@ Use one skill on its own, such as `qa-review` on a diff. Or let the [factory](#h
 - [Philosophy](#philosophy)
 - [Quick Start](#quick-start)
 - [How the factory works](#how-the-factory-works)
-- [How factory-review works](#how-factory-review-works)
+- [How factory reviews a branch](#how-factory-reviews-a-branch)
 - [Skills](#skills)
   - [How skills get used](#how-skills-get-used)
   - [Which skill do I use?](#which-skill-do-i-use)
@@ -26,7 +26,7 @@ Use one skill on its own, such as `qa-review` on a diff. Or let the [factory](#h
 Three rules hold the whole repo together.
 
 1. **A skill does one thing.** `swe` makes the smallest change. `qa-review` judges maintainability. `prove-it-works` checks the real result. None of them tries to be a workflow.
-2. **A workflow is a chain of skills.** `factory` and `factory-review` call other skills as stages. They add no new judgment of their own. They add order, evidence checks, and a place for you to say yes.
+2. **A workflow is a chain of skills.** `factory` calls other skills as stages, for building and for reviewing. They add no new judgment of their own. They add order, evidence checks, and a place for you to say yes.
 3. **You stay in control.** Agents write files and leave code uncommitted. A script checks the files before a job moves on. Only your click on the board approves a spec or commits.
 
 ```mermaid
@@ -126,9 +126,9 @@ Stack skills are picked from file names, not by the agent: TypeScript and React 
 
 For the full state machine, the trust model, and setup for Claude Code, Kiro, and OpenCode, read [factory/README.md](factory/README.md). [factory/SKILL.md](factory/SKILL.md) is the contract an agent follows.
 
-## How factory-review works
+## How factory reviews a branch
 
-`factory-review` reviews a branch or diff you already have. It is read-only: it never edits the code, commits, or posts comments.
+A `factory` review job reviews a branch or diff you already have (`JOB create <id> "<title>" --review BASE HEAD`). It is read-only: it never edits the code, commits, or posts comments.
 
 ```mermaid
 flowchart LR
@@ -148,7 +148,7 @@ flowchart LR
 
 The verify stage is the point of the design. Reviewers make claims, and a claim can be wrong. The verifier did not write the reviews. It opens every cited line, reruns every command in a scratch copy, and marks each finding confirmed, dropped, or unverifiable. Only confirmed findings reach the report, with paste-ready comments for the MR.
 
-See [factory-review/README.md](factory-review/README.md) for the full state machine and setup.
+See [factory/README.md](factory/README.md) for the full state machine and setup. Review jobs show on the Review tab of the same board as build jobs.
 
 ## Skills
 
@@ -158,9 +158,9 @@ A skill is a Markdown file the agent reads when a task matches. You can name it 
 
 Skills are small on purpose, and some call others:
 
-- `simplify` is the shared writing check. `swe`, `pr-body-style`, `documentation-writer`, `performance-review-humanizer`, `factory`, and `factory-review` all point at it.
+- `simplify` is the shared writing check. `swe`, `pr-body-style`, `documentation-writer`, `performance-review-humanizer`, and `factory` all point at it.
 - `code-review-frontend` falls back to `whats-going-on` when a repo has no codebase map.
-- `factory` and `factory-review` call most of the others as stages.
+- `factory` calls most of the others as stages.
 
 ### Which skill do I use?
 
@@ -176,7 +176,7 @@ Skills are small on purpose, and some call others:
 | Review my own change for maintainability                   | [qa-review](qa-review/SKILL.md)                                                                                                                                                                                                                     | "QA review my changes"                              |
 | Check that my tests would catch a bug                      | [test-review](test-review/SKILL.md)                                                                                                                                                                                                                 | "Are these tests good enough?"                      |
 | Review a React or TypeScript PR                            | [code-review-frontend](code-review-frontend/SKILL.md)                                                                                                                                                                                               | "Review this PR"                                    |
-| Review a branch end to end and get paste-ready comments    | [factory-review](factory-review/SKILL.md)                                                                                                                                                                                                           | "/factory-review main my-branch"                    |
+| Review a branch end to end and get paste-ready comments    | [factory](factory/SKILL.md)                                                                                                                                                                                                           | "/factory-review main my-branch"                    |
 | Merge several reviews into one fix list                    | [reconcile-reviews](reconcile-reviews/SKILL.md)                                                                                                                                                                                                     | "Reconcile these reviews"                           |
 | Confirm work is really done                                | [prove-it-works](prove-it-works/SKILL.md)                                                                                                                                                                                                           | "Prove it works"                                    |
 | Strip noisy comments from a diff                           | [comment-sicko](comment-sicko/SKILL.md)                                                                                                                                                                                                             | "Run comment-sicko on this branch"                  |
@@ -226,7 +226,7 @@ Review skills report. They do not edit your code.
 | [test-review](test-review/SKILL.md)                   | Asks whether the tests would notice if the diff were wrong. Runs five focused checks in order (scope, regression, behavior, concurrency, mutation) in a throwaway worktree. Writes to `.planning/reviews/test-review/`.      | You want proof the tests are good, not a count of them.          |
 | [code-review-frontend](code-review-frontend/SKILL.md) | Finds the repo's lint, type, and test tooling, then runs specialist reviewers in parallel: a base checklist, TypeScript and React, frontend patterns, and Vercel performance. Every finding is `VERIFIED` or `[ASSUMPTION]`. | You review a frontend PR.                                        |
 | [reconcile-reviews](reconcile-reviews/SKILL.md)       | Compares several reviews of one PR, checks their claims against the code, ranks by evidence, and pins each fix to `path:line`. Can post inline MR comments when you ask.                                                     | Two or more reviewers disagree, and you need one list to act on. |
-| [factory-review](factory-review/SKILL.md)             | Runs the review skills above as a pipeline and verifies every finding. See [How factory-review works](#how-factory-review-works).                                                                                            | You want a whole branch reviewed and reported.                   |
+| [factory](factory/SKILL.md)             | Runs the review skills above as a pipeline and verifies every finding. See [How factory reviews a branch](#how-factory-reviews-a-branch).                                                                                            | You want a whole branch reviewed and reported.                   |
 
 ### Verify and ship
 

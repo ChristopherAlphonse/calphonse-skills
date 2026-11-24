@@ -222,7 +222,6 @@ rules:
       - python -m unittest*
       - python3 -m unittest*
       - python3 factory/tests/run.py*
-      - python3 factory-review/tests/run.py*
       - coverage run*
       - coverage report*
       - ruff check*

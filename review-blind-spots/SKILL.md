@@ -1,7 +1,7 @@
 ---
 name: review-blind-spots
 description: >
-  Eight checks every code review applies beyond the diff: behavior that depends on a real database, schema, view, other repo, or external consumer, catch-all branches, dates and names pinned to a year, "keep the output identical" requirements, "this is fine" claims never traced to the line, and migrations slotted inside an existing release tag. Use as the lens for every reviewer in a code review, a PR or MR review, or factory-review.
+  Eight checks every code review applies beyond the diff: behavior that depends on a real database, schema, view, other repo, or external consumer, catch-all branches, dates and names pinned to a year, "keep the output identical" requirements, "this is fine" claims never traced to the line, and migrations slotted inside an existing release tag. Use as the lens for every reviewer in a code review, a PR or MR review, or a factory review job.
 ---
 
 # Review blind spots

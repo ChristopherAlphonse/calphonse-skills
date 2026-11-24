@@ -278,6 +278,16 @@ function renderTabs()       {
     }),
   );
   $("meta").textContent = `${v.jobs.length} jobs, updated ${new Date().toLocaleTimeString()}`;
+  showIcon();
+}
+
+// The tab icon follows the active board; an amber dot and a count in the title mean something waits on you.
+function showIcon()       {
+  const waiting = [...views.values()].reduce((n, v) => n + waitingCount(v), 0);
+  const href = `/favicon-${active || "factory"}.svg?dot=${waiting ? 1 : 0}`;
+  const link = document.getElementById("favicon");
+  if (link && link.getAttribute("href") !== href) link.setAttribute("href", href);
+  document.title = `${waiting ? `(${waiting}) ` : ""}Factory${active ? ` · ${view().def.label}` : ""}`;
 }
 
 // ---- canvas

@@ -1,6 +1,6 @@
 ---
 name: factory
-description: Take a feature from idea to a reviewed local commit by chaining this repo's skills as stages (shape, spec, build, review, polish, prove, ship) on a board of connected stages. Use when the user wants a whole feature driven end to end, a software factory, a pipeline, or the board. Never commits without the user's click; never pushes or opens a PR/MR. To review a branch, use factory-review.
+description: Take a feature from idea to a reviewed local commit by chaining this repo's skills as stages (shape, spec, build, review, polish, prove, ship) on a board of connected stages. Use when the user wants a whole feature driven end to end, a software factory, a pipeline, or the board. Also runs read-only code reviews of a branch or diff as review jobs, with a verified report and paste-ready comments. Never commits without the user's click; never pushes or opens a PR/MR; a review never edits code or posts unless the user says so.
 ---
 
 # Factory
@@ -25,9 +25,12 @@ When a job waits on the user (spec approval, **Commit locally**, **Unblock**), s
 
 ## Workflows
 
-This skill runs the **build** workflow: a feature idea becomes a local commit and a PR body. `JOB create <id> "<title>"` makes a build job.
+This skill runs two workflows on one engine and one board, as two tabs:
 
-To review an existing branch or PR, use the `factory-review` skill. It is a separate skill with its own engine, board, and state folder (`.planning/factory-review/`), and it never writes code.
+- **Build**: a feature idea becomes a local commit and a PR body. `JOB create <id> "<title>"` makes a build job.
+- **Review**: a branch or diff becomes a verified report and paste-ready comments, and no code is written. `JOB create <id> "<title>" --review <base> <head>` makes a review job. The two refs are local, so the user fetches the PR or MR branch first, for example `git fetch origin pull/42/head:pr-42`.
+
+The sections below say which workflow they belong to. A review job never edits code, commits, pushes, or posts.
 
 ## Enterprise policy
 
@@ -85,11 +88,61 @@ Stack skills are chosen by `bin/job`, not by you. It reads the file names and wr
 | `.py`, `.pyi`, `pyproject.toml`, `uv.lock` | `python` |
 | `.tf`, `cdk.json`, `serverless.yml`, `samconfig.toml` | `aws` |
 
-For a build job the files are the whole repo. Review jobs (see `factory-review`) use only the files in the diff. If `.planning/` has no codebase map, run `whats-going-on` before Shape.
+For a build job the files are the whole repo. Review jobs use only the files in the diff. If `.planning/` has no codebase map, run `whats-going-on` before Shape.
 
 ### Reviewers
 
 `qa-review` and `test-review` always, and a `code` reviewer whose skill follows the files in the diff: `code-review-frontend` for TypeScript, JavaScript, and React only, `python` for Python, `dotnet` for C#, `aws` for Terraform and CDK, and the repo's own tooling for any other language. Never use a frontend skill on backend code. Add `architecture-review` when it crosses service or module boundaries. Register the extra with `JOB route <id> architecture` before spawning. Review names on disk are `code`, `qa`, `test`, `architecture`. `qa-review` runs only when asked (`disable-model-invocation`), so the `qa` agent cannot invoke it: give it the absolute path of `qa-review/SKILL.md`, the sibling of this skill's folder, and have it read that file.
+
+## Review workflow
+
+A review job runs once, with no rounds. Each stage's agent writes the file named here with the status line first. `JOB advance` reads that line and refuses the move without it. Fixing what a review finds is a separate build job.
+
+| Stage | Skill | Writes (in the job folder) | Advance when |
+| --- | --- | --- | --- |
+| scope | discover the repo's own lint, type, and test tooling for its language, plus `whats-going-on` if `.planning/` has no map, plus the Boundary map below | `scope.md` with `STATUS: READY`, or `rejection.md` | to `review`, or `rejected` |
+| review | see Reviewers, each applying `review-blind-spots` | `round-1/review-<name>.md` with `VERDICT: PASS` or `VERDICT: CHANGES`, findings with severity, file and line, evidence, and a tag, and a `Blind spots` section | to `reconcile` when every reviewer wrote one |
+| reconcile | `reconcile-reviews`, merge step only | `reconcile.md` with `STATUS: READY`, one ranked list that includes every open question from the Boundary map | to `verify` |
+| verify | `prove-it-works` applied to the findings | `verified.md` with `STATUS: READY` | to `report` |
+| report | `simplify` | `report.md` and `comments.md` | to `ready` |
+
+A reviewer that cannot proceed writes `blocked.md` with `STATUS: BLOCKED`. `JOB advance <id> needs-human` then parks the job, and the user resumes it with Unblock on the board.
+
+**Read-only.** Reviewers read and run code. They never edit, create, or delete anything inside the job's worktree. The worktree is at the exact reviewed commit, and a changed tracked file, a moved branch, or changed hooks parks the job on the user. A reviewer that wants to run a changed version copies files to `.planning/factory/scratch/<id>/<reviewer>/` and works there. After the review stage, check `cd <worktree> && git diff --quiet HEAD`.
+
+**Evidence.** Every finding is tagged `VERIFIED (read)`, `VERIFIED (ran)` with the exact command and its output, or `[ASSUMPTION]`.
+
+**Never post, unless the user says so.** No comments, reviews, or approvals reach any forge on the agent's own initiative, and never in a headless `TICK` pass. The one exception is the job's own `comments.md`, after the user explicitly tells you in this session to post it. Post each comment once, through the forge MCP tool (never `glab`, `curl`, or `wget`), then write `posted.md` in the job folder listing what went out. If `posted.md` exists, do not post again unless the user asks. Approvals and reviews are never posted.
+
+### Boundary map
+
+The scope agent reads the story, PR or MR text, and linked ticket if they are in the job folder or the repo, and writes a `Boundary map` section in `scope.md`:
+
+- Every outside system the diff reads or writes: database tables, columns, and views, schema or infra repos, shared libraries, queues, files other jobs consume. For each, the path where its real definition can be read, or `UNREACHABLE`.
+- Every requirement of the form "keep the output identical", "no behavior change", or "backward compatible", quoted.
+- Every year, version, or name pinned in the diff, with the date it stops being right.
+
+Reviewers open each reachable definition and read it. Reviewers raise each unreachable one as an `UNCHECKED: <what> in <where>` finding, not a footnote. Every reviewer's brief includes [review-blind-spots](../review-blind-spots/SKILL.md) and the Boundary map path. A review file with no `Blind spots` section, or with a blank row in it, is sent back once.
+
+### Code reviewer lens
+
+The `code` reviewer's skill follows the files in the diff. Never use a frontend skill on non-frontend code.
+
+| Files in the diff | `code` reviewer uses |
+| --- | --- |
+| `.ts`, `.tsx`, `.js`, `.jsx` and variants | `code-review-frontend`, with `typescript-strict-style`, plus `vercel-react-best-practices` for React |
+| `.py`, `.pyi`, `pyproject.toml` | `python` (its anti-pattern checklist and the sub-skill that fits the change), not `code-review-frontend` |
+| `.cs`, `.csproj`, `.cshtml`, `.razor` | `dotnet`, not `code-review-frontend` |
+| `.tf`, `cdk.json`, `serverless.yml` | `aws`, not `code-review-frontend` |
+| Any other language | The repo's own lint, type, and test tooling, and `review-blind-spots`. No frontend skill |
+
+A mixed diff gets each row that matches, applied only to its own files. `review-blind-spots` applies in every row.
+
+### Verify and report
+
+The verifier did not write the reviews and must not trust them. For each ranked finding it opens the cited file and line in the worktree and quotes the line, reruns every `VERIFIED (ran)` claim with its own command in a scratch copy and records the real output, and marks the finding `CONFIRMED`, `DROPPED` (does not reproduce, or is wrong), or `UNVERIFIABLE` (cannot be run here, with the reason). It also rereads every sentence in the reviews that approves behavior ("handled", "safe", "correct", "by design") against the lines it cites; a sentence about the wrong function, or one that skips a call site, is recorded as `MISREAD` and returns to the ranked list as a finding. It ends `verified.md` with `CONFIRMED: n, DROPPED: n, UNVERIFIABLE: n, MISREAD: n`.
+
+`report.md` starts with exactly three lines: `STATUS: READY`, `FINDINGS: <n>`, and `BLOCKERS: <n>`. `FINDINGS` counts the confirmed findings it includes. `UNCHECKED` and `UNVERIFIABLE` findings count and appear in the ranked list, never only in a footer. Then a one-paragraph summary with a recommendation. `comments.md` holds one paste-ready comment per finding, each starting with `file:line` on its own line, then one to three short sentences.
 
 ## Run
 
@@ -105,9 +158,9 @@ A pass finds nothing to run, or only `hold` rows, and ends. To continue automati
 
 ## Board
 
-`JOB board` starts the board if needed and prints its link (see First action); `JOB watch [port]` (default 8766) runs it in the foreground, and `JOB serve` is the same. One board serves every factory skill: `factory` and `factory-review` print the same link, and `bin/board` (in this folder) is the server. It needs no terminal. Its link stays valid until the process stops and can open in several tabs. The board reads `.planning/factory/jobs/*/job.json` every 2 seconds.
+`JOB board` starts the board if needed and prints its link (see First action); `JOB watch [port]` (default 8766) runs it in the foreground, and `JOB serve` is the same. One link serves both workflows: `bin/board` (in this folder) is the server, and Build and Review are two boards on it. It needs no terminal. Its link stays valid until the process stops and can open in several tabs. The board reads `.planning/factory/jobs/*/job.json` every 2 seconds.
 
-The page has a collapsible left sidebar that lists the boards (Build and Review). Click a board, or drag it onto the tab strip, to open it as a tab. Drag tabs to reorder them, drag rows in the sidebar to reorder the list, and close a tab with its ×. Every open board keeps its own state, so switching tabs loses nothing, and the layout is remembered in the browser. Each board is a canvas of connected stage nodes (Build: Shape to Ready, with Spec held for your approval), a top bar with Pipeline, Needs you and Ready to land filters, a side panel, and an ask bar at the bottom. Each job is a chip on its stage. A node holding a job that waits on the user is outlined. Click a chip to open the panel: status, the Approve spec, Commit locally or Unblock button, the skill switch, a stage note, and every file in the job folder. Those buttons are the only way those moves happen. The ask bar answers questions and makes the same skill and note changes, through Claude Code, OpenCode or Kiro, with a model and effort you pick. The board looks and behaves the same whichever harness ran the pass.
+The page has a collapsible left sidebar that lists the boards: Build shows build jobs and Review shows review jobs. Click a board, or drag it onto the tab strip, to open it as a tab. Drag tabs to reorder them, drag rows in the sidebar to reorder the list, and close a tab with its ×. Every open board keeps its own state, so switching tabs loses nothing, and the layout is remembered in the browser. Each board is a canvas of connected stage nodes (Build: Shape to Ready, with Spec held for your approval; Review: Scope to Ready), a top bar with Pipeline, Needs you and Ready to land filters, a side panel, and an ask bar at the bottom. Each job is a chip on its stage. A node holding a job that waits on the user is outlined. Click a chip to open the panel: status, the Approve spec, Commit locally or Unblock button, the skill switch, a stage note, and every file in the job folder. Those buttons are the only way those moves happen. The ask bar answers questions and makes the same skill and note changes, through Claude Code, OpenCode or Kiro, with a model and effort you pick. The board looks and behaves the same whichever harness ran the pass.
 
 ## Out of scope
 

@@ -6,7 +6,7 @@ description: |
   Agents report findings only: no fixes. Every finding is VERIFIED or tagged [ASSUMPTION].
   Includes a TypeScript + React 19 reviewer (anti-patterns, state management, type safety, useEffect abuse).
   Use when the PR or diff changes TypeScript, JavaScript, or React code. For other languages, use
-  factory-review, which picks the reviewer by file type.
+  factory (a review job), which picks the reviewer by file type.
 ---
 
 # Multi-Agent Pre-Landing PR Review

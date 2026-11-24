@@ -3,8 +3,6 @@ from pathlib import Path
 
 from test_tick import SKILL, TICK, run
 
-REVIEW = SKILL == "factory-review"
-
 
 # Each harness names its tools and their path argument differently.
 NAMES = {"kiro": ("execute_bash", "fs_write", "path", ".kiro/hooks"),
@@ -68,13 +66,6 @@ class Guard:
         for c in ('echo x > ".claude/settings.json"', "echo x > '.claude/settings.json'", "echo x > $HOME/y"):
             with self.subTest(c):
                 self.assertEqual(self.sh(c), 2)
-
-    def test_review_agent_writes_only_under_planning(self):
-        if not REVIEW:
-            self.skipTest("builders may write code")
-        self.assertEqual(self.write("src.py"), 2)
-        self.assertEqual(self.sh("echo x > src.py"), 2)
-        self.assertEqual(self.write(f".planning/{SKILL}/note.md"), 0)
 
     def test_it_fails_closed_on_input_it_cannot_read(self):
         for bad in ("not json", "{}", json.dumps({"tool_name": self.shell, "tool_input": {}})):

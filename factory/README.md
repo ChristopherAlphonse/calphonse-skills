@@ -4,7 +4,7 @@ The factory takes a feature from idea to a reviewed, committed change on a local
 
 It never pushes and never opens a PR or MR. The only commit is the one you make by clicking a button on the board.
 
-To review an existing branch, use the separate `factory-review` skill. It has the same layout, its own engine and board, and never writes code.
+It also reviews an existing branch or diff: a review job scopes the change, runs independent reviewers, reconciles and verifies their findings, and writes a report with paste-ready comments. A review never writes code and never posts unless you say so.
 
 `SKILL.md` is the contract an agent follows. This file explains how the pieces fit.
 
@@ -113,7 +113,7 @@ sequenceDiagram
 
 ## Following along
 
-One board for every factory skill, started with `bin/job board` by you or an agent, served by `bin/board`. `factory` and `factory-review` print the same link. A left sidebar lists the boards (Build, Review); open one as a tab by clicking it or dragging it onto the tab strip, and drag tabs to reorder them. Each board keeps its own state, so you can switch between two at once. The Build board has the Approve spec, Commit locally and Unblock buttons. The server holds the approval key in memory, and its link works in several tabs until the process stops.
+One board for every factory skill, started with `bin/job board` by you or an agent, served by `bin/board`. The link is the same for build and review jobs. A left sidebar lists the boards (Build shows build jobs, Review shows review jobs); open one as a tab by clicking it or dragging it onto the tab strip, and drag tabs to reorder them. Each board keeps its own state, so you can switch between two at once. The Build board has the Approve spec, Commit locally and Unblock buttons. The server holds the approval key in memory, and its link works in several tabs until the process stops.
 
 `watch` and `serve` are the same board: buttons, a skill switch and note per job, and a chat bar.
 
@@ -188,7 +188,7 @@ The board is written in TypeScript, in `dashboard/*.ts`. The server reads the ge
 | Command | Does |
 | --- | --- |
 | `bin/job create <id> "<title>"` | start a build job at shape |
-| `bin/job create <id> "<title>" --review BASE HEAD` | start a review job at scope. Left over from before the split: `factory-review` has its own engine and no longer uses it |
+| `bin/job create <id> "<title>" --review BASE HEAD` | start a review job at scope. It shows on the Review board |
 | `bin/job stack <id>` | recompute the stack skills for a job |
 | `bin/job queue` | list jobs as `action id stage hint` |
 | `bin/job advance <id> <stage>` | move a job if the evidence allows it |

@@ -19,7 +19,6 @@ PROTECTED_FLOOR = [
     ".npmrc", "**/.npmrc",
 ]
 KEY = ""
-LABEL = "Build"
 SELF = Path(__file__).resolve()
 WATCH_FIRST_PORT = 8766
 BOARD_SCRIPT = SELF.parent / "board"
@@ -901,7 +900,7 @@ def snapshot(job):
 def skill_names():
     """The sibling skills the board lets the user switch off."""
     root = SELF.parent.parent.parent
-    return sorted(p.parent.name for p in root.glob("*/SKILL.md") if p.parent.name not in ("factory", "factory-review"))
+    return sorted(p.parent.name for p in root.glob("*/SKILL.md") if p.parent.name != "factory")
 
 
 def ensure_watcher():
@@ -947,13 +946,17 @@ ACTIONS = {
 }
 
 
-def ask_system(jid):
-    """The chat bar's instructions for this engine."""
+def ask_system(jid, board="build"):
+    """The chat bar's instructions for one board."""
     me = str(SELF)
-    return (f"You are the factory board's assistant, working in {ROOT}. Job state is under .planning/factory/jobs/. "
-            f"The user is looking at job {jid or '(none)'}. To change the board run only: {me} skill <id> <name> on|off, "
+    review = board == "review"
+    return (f"You are the factory {'review ' if review else ''}board's assistant, working in {ROOT}. Job state is under .planning/factory/jobs/. "
+            f"The user is looking at {'review' if review else 'job'} {jid or '(none)'}. "
+            + ("This is a read-only review: never edit, create, or delete code, and never post anywhere. " if review else "")
+            + f"To change the board run only: {me} skill <id> <name> on|off, "
             f"{me} brief <id> <stage> <text> (empty text clears), {me} note <id> <text>. "
-            "Approve spec, Commit locally and Unblock are buttons the user clicks: say which one. Answer in a few plain lines.")
+            + ("Unblock is a button the user clicks. " if review else "Approve spec, Commit locally and Unblock are buttons the user clicks: say which one. ")
+            + "Answer in a few plain lines.")
 
 
 HUMAN_ONLY = {"approve", "commit", "unblock"}
