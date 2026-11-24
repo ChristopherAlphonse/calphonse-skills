@@ -938,9 +938,25 @@ const ENGINE_ICON: Record<string, string> = {
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M5 3h14v18H5V3zm4 4v10h6V7H9z"/></svg>',
 };
 
-const bubble = (cls: string, text: string): void => {
-  $("ask-sheet").hidden = false;
+const bubble = (cls: string, text: string, open = true): void => {
+  if (open) $("ask-sheet").hidden = false;
   $("ask-log").append(el("div", cls, text));
+  $("ask-sheet").scrollTop = $("ask-sheet").scrollHeight;
+};
+// Bring back the saved chat after a reload. The log stays closed until you open it.
+async function restoreChat(): Promise<void> {
+  try {
+    const turns: { board: string; job: string; question: string; answer: string; error: string }[] = await (await api("/api/chat")).json();
+    for (const t of turns) {
+      bubble("me", t.question, false);
+      if (t.answer || t.error) bubble(t.error ? "err" : "bot", t.error || t.answer, false);
+    }
+  } catch {
+    // the log is a convenience; the board works without it
+  }
+}
+$("ask-history").onclick = () => {
+  $("ask-sheet").hidden = !$("ask-sheet").hidden;
   $("ask-sheet").scrollTop = $("ask-sheet").scrollHeight;
 };
 $("ask-close").onclick = () => {
@@ -1218,6 +1234,7 @@ async function start(): Promise<void> {
     : (openTabs[0] ?? "");
   document.body.classList.add("with-panel");
   setSide(saved?.sideCollapsed ?? false);
+  void restoreChat();
   try {
     modelChoices = await (await api("/api/engines")).json();
     const found = Object.keys(modelChoices);

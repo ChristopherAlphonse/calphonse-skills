@@ -1,5 +1,7 @@
 """Behavior tests for bin/job. Everything goes through the CLI or a real `serve 0` subprocess."""
 import http.client
+import importlib.machinery
+import importlib.util
 import json
 import os
 import pty
@@ -13,6 +15,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 JOB = Path(__file__).resolve().parent.parent / "bin" / "job"
@@ -1166,6 +1169,27 @@ class TestServer(Factory):
         self.board()
         self.assertEqual(json.loads(self.http("GET", "/api/features")[1]), {"mermaid": False})
         self.assertEqual(self.http("GET", "/frame/mermaid.js", cookie=False)[0], 404)
+
+    def test_chat_turns_are_kept_and_restored(self):
+        self.assertEqual(json.loads(self.http("GET", "/api/chat")[1]), [])
+        st, body = self.http("POST", "/api/ask", body={"id": "", "board": "nope", "question": "add a node"})
+        self.assertEqual(st, 200)
+        turns = json.loads(self.http("GET", "/api/chat")[1])
+        self.assertEqual([(t["question"], bool(t["error"])) for t in turns], [("add a node", True)])
+        log = self.root / ".planning" / "factory-board" / "chat.jsonl"
+        self.assertEqual(oct(log.stat().st_mode & 0o777), "0o600")
+        self.assertEqual(self.http("GET", "/api/chat", cookie=False)[0], 403)
+
+    def test_the_board_assistant_is_told_how_the_factory_works(self):
+        guide = (Path(JOB).resolve().parents[1] / "board-agent.md").read_text()
+        spec = importlib.util.spec_from_loader("factory_job", importlib.machinery.SourceFileLoader("factory_job", str(JOB)))
+        mod = importlib.util.module_from_spec(spec)
+        with mock.patch.dict(os.environ, {"FACTORY_ROOT": str(self.root)}):
+            spec.loader.exec_module(mod)
+        self.assertIn(guide.strip(), mod.ask_system("a"))
+        for stage in list(mod.TRANSITIONS) + list(mod.REVIEW_TRANSITIONS):
+            self.assertIn(stage, guide, f"board-agent.md never mentions the {stage} stage")
+        self.assertIn("not possible from chat", guide)
 
     def test_approve_over_http(self):
         self.new_spec("a")

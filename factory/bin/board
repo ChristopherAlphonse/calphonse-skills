@@ -23,6 +23,9 @@ ENGINE_FILE = HERE / "job"
 # board id -> (label, which of the engine's jobs it shows)
 BOARD_SPECS = {"build": ("Build", lambda job: not job.get("review")), "review": ("Review", lambda job: bool(job.get("review")))}
 WATCH_FILE = "watch.json"
+CHAT_LOG = STATE / "chat.jsonl"
+CHAT_SHOWN = 200
+CHAT_MAX_BYTES = 1_000_000
 FIRST_PORT = 8766
 PORT_TRIES = 11
 MAX_BODY = 64 * 1024
@@ -288,6 +291,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(403, "{}")
         if u.path == "/api/boards":
             return self.send(200, json.dumps([{"id": b, "label": spec[0]} for b, spec in BOARD_SPECS.items()]))
+        if u.path == "/api/chat":
+            return self.send(200, json.dumps(chat_tail()))
         if u.path == "/api/features":
             return self.send(200, json.dumps({"mermaid": mermaid_library() is not None}))
         if u.path == "/api/engines":
@@ -319,6 +324,8 @@ class Handler(BaseHTTPRequestHandler):
         text = lambda k: body.get(k) if isinstance(body.get(k), str) else ""
         if self.path == "/api/ask":
             out = ask(text("board"), jid, text("question"), text("session"), text("engine"), text("model"), text("effort"))
+            chat_append({"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "board": text("board"), "job": jid, "question": text("question"),
+                         "answer": out.get("answer", ""), "error": out.get("error", "")})
             return self.send(200, json.dumps(out))
         m = re.fullmatch(r"/api/([a-z]+)/save", self.path)
         if m and m.group(1) in BOARD_SPECS:
@@ -375,6 +382,33 @@ def bind(port):
         except OSError:
             continue
     sys.exit(f"refused: no free port from {FIRST_PORT} to {FIRST_PORT + PORT_TRIES - 1}")
+
+
+def chat_append(entry):
+    """Keep every chat turn on disk, so a reload or a restart does not lose it. Trimmed to the last CHAT_SHOWN turns past 1 MB."""
+    try:
+        STATE.mkdir(parents=True, exist_ok=True)
+        fd = os.open(CHAT_LOG, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        with os.fdopen(fd, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+        if CHAT_LOG.stat().st_size > CHAT_MAX_BYTES:
+            write_private(CHAT_LOG, "".join(CHAT_LOG.read_text().splitlines(keepends=True)[-CHAT_SHOWN:]))
+    except OSError as e:
+        print(f"chat log not saved: {e!r}", file=sys.stderr)
+
+
+def chat_tail():
+    try:
+        lines = CHAT_LOG.read_text().splitlines()[-CHAT_SHOWN:]
+    except OSError:
+        return []
+    out = []
+    for line in lines:
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            continue
+    return out
 
 
 def write_private(path, text):

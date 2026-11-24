@@ -946,6 +946,14 @@ ACTIONS = {
 }
 
 
+def board_agent_guide():
+    """The board assistant's reference, kept in board-agent.md beside SKILL.md so it can be read and edited as text."""
+    try:
+        return (SELF.parent.parent / "board-agent.md").read_text()
+    except OSError:
+        return ""
+
+
 def ask_system(jid, board="build"):
     """The chat bar's instructions for one board."""
     me = str(SELF)
@@ -956,7 +964,8 @@ def ask_system(jid, board="build"):
             + f"To change the board run only: {me} skill <id> <name> on|off, "
             f"{me} brief <id> <stage> <text> (empty text clears), {me} note <id> <text>. "
             + ("Unblock is a button the user clicks. " if review else "Approve spec, Commit locally and Unblock are buttons the user clicks: say which one. ")
-            + "Answer in a few plain lines.")
+            + "Answer in a few plain lines."
+            + f"\n\nThe factory skill is in {SELF.parent.parent}.\n\n{board_agent_guide()}")
 
 
 HUMAN_ONLY = {"approve", "commit", "unblock"}
