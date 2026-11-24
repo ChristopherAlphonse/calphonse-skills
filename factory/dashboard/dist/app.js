@@ -1,6 +1,7 @@
 // Generated from app.ts by build.mjs. Do not edit.
 import { el, chip } from "/static/dom.js";
 import { openEditor,                   } from "/static/editor.js";
+import { renderMarkdown } from "/static/markdown.js";
              
            
          
@@ -980,7 +981,11 @@ const ENGINE_ICON                         = {
 
 const bubble = (cls        , text        , open = true)       => {
   if (open) $("ask-sheet").hidden = false;
-  $("ask-log").append(el("div", cls, text));
+  const line = el("div", cls);
+  // The agent writes markdown. What you typed, and errors, stay as text.
+  if (cls === "bot") line.append(renderMarkdown(text));
+  else line.textContent = text;
+  $("ask-log").append(line);
   $("ask-sheet").scrollTop = $("ask-sheet").scrollHeight;
 };
 // Bring back the saved chat after a reload. The log stays closed until you open it.

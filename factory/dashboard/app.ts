@@ -1,5 +1,6 @@
 import { el, chip } from "/static/dom.js";
 import { openEditor, type EditorHandle } from "/static/editor.js";
+import { renderMarkdown } from "/static/markdown.js";
 import type {
   BoardDef,
   Filter,
@@ -979,7 +980,11 @@ const ENGINE_ICON: Record<string, string> = {
 
 const bubble = (cls: string, text: string, open = true): void => {
   if (open) $("ask-sheet").hidden = false;
-  $("ask-log").append(el("div", cls, text));
+  const line = el("div", cls);
+  // The agent writes markdown. What you typed, and errors, stay as text.
+  if (cls === "bot") line.append(renderMarkdown(text));
+  else line.textContent = text;
+  $("ask-log").append(line);
   $("ask-sheet").scrollTop = $("ask-sheet").scrollHeight;
 };
 // Bring back the saved chat after a reload. The log stays closed until you open it.
