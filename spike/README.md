@@ -32,6 +32,14 @@ Do not use it when the answer is in the docs or the existing code (research and 
 
 If a spike outgrows its estimate, the skill stops and asks before continuing.
 
+## Optimization spikes
+
+When the question is "make this metric better" — training loss, test runtime, bundle size, build time, p95 latency — the skill switches to an autoresearch loop. You agree on a primary metric, a command that prints it, the files in scope, constraints, and a termination condition. Then it tries one idea at a time, measures it, keeps improvements, reverts regressions, and logs every run so a fresh session can resume.
+
+For this mode, the agreed termination condition replaces the per-spike estimate check. The loop does not ask "should I continue?" once it is running. It writes its state inside the spike directory and finishes by grouping the kept changes into clean, independently mergeable branches. The original experiment branch stays put.
+
+The same evidence rules apply. Every number in the verdict comes from output we saw, and a confidence score is advisory, not proof. The loop also runs in a disposable worktree, strips ambient credentials from the benchmark, stages only agreed files, and requires a secret scan before each keep commit — see the safety gate in the reference.
+
 ## Verdicts
 
 | Verdict      | Meaning                                                      |
@@ -72,6 +80,8 @@ To change the default stack or the AWS rule, edit `SKILL.md` (Non-negotiables) a
 | `references/comparison.md`      | Head-to-head format when two approaches answer one question    |
 | `references/frontier.md`        | Finding gaps when asked "what should I spike next?"            |
 | `references/aws-floci.md`       | Floci setup, Terraform provider block, tested limits           |
+| `references/autoresearch.md`    | Autoresearch loop for measurable optimization spikes            |
+| `scripts/autoresearch_helper.py`| Stdlib helper for the log: init, log, evaluate, status, summary |
 
 ## Notes
 

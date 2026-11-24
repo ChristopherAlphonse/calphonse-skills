@@ -1,11 +1,20 @@
 ---
 name: spike
-description: "Run throwaway experiments, sized in story points, to answer a feasibility question before committing to a real build. Use when the user says 'spike this', 'is this even possible?', 'let me try X', 'quick prototype', 'proof of concept', 'compare A vs B', 'before I commit to Y', or 'what should I spike next?'. Not for questions answerable by reading docs or code, and not for production implementation."
+description: "Run throwaway experiments, sized in story points, to answer a feasibility question before committing to a real build, or run an autoresearch loop that optimizes a measurable metric by keeping wins and reverting regressions. Use when the user says 'spike this', 'is this even possible?', 'let me try X', 'quick prototype', 'proof of concept', 'compare A vs B', 'before I commit to Y', 'what should I spike next?', 'optimize this metric', 'make this faster/smaller', or 'run autoresearch'. Not for questions answerable by reading docs or code, and not for production implementation."
 ---
 
 # Spike
 
 A spike is a disposable experiment that answers one specific question so the team can decide or estimate with less risk. The deliverable is the **verdict**, not the code.
+
+## Pick a mode
+
+| Question | Mode | Read |
+|----------|------|------|
+| "Can we do X?" — feasibility, risk, a decision | The spike loop below | the reference for each step, when you reach it |
+| "Make metric X better" — a measurable target | Autoresearch loop | `references/autoresearch.md` |
+
+Both modes use the same evidence rules and end with a verdict. Autoresearch is the long-running loop: try an idea, measure it, keep improvements, revert regressions, repeat, then finalize into clean branches. Read its reference at the start of an optimization spike and follow it instead of the step table below.
 
 ## When NOT to use this
 
@@ -38,6 +47,7 @@ Other situations:
 | The spike touches any AWS service | `references/aws-floci.md` |
 | Two or more approaches answer the same question | `references/comparison.md` |
 | Spikes already exist and the user asks what to spike next | `references/frontier.md` |
+| The question is to improve a metric through repeated experiments | `references/autoresearch.md` |
 
 ## Non-negotiables
 
@@ -55,6 +65,8 @@ Read `references/evidence.md` before you build and before you report. It overrid
 - AWS operations run on Floci in Docker, and never on real AWS. Results are reported as "on Floci [version]", never as "works on AWS".
 - No real credentials, and no touching other shared systems without asking.
 - INVALIDATED and INCONCLUSIVE are honest outcomes. Report them plainly.
+- In autoresearch mode, every keep rests on pasted metric output. A confidence score is advisory, never proof, and a single run is still a single run.
+- Autoresearch runs only in a disposable worktree, never the main checkout. Follow the safety gate in `references/autoresearch.md` before any command that writes git state or executes the benchmark.
 
 ## Voice
 
