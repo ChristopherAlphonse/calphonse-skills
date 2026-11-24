@@ -125,6 +125,8 @@ button.callout:hover { background: rgba(240, 195, 107, 0.16); }
 #ask-sheet { margin-bottom: 10px; max-height: 50vh; overflow: auto; border-radius: var(--r-panel); background: var(--surface); box-shadow: 0 0 0 1px var(--hair-2), 0 24px 64px -24px rgba(0, 0, 0, 0.7); }
 #ask-sheet[hidden] { display: none; }
 #ask-head { display: flex; justify-content: space-between; gap: 12px; padding: 14px 18px; color: var(--text-2); position: sticky; top: 0; z-index: 1; background: var(--surface); box-shadow: 0 1px 0 var(--hair); }
+#ask-esc { align-self: center; font: 11px/1 ui-monospace, monospace; padding: 3px 6px; border-radius: 5px; color: var(--text-2); box-shadow: 0 0 0 1px var(--hair-2); }
+#ask-q { flex: 1; min-width: 0; }
 #ask-close { border: 0; background: transparent; font-size: 20px; line-height: 1; color: var(--text-2); }
 #ask-log { padding: 0 18px 16px; display: grid; gap: 10px; }
 #ask-log .me { justify-self: end; background: var(--raise); border-radius: 12px; padding: 6px 10px; }
