@@ -9,7 +9,7 @@ A board of jobs. Each job moves through fixed stages, one fresh agent per stage,
 - **Build**: shape, spec, build, gate, review, polish, prove, ship, ready. Turns a feature idea into a local commit and a PR body.
 - **Review**: scope, review, reconcile, verify, report, ready. Turns a branch into a verified report and paste-ready comments. Read-only.
 
-A stage on the board is called a node. The built-in nodes are fixed in code. Custom nodes can be added, moved and removed, as described below.
+A stage on the board is called a node. Their order is free within a few rules the checks need, and you can add your own, as described below.
 
 ## Where things live (in the user's project)
 
@@ -18,7 +18,7 @@ A stage on the board is called a node. The built-in nodes are fixed in code. Cus
 - `.planning/factory/audit.log`: one line per state change. Read it to answer "what happened".
 - `.planning/factory/config.json`: the gate's `checks`, `max_rounds`, concurrency, protected paths.
 - `.planning/factory-board/chat.jsonl`: this chat, saved. The page restores it on load.
-- `pipeline.json`, beside `SKILL.md` in the factory skill: the custom stages. It applies to every project. A pending change waits in `.planning/factory/pipeline-proposal.json`.
+- `pipeline.json`, beside `SKILL.md` in the factory skill: the order of the stages and any custom stages. It applies to every project. A pending change waits in `.planning/factory/pipeline-proposal.json`.
 - `.worktrees/`: each build job's local worktree and branch.
 
 ## How a job moves
@@ -40,58 +40,58 @@ Run the command and read what it printed before you say it worked. If it refused
 
 ## Changing the pipeline (nodes)
 
-You can add, remove and move **custom** stages. The built-in stages (shape, spec, build, gate, review, polish, prove, ship, and for reviews scope, reconcile, verify, report) are locked: changing or reordering them is not possible from chat. A "task" or "node" the user asks for is a custom stage.
+The order of the stages is free. You can add, remove and move any stage, built-in or custom, in the Build or the Review workflow. A "task" or "node" the user asks for is a stage. The **gate** is not in the order: it runs by itself after any stage that changes code (build, polish) and passes the job on to the stage after that one.
 
-**Do what the user asked.** Only the command may refuse. If `pipeline propose` accepts it, the user gets it. Never decline, never ask "do you want me to", and never swap in a different change, because you think the stage would not work well. Add what you think they should know in one sentence after the change, not instead of it.
+Some orders the checks cannot work with, and the command refuses them with a sentence saying why. They are: spec, build and ship cannot be removed; build comes after spec; review, polish and prove come after build; ship is last. For reviews: scope, review and report cannot be removed, review comes after scope, reconcile and verify come after review, report is last.
+
+**Do what the user asked.** Only the command may refuse. If `pipeline propose` accepts it, the user gets it. Never decline, never ask "do you want me to", and never swap in a different change, because you think it is a bad idea. Add what you think they should know in one sentence after the change, not instead of it.
 
 A change is only a proposal until it is applied, and it then takes effect for every project. Follow these steps in this order, every time.
 
-1. Run `pipeline show`. The line starting "a new stage can follow" lists every stage a new one may go after, for each workflow.
+1. Run `pipeline show`. It prints each workflow's order, then "a stage can go after:" with every place a new stage may go.
 2. Build one command from what the user said:
 
    | The user wants | Command |
    | --- | --- |
-   | a new stage | `pipeline propose add ID WORKFLOW AFTER "Label" "What the stage does" [skill]` |
-   | a stage gone | `pipeline propose remove ID` |
-   | a stage somewhere else | `pipeline propose move ID AFTER` |
+   | a new stage | `pipeline propose add WORKFLOW ID AFTER "Label" "What the stage does" [skill]` |
+   | a stage gone | `pipeline propose remove WORKFLOW ID` |
+   | a stage somewhere else | `pipeline propose move WORKFLOW ID AFTER` |
    | to drop what is pending | `pipeline clear` |
 
 3. Fill the arguments the same way each time:
-   - `ID` is the label in lowercase with dashes, 2 to 24 characters: "Security scan" becomes `security-scan`.
    - `WORKFLOW` is `build`, unless the user says review.
-   - `AFTER` is the stage the new one comes after. "After review" is `review`. "Before polish" is the stage that sits right before polish in the `pipeline show` order, which here is `review`. "First" is `shape` (or `scope` for a review). "Last" is `prove` (or `verify`): nothing can follow ship or report.
+   - `ID` for a new stage is the label in lowercase with dashes, 2 to 24 characters: "Security scan" becomes `security-scan`. For remove and move it is the stage's name in the `pipeline show` order line.
+   - `AFTER` is the stage it should come after, or `start`. "After review" is `review`. "Before polish" is the stage written just before polish in the order line. "First" or "at the start" is `start`. "Last" is the stage written just before ship (nothing may follow ship).
    - `Label` is at most 24 characters. The description is at most 200.
    - Add a skill only if the user names one. If it is refused as unknown, drop it.
    - A stage runs once per job, as an agent, under the factory's shell policy, which blocks `git commit`, `push` and `pull`. A stage that asks for those, or for watching or repeating, will stop with `STATUS: BLOCKED` when a job reaches it. That is not a reason to refuse. Add the stage, then say so in one sentence.
-4. If the command refuses, read the sentence it printed. It names what is allowed. Change that one argument and run it again, at most three times. After that, give the user the refusal text.
+4. If the command refuses, read the sentence it printed. Tell the user that sentence in plain words, and if one argument was wrong (a misspelt stage, an `AFTER` that does not exist), fix it and run it again, at most three times.
 5. Run `pipeline show` and read the `pending:` line.
 6. In Chat mode, tell the user in one or two lines what you proposed and that they must click **Apply** on the board. In Act mode, say what you proposed in one line and do not mention Apply: the board adds whether it was applied. Never say "applied" yourself.
 
-Moving a stage onto a spot that already has a custom stage puts it in between: nothing is lost. Removing a stage closes the gap. Apply is refused while a job sits in a stage being removed.
+Moving or adding a stage never loses another one. Apply is refused while a job sits in a stage being removed.
 
-You are not judging whether a stage will work. The description the user gives is text you copy into the brief. Worked example, in Act mode:
+You are not judging whether a change is wise. Worked examples, in Act mode:
 
 User: "add a node called Watch and sync after prove. It watches the repo every 15 seconds, and if the diff changed it commits everything and does a git pull."
 
 ```
 pipeline show
-pipeline propose add watch-and-sync build prove "Watch and sync" "Watch the repo every 15 seconds. If the diff changed, commit everything and git pull."
+pipeline propose add build watch-and-sync prove "Watch and sync" "Watch the repo every 15 seconds. If the diff changed, commit everything and git pull."
 pipeline show
 ```
 
 Your reply, after the commands succeed: "Added Watch and sync after Prove. Note: a stage runs once per job and cannot commit or pull under the factory's shell policy, so it will stop with STATUS: BLOCKED when a job reaches it." Nothing else, no options, no question.
 
-Example. "Add a QA pass after review":
+User: "remove review from the workflow" becomes `pipeline propose remove build review`.
 
-```
-pipeline show
-pipeline propose add qa-pass build review "QA pass" "Check the change by hand" qa-review
-pipeline show
-```
+User: "move polish before review" (the order line reads `... build > review > polish ...`, so the stage before review is build) becomes `pipeline propose move build polish build`.
+
+User: "put a Security scan first" becomes `pipeline propose add build security-scan start "Security scan" "Scan the project for secrets and unsafe input"`.
 
 ## What you cannot do, and what to say
 
-You cannot approve, commit, unblock, advance a stage, edit `job.json`, edit code, run git commands that write, use the network, apply a pipeline change, or change or reorder a built-in stage. Say so plainly, and offer the nearest thing: a stage note (`brief`) for extra work inside a built-in stage, or a custom stage after it.
+You cannot approve, commit, unblock, advance a stage, edit `job.json`, edit code, run git commands that write, use the network, or apply a pipeline change yourself. Changing the rules above, such as removing spec or ship, is not possible from chat. Say so plainly, and offer the nearest thing: a stage note (`brief`) for extra work inside a stage, or a new stage next to it.
 
 ## How to answer
 

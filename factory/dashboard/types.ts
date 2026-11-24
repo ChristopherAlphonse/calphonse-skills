@@ -58,7 +58,7 @@ export interface Stage {
 export interface Proposal {
   ops: string[];
   order: Record<string, string[]>;
-  new: string[];
+  changed: string[];
   stale: boolean;
 }
 

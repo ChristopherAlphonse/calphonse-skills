@@ -662,7 +662,7 @@ function proposalBox(v: View, p: NonNullable<View["proposal"]>): HTMLElement {
   const order = el("div", "porder");
   for (const id of p.order[v.def.id] ?? []) {
     const label = v.baseStages.find((s) => s.id === id)?.label ?? id;
-    order.append(el("span", `pchip${p.new.includes(id) ? " new" : ""}`, label));
+    order.append(el("span", `pchip${p.changed.includes(id) ? " new" : ""}`, label));
   }
   const msg = el("p", "pmsg", p.stale ? "The pipeline changed after this was prepared. Discard it and ask again." : "Nothing changes until you click Apply.");
   const act = async (action: "applypipe" | "discardpipe"): Promise<void> => {
