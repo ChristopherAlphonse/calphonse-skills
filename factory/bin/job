@@ -30,32 +30,15 @@ CHECKS_FILE = "checks.md"
 SPEC_FILE = "spec.md"
 HUMAN_STAGES = {"needs-human"}
 TERMINAL = {"ready", "rejected"}
-TRANSITIONS = {
-    "shape": {"spec", "rejected"},
-    "spec": {"build"},
-    "build": {"gate", "needs-human"},
-    "gate": {"review", "build", "prove", "needs-human"},
-    "review": {"polish", "build", "needs-human"},
-    "polish": {"gate", "build", "needs-human"},
-    "prove": {"ship", "build", "needs-human"},
-    "ship": {"ready", "build", "needs-human"},
-}
 HINT = {
     "shape": "lets-talk-about-it -> shape.md (STATUS: READY, or reject with rejection.md)",
     "spec": "prd-mode -> spec.md and the tasks file, then wait for the user to approve",
-    "build": "swe plus stack skill, one task at a time -> build.md, then advance gate",
-    "gate": "job gate <id>, then advance review (or prove after polish) or build",
-    "review": "reviewers -> round-N/review-<name>.md, reconcile-reviews -> reconcile.md, advance polish or build",
-    "polish": "comment-sicko then simplify -> polish.md, then advance gate or build",
-    "prove": "prove-it-works -> uat.md, then advance ship or build",
-    "ship": "pr-body-style (+ demo-script) -> pr-body.md, wait for user approval, advance ready",
-}
-REVIEW_TRANSITIONS = {
-    "scope": {"review", "rejected", "needs-human"},
-    "review": {"reconcile", "needs-human"},
-    "reconcile": {"verify", "needs-human"},
-    "verify": {"report", "needs-human"},
-    "report": {"ready", "needs-human"},
+    "build": "swe plus stack skill, one task at a time -> build.md (STATUS: READY, or STATUS: BLOCKED)",
+    "gate": "job gate <id>: it passes the job on, or sends it back to build",
+    "review": "reviewers -> round-N/review-<name>.md, reconcile-reviews -> reconcile.md when anything is CHANGES",
+    "polish": "comment-sicko then simplify -> polish.md (STATUS: DONE, or STATUS: REWORK to send it back to build)",
+    "prove": "prove-it-works -> uat.md (STATUS: PASS, or STATUS: FAIL to send it back to build)",
+    "ship": "pr-body-style (+ demo-script) -> pr-body.md and commit.md, then wait for the user to click Commit locally",
 }
 HINT_REVIEW = {
     "scope": "find the repo's own lint, type, and test tooling (CI config, Makefile, pyproject, package scripts, whatever it uses) -> scope.md (STATUS: READY, or reject with rejection.md); add an architecture reviewer with `job route`",
@@ -86,14 +69,21 @@ def workflow_of(job):
 
 
 def transitions(job):
-    return pipeline()[workflow_of(job)]["transitions"]
+    comp = pipeline()[workflow_of(job)]
+    if workflow_of(job) == "review":
+        return comp["transitions"]
+    # The gate follows whichever stage last changed the code, and passes the job to the stage after that one.
+    after = comp["next"].get(job.get("gate_for") or "build") or comp["next"]["build"]
+    return {**comp["transitions"], "gate": {after, "build", "needs-human"}}
 
 
 def hint_for(job):
     hint = pipeline()[workflow_of(job)]["hints"].get(job["stage"], "")
     off = set(job.get("skills_off", []))
     stack = [s for s in job.get("stack") or [] if s not in off]
-    out = hint + (f" | stack skills: {', '.join(stack)}" if stack and hint else "")
+    forward = sorted(transitions(job).get(job["stage"], set()) - {"build", "needs-human", "rejected"})
+    out = hint + (f" | on success advance to: {forward[0]}" if hint and forward else "")
+    out += (f" | stack skills: {', '.join(stack)}" if stack and hint else "")
     if hint and off:
         out += f" | USER TURNED OFF, do not use: {', '.join(sorted(off))}"
     note = job.get("briefs", {}).get(job["stage"])
@@ -259,14 +249,14 @@ def cmd_create(jid, title, *opts):
     need(not d.exists(), f"{jid} exists")
     d.mkdir(parents=True)
     job = {
-        "id": jid, "title": title, "stage": "shape", "round": 0,
+        "id": jid, "title": title, "stage": pipeline_order("build")[0], "round": 0,
         "round_limit": config()["max_rounds"], "reviewers": list(BASE_REVIEWERS),
         "polished": False, "approvals": {}, "progress": [0, 0], "stack": [],
         "branch": None, "worktree": None, "commit": None, "tip": None,
         "started": now(), "ended": None, "note": "",
     }
     if review:
-        job.update(stage="scope", round=1, review=review)
+        job.update(stage=pipeline_order("review")[0], round=1, review=review)
         try:
             make_worktree(job)
         except BaseException:
@@ -275,6 +265,7 @@ def cmd_create(jid, title, *opts):
         job["stack"] = detect_stack(review_files(review))
     save(job)
     audit("create-review" if review else "create", jid, f"{review['base_ref']}..{review['head_ref']}" if review else title)
+    audit("start", jid, job["stage"])
     print(jid)
     announce_board()
 
@@ -295,10 +286,10 @@ def bump_round(job):
 
 
 def from_shape(job, d, rd, to):
-    if to == "spec":
-        need(kv(d / "shape.md").get("STATUS") == "READY", "shape.md needs STATUS: READY")
-    elif to == "rejected":
+    if to == "rejected":
         need((d / "rejection.md").exists(), "rejection.md missing")
+    else:
+        need(kv(d / "shape.md").get("STATUS") == "READY", "shape.md needs STATUS: READY")
     return to
 
 
@@ -314,6 +305,7 @@ def from_spec(job, d, rd, to):
 def from_build(job, d, rd, to):
     if to == "gate":
         need(kv(d / "build.md").get("STATUS") == "READY", "build.md needs STATUS: READY")
+        job["gate_for"] = "build"
     elif to == "needs-human":
         need(kv(d / "build.md").get("STATUS") == "BLOCKED", "build.md needs STATUS: BLOCKED")
     return to
@@ -322,13 +314,11 @@ def from_build(job, d, rd, to):
 def from_gate(job, d, rd, to):
     g = kv(rd / CHECKS_FILE).get("GATE")
     need(g, "run `job gate` first")
-    if to == "review":
-        need(g == "PASS" and not job["polished"], "needs a passing gate before polish")
-    elif to == "prove":
-        need(g == "PASS" and job["polished"], "needs a passing gate after polish")
-    elif to == "build":
+    if to == "build":
         need(g == "FAIL", "gate passed, nothing to rebuild")
         to = bump_round(job)
+    else:
+        need(g == "PASS", "the gate has not passed")
     return to
 
 
@@ -337,12 +327,12 @@ def from_review(job, d, rd, to):
     missing = [r for r, v in verdicts.items() if not v]
     need(not missing, f"missing reviews: {', '.join(missing)}")
     changes = [r for r, v in verdicts.items() if v == "CHANGES"]
-    if to == "polish":
-        need(not changes, f"open CHANGES from: {', '.join(changes)}")
-    elif to == "build":
+    if to == "build":
         need(changes, "all reviews passed, nothing to rebuild")
         need((rd / "reconcile.md").exists(), "reconcile.md missing")
         to = bump_round(job)
+    else:
+        need(not changes, f"open CHANGES from: {', '.join(changes)}")
     return to
 
 
@@ -351,6 +341,7 @@ def from_polish(job, d, rd, to):
     if to == "gate":
         need(s == "DONE", "polish.md needs STATUS: DONE")
         job["polished"] = True
+        job["gate_for"] = "polish"
         (rd / CHECKS_FILE).unlink(missing_ok=True)
     elif to == "build":
         need(s == "REWORK", "polish.md needs STATUS: REWORK")
@@ -360,11 +351,11 @@ def from_polish(job, d, rd, to):
 
 def from_prove(job, d, rd, to):
     s = kv(d / "uat.md").get("STATUS")
-    if to == "ship":
-        need(s == "PASS", "uat.md needs STATUS: PASS")
-    elif to == "build":
+    if to == "build":
         need(s == "FAIL", "uat.md needs STATUS: FAIL")
         to = bump_round(job)
+    else:
+        need(s == "PASS", "uat.md needs STATUS: PASS")
     return to
 
 
@@ -385,13 +376,10 @@ def justify(job, cur, to):
     """Check the files that justify cur -> to. Returns the real target and mutates job."""
     d = jobdir(job["id"])
     rd = d / f"round-{job['round']}"
-    pipe = pipeline()["build"]
-    if cur in pipe["custom"]:
+    if cur in pipeline()["build"]["custom"]:
         to = from_custom(d, cur, to)
     elif cur in JUSTIFY_FROM:
-        shown = pipe["evidence"].get((cur, to), to)
-        real = JUSTIFY_FROM[cur](job, d, rd, shown)
-        to = to if shown != to and real == shown else real
+        to = JUSTIFY_FROM[cur](job, d, rd, to)
     if to == "build":
         job["polished"] = False
     return to
@@ -542,7 +530,9 @@ def audited_state(jid):
         if e.get("job") != jid:
             continue
         a, human = e["action"], e["actor"] == "human"
-        if a in AUDIT_STAGE:
+        if a == "start":
+            st["stage"] = e["detail"]
+        elif a in AUDIT_STAGE:
             st["stage"] = AUDIT_STAGE[a]
         elif a == "advance":
             st["stage"] = e["detail"].split(" -> ")[1]
@@ -613,21 +603,14 @@ def enforce(job):
 def justify_review(job, cur, to):
     d = jobdir(job["id"])
     rd = d / "round-1"
-    pipe = pipeline()["review"]
-    if cur in pipe["custom"]:
+    if cur in pipeline()["review"]["custom"]:
         return from_custom(d, cur, to)
-    wanted, to = to, pipe["evidence"].get((cur, to), to)
-    check_review_move(job, d, rd, cur, to)
-    return wanted
-
-
-def check_review_move(job, d, rd, cur, to):
     if to == "needs-human":
         need(kv(d / "blocked.md").get("STATUS") == "BLOCKED", "blocked.md needs STATUS: BLOCKED")
-    elif cur == "scope" and to == "review":
-        need(kv(d / "scope.md").get("STATUS") == "READY", "scope.md needs STATUS: READY")
     elif cur == "scope" and to == "rejected":
         need((d / "rejection.md").exists(), "rejection.md missing")
+    elif cur == "scope":
+        need(kv(d / "scope.md").get("STATUS") == "READY", "scope.md needs STATUS: READY")
     elif cur == "review":
         missing = [r for r in job["reviewers"] if kv(rd / f"review-{r}.md").get("VERDICT") not in ("PASS", "CHANGES")]
         need(not missing, f"missing reviews: {', '.join(missing)}")
@@ -638,6 +621,7 @@ def check_review_move(job, d, rd, cur, to):
     elif cur == "report":
         r = kv(d / "report.md")
         need(r.get("STATUS") == "READY" and r.get("FINDINGS", "").isdigit(), "report.md needs STATUS: READY and FINDINGS: <n>")
+    return to
 
 
 # ---- pipeline: custom stages
