@@ -187,26 +187,31 @@ async function pollLoop(): Promise<void> {
   setTimeout(pollLoop, POLL_MS);
 }
 
-function needsPanel(n: Needs): HTMLDivElement {
+function needsPanel(n: Needs, j: Job): HTMLDivElement {
   const box = el("div", "needs");
-  const copy = el("button", "", "Copy");
-  copy.onclick = async () => {
-    try {
-      await navigator.clipboard.writeText(n.command);
-      copy.textContent = "Copied";
-    } catch {
-      copy.textContent = "Copy failed";
-    }
-  };
-  const cmd = el("div", "cmd");
-  cmd.append(el("code", "", n.command), copy);
-  box.append(
-    el("h4", "", `Needs you: ${n.action}`),
-    el("p", "", n.why),
-    el("p", "", n.todo),
-    cmd,
-    el("p", "id", "Run it in your own terminal. It prints a one-time link with the buttons. This read-only page cannot approve."),
-  );
+  box.append(el("h4", "", `Needs you: ${n.action}`), el("p", "", n.why), el("p", "", n.todo));
+  const path = j.can_approve ? "/api/approve" : j.can_commit ? "/api/commit" : "/api/unblock";
+  box.append(actionButton(n.action, path, j));
+  return box;
+}
+
+// Skills the user switched off for this job, and a note for the current stage. Both reach the next agent through `JOB queue`.
+function toolsPanel(j: Job): HTMLElement {
+  const box = el("div", "tools");
+  const off = new Set(j.skills_off ?? []);
+  const chips = j.skills.map((name) => {
+    const c = chip(off.has(name) ? `${name} (off)` : name, off.has(name) ? "FAIL" : "");
+    c.title = off.has(name) ? "Click to use this skill again" : "Click to stop using this skill on this job";
+    c.onclick = () => post("/api/skill", { id: j.id, name, off: !off.has(name) });
+    return c;
+  });
+  const note = el("textarea") as HTMLTextAreaElement;
+  note.rows = 2;
+  note.placeholder = `Note for the ${j.stage} stage. The next agent follows it.`;
+  note.value = j.briefs?.[j.stage] ?? "";
+  const save = el("button", "", "Save note");
+  save.onclick = () => post("/api/brief", { id: j.id, stage: j.stage, text: note.value });
+  box.append(el("h4", "", "Skills on this job"), row(...chips), note, save);
   return box;
 }
 
@@ -215,7 +220,8 @@ function renderDrawerHead(): void {
   if (!j) return;
   const branch = j.branch ? `, ${j.branch}` : "";
   $("dhead").replaceChildren(el("h3", "", j.title), el("div", "id", `${j.id} at ${j.stage}${branch}`));
-  $("dneeds").replaceChildren(...(j.needs ? [needsPanel(j.needs)] : []));
+  $("dneeds").replaceChildren(...(j.needs ? [needsPanel(j.needs, j)] : []));
+  if (document.activeElement?.tagName !== "TEXTAREA") $("dtools").replaceChildren(toolsPanel(j));
   $("dfiles").replaceChildren(
     ...j.files.map((f) => {
       const c = chip(f, f === state.openFile ? "on" : "");
@@ -279,16 +285,31 @@ function closeDrawer(): void {
   $("drawer").classList.remove("open");
 }
 
-async function applyMode(): Promise<void> {
+let session = "";
+const bubble = (cls: string, text: string): void => {
+  const log = $("ask-log");
+  log.hidden = false;
+  log.append(el("div", cls, text));
+  log.scrollTop = log.scrollHeight;
+};
+
+$("ask-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const input = $("ask-input") as HTMLInputElement;
+  const question = input.value.trim();
+  if (!question) return;
+  input.value = "";
+  bubble("me", question);
   try {
-    const mode: { readonly: boolean } = await (await api("/api/mode")).json();
-    const policy = document.querySelector(".policy");
-    if (mode.readonly && policy) {
-      policy.textContent = "Read-only view. Approve, commit, and unblock stay in the terminal board.";
-    }
+    const res = await api("/api/ask", { method: "POST", body: JSON.stringify({ id: state.openId ?? "", question, session }) });
+    const out: { answer?: string; session?: string; error?: string } = await res.json();
+    session = out.session ?? session;
+    bubble(out.error ? "err" : "bot", out.error ?? out.answer ?? "");
   } catch {
+    bubble("err", "offline");
   }
-}
+  await poll();
+};
 
 initDrawerResize();
 
@@ -296,5 +317,4 @@ $("close").onclick = closeDrawer;
 document.addEventListener("visibilitychange", async () => {
   if (!document.hidden) await poll();
 });
-await applyMode();
 await pollLoop();

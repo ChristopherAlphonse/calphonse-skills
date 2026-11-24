@@ -26,12 +26,9 @@ class Watch(Factory):
 
 
 class TestWatch(Watch):
-    def test_it_starts_without_a_terminal_and_the_real_board_still_refuses_to(self):
+    def test_it_starts_without_a_terminal(self):
         self.start_watch()
-        r = subprocess.run([sys.executable, "-I", str(JOB), "serve", "0"], cwd=str(self.base), env=self.env,
-                           capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL)
-        self.assertNotEqual(r.returncode, 0)
-        self.assertIn("interactive terminal", r.stderr)
+        self.assertEqual(self.http("GET", "/api/jobs")[0], 200)
 
     def test_static_assets_need_a_session_and_are_whitelisted(self):
         self.start_watch()
@@ -61,48 +58,37 @@ class TestWatch(Watch):
         self.assertEqual(self.http("GET", "/api/jobs", xfactory=False)[0], 403)
         self.assertEqual(self.http("GET", "/api/jobs")[0], 200)
 
-    def test_it_serves_the_board_and_says_it_is_read_only(self):
+    def test_it_serves_the_board(self):
         self.spec_ready_job()
         self.start_watch()
         status, page = self.http("GET", "/")
         self.assertEqual(status, 200)
         self.assertIn(b"<h1>Factory</h1>", page)
-        self.assertEqual(json.loads(self.http("GET", "/api/mode")[1]), {"readonly": True})
         jobs = json.loads(self.http("GET", "/api/jobs")[1])
         self.assertEqual([j["id"] for j in jobs], ["s"])
         self.assertEqual(self.http("GET", "/api/file?job=s&name=spec.md")[0], 200)
 
-    def test_no_action_route_works_and_nothing_changes(self):
+    def test_the_buttons_work_from_the_board_an_agent_started(self):
         self.spec_ready_job()
         self.start_watch()
-        before = self.js("s")
-        for action in ("approve", "commit", "unblock"):
-            for body in ({"id": "s"}, {}):
-                with self.subTest(action=action, body=body):
-                    self.assertEqual(self.http("POST", f"/api/{action}", body=body)[0], 403)
-        self.assertEqual(self.js("s"), before)
-        self.assertFalse(any(e["actor"] == "human" for e in self.audit_lines()))
-
-    def test_the_approve_button_is_never_offered(self):
-        self.spec_ready_job()
-        self.start_watch()
-        job = json.loads(self.http("GET", "/api/jobs")[1])[0]
-        self.assertTrue(job["needs_human"])
-        self.assertFalse(job["can_approve"])
-        self.assertFalse(job["can_commit"])
-
-    def test_the_real_board_still_offers_the_button_for_the_same_job(self):
-        self.spec_ready_job()
-        self.board()
         job = json.loads(self.http("GET", "/api/jobs")[1])[0]
         self.assertTrue(job["can_approve"])
+        self.assertEqual(self.http("POST", "/api/approve", body={"id": "s"})[0], 200)
+        self.assertTrue(self.js("s")["approvals"].get("spec"))
+        self.assertTrue(any(e["actor"] == "human" and e["action"] == "approve" for e in self.audit_lines()))
 
-    def test_it_never_touches_the_real_boards_key_file(self):
-        self.state.mkdir(parents=True, exist_ok=True)
-        key_file = self.state / "human.sha256"
-        key_file.write_text("a" * 64 + "\n")
+    def test_the_board_changes_skills_and_stage_notes(self):
+        self.spec_ready_job()
         self.start_watch()
-        self.assertEqual(key_file.read_text(), "a" * 64 + "\n")
+        self.assertEqual(self.http("POST", "/api/skill", body={"id": "s", "name": "qa-review", "off": True})[0], 200)
+        self.assertEqual(self.http("POST", "/api/brief", body={"id": "s", "stage": "spec", "text": "keep it small"})[0], 200)
+        job = self.js("s")
+        self.assertEqual(job["skills_off"], ["qa-review"])
+        self.assertEqual(job["briefs"], {"spec": "keep it small"})
+        hint = self.ok("queue").stdout
+        self.assertIn("USER TURNED OFF, do not use: qa-review", hint)
+        self.assertIn("USER NOTE for this stage, follow it: keep it small", hint)
+        self.assertEqual(self.http("POST", "/api/skill", body={"id": "s", "name": "../x", "off": True})[0], 409)
 
     def test_the_cli_human_commands_stay_refused_next_to_a_watcher(self):
         self.spec_ready_job()

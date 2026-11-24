@@ -4,7 +4,6 @@ export interface Needs {
   files: string;
   why: string;
   todo: string;
-  command: string;
 }
 
 export interface ReviewRange {
@@ -30,6 +29,9 @@ export interface Job {
   approvals: Record<string, string>;
   progress: [number, number];
   stack: string[];
+  skills_off?: string[];
+  briefs?: Record<string, string>;
+  skills: string[];
   branch: string | null;
   worktree: string | null;
   commit: string | null;

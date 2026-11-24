@@ -185,7 +185,7 @@ class Factory(unittest.TestCase):
             ready, _, _ = select.select([master], [], [], 20)
             self.assertTrue(ready, f"serve printed nothing: {buf!r}")
             buf += os.read(master, 4096).decode()
-        m = re.match(r"board: http://127\.0\.0\.1:(\d+)/\?c=(\S+)", buf)
+        m = re.match(r"watch: 127\.0\.0\.1:(\d+)/\?c=(\S+)", buf)
         self.assertIsNotNone(m, f"bad first line {buf!r}")
         self.port, self.code = int(m.group(1)), m.group(2)
         status, _, headers = self.http_full("GET", f"/?c={self.code}", cookie=False)
@@ -900,7 +900,7 @@ class TestAudit(Factory):
 
     def test_serve_logged(self):
         self.start_server()
-        self.assertIn("serve", [l["action"] for l in self.audit_lines()])
+        self.assertIn("watch", [l["action"] for l in self.audit_lines()])
 
 
 class TestQueue(Factory):
@@ -998,8 +998,8 @@ class TestServer(Factory):
         self.procs.clear()
         self.port = None
         self.board()
-        # start_server already redeemed the code once and checked the 303; replay must fail
-        self.assertEqual(self.http("GET", f"/?c={self.code}", cookie=False)[0], 403)
+        # the link is reusable, so a second browser can open it
+        self.assertEqual(self.http("GET", f"/?c={self.code}", cookie=False)[0], 303)
         st, _, headers = self.http_full("GET", "/", cookie=True)
         self.assertEqual(st, 200)
         self.assertIn("default-src 'none'", headers["Content-Security-Policy"])
@@ -1019,7 +1019,7 @@ class TestServer(Factory):
         buf = ""
         while "\n" not in buf:
             buf += os.read(master, 4096).decode()
-        m = re.match(r"board: http://127\.0\.0\.1:(\d+)/\?c=(\S+)", buf)
+        m = re.match(r"watch: 127\.0\.0\.1:(\d+)/\?c=(\S+)", buf)
         self.port = int(m.group(1))
         st, _, headers = self.http_full("GET", f"/?c={m.group(2)}", cookie=False)
         self.assertEqual((st, headers["Location"]), (303, "/"))
@@ -1065,14 +1065,14 @@ class TestServer(Factory):
         self.human("approve", "a")
         self.assertFalse(self.get_jobs()["a"]["can_approve"])
 
-    def test_needs_tells_the_user_what_to_run(self):
+    def test_needs_tells_the_user_what_to_click(self):
         self.new_spec("a")
         self.to_ship("b")
         jobs = self.get_jobs()
         for jid, action in (("a", "Approve spec"), ("b", "Commit locally")):
             n = jobs[jid]["needs"]
             self.assertEqual(n["action"], action)
-            self.assertTrue(n["command"].endswith(" serve") and n["command"].startswith("cd "))
+            self.assertNotIn("command", n)
         self.human("approve", "a")
         self.assertIsNone(self.get_jobs()["a"]["needs"])
 
@@ -1183,12 +1183,14 @@ class TestHumanGate(Factory):
                 self.assertIn("board", r.stderr)
         self.assertIsNone(self.js("j")["commit"])
 
-    def test_serve_refuses_without_a_terminal(self):
-        r = subprocess.run([sys.executable, "-I", str(JOB), "serve", "0"], cwd=str(self.base), env=self.env,
-                           capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL)
-        self.assertNotEqual(r.returncode, 0)
-        self.assertIn("interactive terminal", r.stderr)
-        self.assertFalse((self.state / "human.sha256").exists())
+    def test_the_board_starts_without_a_terminal_and_writes_the_key_hash(self):
+        p = subprocess.Popen([sys.executable, "-I", str(JOB), "serve", "0"], cwd=str(self.base), env=self.env,
+                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        self.addCleanup(p.wait)
+        self.addCleanup(p.kill)
+        self.addCleanup(p.stdout.close)
+        self.assertTrue(p.stdout.readline().startswith("watch: 127.0.0.1:"))
+        self.assertTrue((self.state / "human.sha256").exists())
 
     def test_hash_file_holds_a_hash_not_the_key(self):
         self.board()

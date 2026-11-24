@@ -11,13 +11,17 @@ You are the orchestrator. You do no stage work yourself. For each stage you spaw
 
 ## First action
 
-Before any other tool call, including `JOB create` and `JOB queue`, run `JOB board`. It starts the read-only board if none is running and prints its link as `127.0.0.1:PORT/?c=CODE`. Then write that link to the user as a message of its own, with the `http` scheme added and the code included, so it is clickable, and only then continue. The point is that the user watches the work happen, so the link must reach them before the first stage starts, never in the final report. Do not spawn a subagent, read the repo, or plan first. Repeat the link in every report that ends a pass. The board keeps running between passes and the link stays the same while it does. If `JOB board` refuses, say so in that first message and give `JOB watch` as the fallback. Do not use `JOB serve`: only the user starts that.
+Before any other tool call, including `JOB create` and `JOB queue`, run `JOB board`. It starts the board if none is running and prints its link as `127.0.0.1:PORT/?c=CODE`. Write that link to the user as a message of its own, with the `http` scheme added and the code included, so it is clickable, and only then continue. Do not spawn a subagent, read the repo, or plan first. Repeat the link in every report that ends a pass. The board keeps running between passes and the link stays the same while it does.
+
+The board has buttons (Approve spec, Commit locally, Unblock), a skill switch and a note box per job, and a chat bar. The user does everything there and never needs a terminal.
 
 ## Waiting on the user
 
-Whenever a job waits on the user (spec approval, **Commit locally**, **Unblock**), end the message with the command that opens the board with the buttons, in its own code block, with absolute paths and without being asked: `cd <project root> && <absolute path of JOB> serve`. `JOB advance`, `JOB create`, and `JOB queue` print it on stderr as well; copy it from there. Say that the read-only link has no buttons and this board does. Never run the command yourself: `serve` prints its one-time link in the user's terminal.
+When a job waits on the user (spec approval, **Commit locally**, **Unblock**), say so and point at the board link. Then do not end your turn. Run `JOB wait` (90 seconds by default, `JOB wait 110` to choose). It prints `RESUME: <ids> ...` the moment the user clicks, and then you run `JOB queue` and carry on. It prints `STILL WAITING` and exits 3 on timeout: run it again, and keep going until it prints `RESUME`, the user answers in chat, or the user says to stop.
 
-Then do not end your turn. Run `JOB wait` (90 seconds by default, `JOB wait 110` to choose). It prints `RESUME: <ids> ...` the moment the user clicks, and then you run `JOB queue` and carry on. It prints `STILL WAITING` and exits 3 on timeout: run it again, and keep going until it prints `RESUME`, the user answers in chat, or the user says to stop. The board cannot message you, so this is how a click reaches you. A scheduled `TICK` pass picks the click up the same way on its next run.
+## User choices on the board
+
+`JOB queue` hints can end with `USER TURNED OFF, do not use: ...` and `USER NOTE for this stage, follow it: ...`. Obey both, and pass them to every stage agent. The user sets them in the board or in its chat bar. You can set them too: `JOB skill <id> <name> on|off`, `JOB brief <id> <stage> <text>`.
 
 ## Workflows
 
@@ -32,10 +36,10 @@ These hold in every harness and are enforced by structure, not by this text.
 - **Baseline shell rules.** `policy.yaml` is the human-in-the-loop baseline for every harness (Claude Code, Kiro, OpenCode). It denies `git push`, `aws s3 rm`, and `curl -X POST`, asks before every git verb that changes a repository, and allows a list of read-only commands. Deny beats ask, and ask beats allow. A command no rule names is not allowed, so it waits for a human. `TICK` turns the file into each harness's format and refuses a headless pass until the project's policy covers it. The factory's own denies below are stricter, never looser.
 - **No commit, push, PR, or MR without the user.** Agents leave changes uncommitted in the job's worktree. The only commit is `JOB commit`, which the user triggers from the board. It runs the repo's own hooks and refuses unless the tree matches the one that passed the gate.
 - **Never run** `git commit`, `git push`, `git merge`, `git rebase`, `git config`, `git -c`, `git -C`, `gh`, `glab`, `curl`, or `wget`. Never use the network.
-- **Never** try to run `approve`, `commit`, or `unblock`, or to start `JOB serve`. They belong to the user, and the CLI refuses them. `JOB watch` is the exception: it is a read-only board with no key and no action routes, and you may start it so the user can follow along.
+- **Never** try to run `approve`, `commit`, or `unblock` from the CLI. They are the user's buttons on the board, and the CLI refuses them. Starting the board (`JOB board`, `JOB watch`) is yours to do.
 - **Protected paths** (CI config, CODEOWNERS, `.env`, factory config, plus any in `config.json`) fail the gate when touched.
 - **Audit.** Every state change is one line in `.planning/factory/audit.log`.
-- **Board.** The user starts `JOB serve` in their own terminal. It binds to localhost, redeems a one-time code for a session cookie, and holds the approval key in memory. The user's clicks are the only approvals.
+- **Board.** Started by `JOB board`. It binds to localhost, redeems the code in its link for a session cookie, and holds the approval key in memory. The user's clicks are the only approvals.
 
 Each layer's strength, the per-harness policy paths, and the probe results are in `README.md` (Safety layers, Harnesses). Your remote's protected branches are the only layer an agent on this machine cannot edit.
 
@@ -101,7 +105,7 @@ A pass finds nothing to run, or only `hold` rows, and ends. To continue automati
 
 ## Board
 
-`JOB board` starts the read-only view if needed and prints its link (see First action); `JOB watch [port]` (default 8766) runs it in the foreground. It needs no terminal, holds no key, and answers no approve, commit, or unblock request. Its link stays valid until the process stops and can open in several tabs. Anyone, including an agent, may start it. `JOB serve [port]` serves the kanban on 127.0.0.1 and prints an address with a one-time code. It only starts in an interactive terminal. The board reads `.planning/factory/jobs/*/job.json` every 2 seconds. Columns: Shape, Spec, Build (build and gate), Review, Polish, Prove, Ship, Needs you, Ready to land. Cards show round, gate, one chip per reviewer, task progress, and the local commit. A card waiting on the user is outlined. Approve spec, Commit locally, and Unblock are the only buttons, and the only way those moves happen. Click a card to read every file in its folder. The board looks and behaves the same whichever harness ran the pass.
+`JOB board` starts the board if needed and prints its link (see First action); `JOB watch [port]` (default 8766) runs it in the foreground, and `JOB serve` is the same. It needs no terminal. Its link stays valid until the process stops and can open in several tabs. The board reads `.planning/factory/jobs/*/job.json` every 2 seconds. Columns: Shape, Spec, Build (build and gate), Review, Polish, Prove, Ship, Needs you, Ready to land. Cards show round, gate, one chip per reviewer, task progress, and the local commit. A card waiting on the user is outlined. Approve spec, Commit locally, and Unblock are buttons, and the only way those moves happen. The drawer has a skill switch and a stage note per job, and the chat bar answers questions and makes the same changes. Click a card to read every file in its folder. The board looks and behaves the same whichever harness ran the pass.
 
 ## Out of scope
 

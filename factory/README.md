@@ -20,7 +20,7 @@ To review an existing branch, use the separate `factory-review` skill. It has th
    Other keys: `concurrency` (default 1), `max_rounds` (default 3), `base_branch` (default `main`), extra `protected_paths`, and `allow` (extra shell patterns the agents may run unattended, such as `make verify*`; your `checks` command is allowed already). Test, lint, format-check, and quality tools for the common stacks are allowed by `policy.yaml`. Formatters that rewrite files are in `policy.build.yaml`, which only this skill loads.
 3. Install the policy for your harness: `bin/tick install claude`. It comes from `policy.yaml`.
 4. Start a job in Claude Code with `/factory <feature idea>`.
-5. Open the board in your own terminal with `bin/job serve`, then open the address it prints.
+5. Open the board with `bin/job board`, then open the address it prints.
 6. Keep passes going, including after you click approve, commit, or unblock: run `bin/tick loop kiro` (or `claude`, `opencode`) in a spare terminal. Or use `/loop 5m /factory run`, or schedule `bin/tick claude` with cron.
 
 Gitignore `.planning/` and `.worktrees/` in the project.
@@ -113,17 +113,9 @@ sequenceDiagram
 
 ## Following along
 
-Two boards read the same files and look the same.
+One board, started with `bin/job board` by you or an agent. It has the Approve spec, Commit locally and Unblock buttons, holds the approval key in memory, and its link works in several tabs until the process stops.
 
-| | `bin/job serve` | `bin/job watch` |
-| --- | --- | --- |
-| Who starts it | you, in your terminal | you or an agent |
-| Buttons | Approve spec, Commit locally, Unblock | none |
-| Holds the approval key | yes, in memory | no |
-| Link | one-time code, valid 5 minutes | stays valid until the process stops, works in several tabs |
-| Default port | 8765 | 8766 |
-
-Use `watch` to see what an agent is doing. Use `serve` when you need to approve or commit. The header of a watch board says it is read-only.
+`watch` and `serve` are the same board: buttons, a skill switch and note per job, and a chat bar.
 
 ## Who can do what
 
@@ -136,9 +128,9 @@ Use `watch` to see what an agent is doing. Use `serve` when you need to approve 
 | Unblock a parked job | no | yes |
 | Push, open a PR or MR | no | your own step, outside the factory |
 
-`approve`, `commit`, and `unblock` are not CLI commands. They run only inside `bin/job serve`.
+`approve`, `commit`, and `unblock` are not CLI commands. They run only from the board.
 
-The board starts only in an interactive terminal. It binds to localhost and prints a one-time code that is valid for 5 minutes. The code becomes a session cookie. Every action also needs a custom header and a loopback `Host`. The approval key lives only in the server's memory, and the git hooks check its hash.
+The board binds to localhost and prints a code in its link. The code becomes a session cookie. Every action also needs a custom header and a loopback `Host`. The approval key lives only in the server's memory, and the git hooks check its hash.
 
 The commit click refuses unless all of these hold:
 
@@ -204,8 +196,9 @@ The board is written in TypeScript, in `dashboard/*.ts`. The server reads the ge
 | `bin/job route <id> architecture` | add a reviewer |
 | `bin/job progress <id> <done> <total>` | set the task progress bar |
 | `bin/job note <id> "<text>"` | record what the agent is doing now; the card shows the latest note |
-| `bin/job serve [port]` | start the board with the approve, commit, and unblock buttons (needs your terminal, default port 8765) |
-| `bin/job watch [port]` | start a read-only board to follow along (no terminal needed, no buttons, default port 8766) |
+| `bin/job serve [port]` / `bin/job watch [port]` | run the board in the foreground (default ports 8765 / 8766) |
+| `bin/job skill <id> <name> on\|off` | switch a skill off or on for one job |
+| `bin/job brief <id> <stage> <text>` | set a note the next agent for that stage follows (empty text clears) |
 | `bin/tick <harness> [--dry-run]` | run one headless pass if the policy is installed |
 | `bin/tick loop <harness> [seconds] [--once]` | run a pass whenever a job can run, so your board click continues the work by itself |
 | `bin/tick install`, `check`, `print`, `list` | install, verify, show, or list the policy |

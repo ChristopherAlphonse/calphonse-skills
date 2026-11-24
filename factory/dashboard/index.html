@@ -21,9 +21,17 @@
       <button class="x" id="reset" title="Reset drawer width">Reset width</button>
       <div id="dhead"></div>
       <div id="dneeds"></div>
+      <div id="dtools"></div>
       <div class="files" id="dfiles"></div>
       <div id="dbody" class="raw"></div>
     </aside>
+    <div id="ask">
+      <div id="ask-log" hidden></div>
+      <form id="ask-form" autocomplete="off">
+        <input id="ask-input" placeholder="Ask the factory, or say: skip qa-review on this job" spellcheck="false" />
+        <button id="ask-send" type="submit">Send</button>
+      </form>
+    </div>
     <button id="grip" type="button" aria-label="Resize drawer"></button>
     <script type="module" src="/static/app.js"></script>
   </body>

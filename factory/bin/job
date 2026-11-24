@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Only writer of job.json. Refuses illegal stage moves. Serves the board."""
+"""Only writer of job.json. Refuses illegal stage moves. Serves the board and its chat."""
 import fcntl, fnmatch, hashlib, hmac, json, os, re, secrets, select, shlex, shutil, socket, subprocess, sys, tempfile, threading, time
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -24,7 +24,6 @@ PROTECTED_FLOOR = [
     ".gitattributes", "**/.gitattributes", ".circleci/**", ".buildkite/**", "azure-pipelines.yml",
     ".npmrc", "**/.npmrc",
 ]
-READONLY = False
 KEY = ""
 SESSION = ""
 CODE = ""
@@ -96,8 +95,13 @@ def transitions(job):
 
 def hint_for(job):
     hint = (HINT_REVIEW if job.get("review") else HINT).get(job["stage"], "")
-    stack = job.get("stack") or []
-    return hint + (f" | stack skills: {', '.join(stack)}" if stack and hint else "")
+    off = set(job.get("skills_off", []))
+    stack = [s for s in job.get("stack") or [] if s not in off]
+    out = hint + (f" | stack skills: {', '.join(stack)}" if stack and hint else "")
+    if hint and off:
+        out += f" | USER TURNED OFF, do not use: {', '.join(sorted(off))}"
+    note = job.get("briefs", {}).get(job["stage"])
+    return out + (f" | USER NOTE for this stage, follow it: {' '.join(note.split())}" if hint and note else "")
 
 
 def die(msg):
@@ -643,7 +647,8 @@ def cmd_advance(jid, to):
     save(job)
     audit("advance", jid, f"{cur} -> {real}")
     print(f"{jid}: {cur} -> {real}" + (" (round limit hit)" if real != to else ""))
-    announce_serve()
+    if waiting_on_human(job):
+        announce_board()
 
 
 def cmd_gate(jid):
@@ -709,6 +714,35 @@ def cmd_note(jid, text):
     job["activity"] = log[-ACTIVITY_KEEP:]
     save(job)
     audit("note", jid, text.strip()[:200])
+
+
+SKILL_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")
+
+
+@serialized
+def cmd_skill(jid, name, state):
+    """Turn a skill off or on for one job. The queue hint tells the orchestrator."""
+    need(SKILL_NAME.fullmatch(name) and state in ("on", "off"), "usage: skill <id> <name> on|off")
+    job = load(jid)
+    off = set(job.get("skills_off", [])) - {name}
+    job["skills_off"] = sorted(off | ({name} if state == "off" else set()))
+    save(job)
+    audit("skill", jid, f"{name} {state}")
+
+
+@serialized
+def cmd_brief(jid, stage, text):
+    """Set (or clear, with empty text) the user's note for one stage of one job."""
+    job = load(jid)
+    need(stage in transitions(job), f"no stage {stage!r}")
+    briefs = job.setdefault("briefs", {})
+    text = text.strip()[:1000]
+    if text:
+        briefs[stage] = text
+    else:
+        briefs.pop(stage, None)
+    save(job)
+    audit("brief", jid, f"{stage}: {text[:100]}")
 
 
 def human_only():
@@ -821,10 +855,6 @@ def cmd_queue():
         print(f"{action}\t{job['id']}\t{s}\t{hint_for(job)}")
 
 
-def serve_command():
-    return f"cd {shlex.quote(str(ROOT))} && {shlex.quote(str(Path(__file__).resolve()))} serve"
-
-
 def needs_you(job):
     """What the user must do, and why, for a job that waits on them. None when it does not."""
     if not waiting_on_human(job):
@@ -833,16 +863,16 @@ def needs_you(job):
     if s == "spec":
         action, files = "Approve spec", "spec.md"
         why = "Nothing is built until you approve spec.md, and editing it later cancels the approval."
-        todo = "Read it in this drawer, then run the command below and click Approve spec."
+        todo = "Read it in this drawer, then click Approve spec."
     elif s == "ship":
         action, files = "Commit locally", "pr-body.md and commit.md"
         why = "The gate passed and the PR body and commit message are written. Nothing is committed until you click."
-        todo = "Read pr-body.md and commit.md in this drawer, then click Commit locally on the board the command below opens."
+        todo = "Read pr-body.md and commit.md in this drawer, then click Commit locally."
     else:
         action, files = "Unblock", "blocked.md"
         why = job.get("note") or "The job stopped and cannot continue on its own."
         todo = "Read blocked.md or the activity log to see why. Then click Unblock to grant more rounds, or leave it parked."
-    return {"action": action, "files": files, "why": why, "todo": todo, "command": serve_command()}
+    return {"action": action, "files": files, "why": why, "todo": todo}
 
 
 def cmd_wait(seconds):
@@ -871,8 +901,14 @@ def snapshot(job):
     return {**job, "kind": "review" if job.get("review") else "build", "report": kv(d / "report.md"),
             "gate": kv(rd / CHECKS_FILE).get("GATE"), "reviews": reviews,
             "files": files, "needs_human": waiting_on_human(job), "needs": needs_you(job),
-            "can_approve": not READONLY and job["stage"] == "spec" and waiting_on_human(job),
-            "can_commit": not READONLY and job["stage"] == "ship" and waiting_on_human(job)}
+            "skills": skill_names(), "can_approve": job["stage"] == "spec" and waiting_on_human(job),
+            "can_commit": job["stage"] == "ship" and waiting_on_human(job)}
+
+
+def skill_names():
+    """The sibling skills the board lets the user switch off."""
+    root = DASH_DIR.parent.parent
+    return sorted(p.parent.name for p in root.glob("*/SKILL.md") if p.parent.name not in ("factory", "factory-review"))
 
 
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
@@ -915,12 +951,9 @@ class Handler(BaseHTTPRequestHandler):
         return self.host_ok() and self.session_ok() and self.headers.get("X-Factory") == "1"
 
     def redeem_code(self, supplied):
-        global CODE
         with AUTH_LOCK:
             good = bool(supplied and CODE) and time.time() < CODE_EXP and \
                 hmac.compare_digest(supplied.encode(), CODE.encode())
-            if good and not READONLY:
-                CODE = ""
             return good
 
     def get_root(self, q):
@@ -964,8 +997,6 @@ class Handler(BaseHTTPRequestHandler):
             return self.get_static(u.path[len("/static/"):])
         if not self.trusted():
             return self.send(403, "{}")
-        if u.path == "/api/mode":
-            return self.send(200, json.dumps({"readonly": READONLY}))
         if u.path == "/api/jobs":
             return self.send(200, json.dumps([snapshot(j) for j in all_jobs()]))
         if u.path == "/api/file":
@@ -973,7 +1004,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send(404, "{}")
 
     def do_POST(self):
-        if READONLY or not self.trusted():
+        if not self.trusted():
             return self.send(403, "{}")
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -983,14 +1014,19 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(413, "{}")
         try:
             body = json.loads(self.rfile.read(n) or b"{}")
-            jid = body["id"]
-        except (ValueError, KeyError, TypeError):
+            jid = body.get("id", "")
+        except (ValueError, AttributeError):
             return self.send(400, "{}")
+        text = lambda k: body.get(k) if isinstance(body.get(k), str) else ""
         if not isinstance(jid, str):
             return self.send(400, "{}")
+        if self.path == "/api/ask":
+            return self.send(200, json.dumps(ask_claude(jid, text("question"), text("session"))))
         routes = {"/api/approve": lambda: cmd_approve(jid, "spec"),
                   "/api/commit": lambda: cmd_commit(jid),
-                  "/api/unblock": lambda: cmd_unblock(jid)}
+                  "/api/unblock": lambda: cmd_unblock(jid),
+                  "/api/skill": lambda: cmd_skill(jid, text("name"), "off" if body.get("off") else "on"),
+                  "/api/brief": lambda: cmd_brief(jid, text("stage"), text("text"))}
         if self.path not in routes:
             return self.send(404, "{}")
         CTX.human = True
@@ -1004,6 +1040,35 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             CTX.human = False
         self.send(200, "{}")
+
+
+ASK_TIMEOUT = 300
+
+
+def ask_claude(jid, question, session):
+    """One chat turn: `claude -p` may read the job files and change the board only through skill, brief, and note."""
+    claude = shutil.which("claude")
+    if not claude:
+        return {"error": "claude was not found on PATH"}
+    me = str(Path(__file__).resolve())
+    system = (f"You are the factory board's assistant, working in {ROOT}. Job state is under .planning/factory/jobs/. "
+              f"The user is looking at job {jid or '(none)'}. To change the board run only: {me} skill <id> <name> on|off, "
+              f"{me} brief <id> <stage> <text> (empty text clears), {me} note <id> <text>. "
+              "Approve spec, Commit locally and Unblock are buttons the user clicks: say which one. Answer in a few plain lines.")
+    args = [claude, "-p", "--output-format", "json", "--append-system-prompt", system,
+            "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--tools", "Read,Grep,Glob,Bash",
+            "--allowedTools", f"Bash({me} skill:*)", f"Bash({me} brief:*)", f"Bash({me} note:*)", "Read", "Grep", "Glob"]
+    if session:
+        args += ["--resume", session]
+    try:
+        r = subprocess.run(args, input=question[:4000], capture_output=True, text=True, timeout=ASK_TIMEOUT,
+                           cwd=str(ROOT), env={**os.environ, "FACTORY_ROOT": str(ROOT)})
+        out = json.loads(r.stdout)
+    except (OSError, ValueError, subprocess.SubprocessError) as e:
+        return {"error": f"chat failed: {e}"}
+    if out.get("is_error"):
+        return {"error": str(out.get("result", "claude reported an error"))[:500]}
+    return {"answer": out.get("result", ""), "session": out.get("session_id", "")}
 
 
 def rebuild_dashboard():
@@ -1031,26 +1096,6 @@ def rebuild_dashboard():
         warn(f"rebuild failed ({(r.stderr.strip().splitlines() or ['no output'])[-1]})")
 
 
-def cmd_serve(port):
-    """The only place human actions run. The key and session live in this process's memory only."""
-    global KEY, SESSION, CODE, CODE_EXP
-    need(sys.stdin.isatty() and sys.stdout.isatty(),
-         "serve needs an interactive terminal: the board belongs to the user, not to an agent")
-    rebuild_dashboard()
-    KEY, SESSION, CODE = (secrets.token_urlsafe(n) for n in (32, 32, 24))
-    CODE_EXP = time.time() + 300
-    STATE.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=STATE)
-    with os.fdopen(fd, "w") as f:
-        f.write(hashlib.sha256(KEY.encode()).hexdigest() + "\n")
-    os.chmod(tmp, 0o600)
-    os.replace(tmp, STATE / HASH_FILE)
-    srv = ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
-    print(f"board: http://127.0.0.1:{srv.server_port}/?c={CODE}  (opens once, valid 5 minutes)", flush=True)
-    audit("serve", "", f"port {srv.server_port}")
-    srv.serve_forever()
-
-
 WATCH_FILE = "watch.json"
 WATCH_FIRST_PORT = 8766
 WATCH_PORT_TRIES = 11
@@ -1068,14 +1113,19 @@ def bind_watch(port):
 
 
 def cmd_watch(port):
-    """Read-only board. It holds no key and has no action routes, so an agent may start it."""
-    global READONLY, SESSION, CODE, CODE_EXP
+    """The board, with buttons and chat. The key and session live in this process's memory only."""
+    global KEY, SESSION, CODE, CODE_EXP
     rebuild_dashboard()
-    READONLY = True
-    SESSION, CODE = secrets.token_urlsafe(32), secrets.token_urlsafe(24)
+    KEY, SESSION, CODE = (secrets.token_urlsafe(n) for n in (32, 32, 24))
     CODE_EXP = float("inf")
+    STATE.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=STATE)
+    with os.fdopen(fd, "w") as f:
+        f.write(hashlib.sha256(KEY.encode()).hexdigest() + "\n")
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, STATE / HASH_FILE)
     srv = bind_watch(port)
-    print(f"watch: 127.0.0.1:{srv.server_port}/?c={CODE}  (read-only, valid until this process stops)", flush=True)
+    print(f"watch: 127.0.0.1:{srv.server_port}/?c={CODE}", flush=True)
     audit("watch", "", f"port {srv.server_port}")
     srv.serve_forever()
 
@@ -1095,10 +1145,7 @@ def pid_alive(pid):
 
 
 def ensure_watcher():
-    """Return the link of a running read-only board for this project, starting one if needed.
-
-    The board outlives the command that started it. It never starts the board with the buttons.
-    """
+    """Return the link of a running board for this project, starting one if needed. It outlives the command that started it."""
     if os.environ.get("FACTORY_NO_WATCH") == "1" or config().get("auto_watch") is False:
         return None
     STATE.mkdir(parents=True, exist_ok=True)
@@ -1130,23 +1177,15 @@ def ensure_watcher():
         return m.group(1)
 
 
-def announce_serve():
-    """Tell the user the exact command to run when a job waits on them, so they never have to ask for it."""
-    if any(waiting_on_human(j) for j in all_jobs()):
-        print(f"waiting on you. To approve, commit, or unblock, run this in your terminal:\n"
-              f"  cd {shlex.quote(str(ROOT))} && {shlex.quote(str(Path(__file__).resolve()))} serve", file=sys.stderr)
-
-
 def announce_board():
     url = ensure_watcher()
     if url:
         print(f"board: {url}", file=sys.stderr)
-    announce_serve()
 
 
 def cmd_board():
     url = ensure_watcher()
-    need(url, "auto_watch is off, or the read-only board could not start. Run `job watch` yourself")
+    need(url, "auto_watch is off, or the board could not start. Run `job watch` yourself")
     print(url)
 
 
@@ -1155,7 +1194,7 @@ HUMAN_ONLY = {"approve", "commit", "unblock"}
 
 COMMANDS = {
     "create": (cmd_create, None), "advance": (cmd_advance, 2), "gate": (cmd_gate, 1), "stack": (cmd_stack, 1), "watch": (cmd_watch, 1), "board": (cmd_board, 0),
-    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_serve, 1), "wait": (cmd_wait, 1),
+    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_watch, 1), "skill": (cmd_skill, 3), "brief": (cmd_brief, 3), "wait": (cmd_wait, 1),
 }
 
 if __name__ == "__main__":
