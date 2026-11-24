@@ -6,6 +6,7 @@ import type {
   Job,
   Needs,
   Stage,
+  StagesPayload,
   View,
 } from "/static/types.js";
 
@@ -654,6 +655,30 @@ function listRow(j: Job): HTMLButtonElement {
   return r;
 }
 
+// A change to the custom stages that an agent prepared. Nothing happens until the user clicks Apply.
+function proposalBox(v: View, p: NonNullable<View["proposal"]>): HTMLElement {
+  const box = el("div", "callout");
+  const order = el("div", "porder");
+  for (const id of p.order[v.def.id] ?? []) {
+    const label = v.baseStages.find((s) => s.id === id)?.label ?? id;
+    order.append(el("span", `pchip${p.new.includes(id) ? " new" : ""}`, label));
+  }
+  const msg = el("p", "pmsg", p.stale ? "The pipeline changed after this was prepared. Discard it and ask again." : "Nothing changes until you click Apply.");
+  const act = async (action: "applypipe" | "discardpipe"): Promise<void> => {
+    try {
+      const res = await api(`/api/${v.def.id}/${action}`, { method: "POST", body: JSON.stringify({ id: "" }) });
+      msg.textContent = res.ok ? "" : "Refused: the pipeline changed, or a job sits in a stage this removes.";
+    } catch {
+      msg.textContent = "offline";
+    }
+    await pollOne(v.def.id);
+  };
+  const apply = button("Apply", "btn go", () => void act("applypipe"));
+  apply.disabled = p.stale;
+  box.append(el("b", "", "Waiting for you"), ...p.ops.map((o) => el("p", "", o)), order, msg, row(apply, button("Discard", "btn", () => void act("discardpipe"))));
+  return box;
+}
+
 function overview(): HTMLElement[] {
   const v = view();
   const waiting = v.jobs.filter((j) => j.needs_human);
@@ -673,6 +698,7 @@ function overview(): HTMLElement[] {
         [v.jobs.filter(finished).length, "done"],
       ),
     ),
+    ...(v.proposal ? [sec(heading("Pipeline change"), proposalBox(v, v.proposal))] : []),
     ...(waiting.length
       ? [
           sec(
@@ -896,16 +922,29 @@ function pollOne(id: string): Promise<void> {
   return p;
 }
 
+// Built-in stages keep their text from BUILD and REVIEW. A custom stage brings its own label and blurb.
+function applyStages(v: View, p: StagesPayload): void {
+  const base = new Map(v.baseStages.map((s) => [s.id, s]));
+  v.def.stages = p.order.flatMap((id) => {
+    const custom = p.custom[id];
+    const stage = base.get(id) ?? (custom ? { id, label: custom.label, blurb: custom.blurb } : null);
+    return stage ? [stage] : [];
+  });
+  v.proposal = p.proposal;
+}
+
 async function fetchJobs(v: View): Promise<void> {
   try {
-    const res = await api(`/api/${v.def.id}/jobs`);
-    if (!res.ok) throw new Error(`status ${res.status}`);
-    const text = await res.text();
-    if (text === v.sig)
+    const [res, sres] = await Promise.all([api(`/api/${v.def.id}/jobs`), api(`/api/${v.def.id}/stages`)]);
+    if (!res.ok || !sres.ok) throw new Error(`status ${res.status}/${sres.status}`);
+    const [text, stagesText] = [await res.text(), await sres.text()];
+    const sig = `${text}\n${stagesText}`;
+    if (sig === v.sig)
       return v.def.id === active ? renderTabs() : renderSidebar();
-    v.sig = text;
-    // shortcut: the payload is trusted, not validated, upgrade if the server stops being ours
+    v.sig = sig;
+    // shortcut: the payloads are trusted, not validated, upgrade if the server stops being ours
     v.jobs = JSON.parse(text) as Job[];
+    applyStages(v, JSON.parse(stagesText) as StagesPayload);
     if (v.def.id === active) renderAll();
     else {
       renderSidebar();
@@ -1217,6 +1256,8 @@ async function start(): Promise<void> {
           sig: "",
           session: "",
           skillsOpen: false,
+          baseStages: def.stages,
+          proposal: null,
         });
     }
   } catch {

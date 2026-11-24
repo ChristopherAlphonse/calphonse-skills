@@ -55,6 +55,21 @@
                 
  
 
+// A change to the custom stages that waits for the user to click Apply.
+                           
+                
+                                  
+                
+                 
+ 
+
+// The /api/<board>/stages payload: the stage order for one workflow, the custom stages' labels, and any waiting change.
+                                
+                  
+                                                           
+                            
+ 
+
                                               
 
 // One engine's board: its stages and how its jobs read in the panel.
@@ -85,4 +100,6 @@
               
                   
                       
+                      
+                            
  

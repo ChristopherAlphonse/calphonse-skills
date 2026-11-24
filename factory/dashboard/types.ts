@@ -54,6 +54,21 @@ export interface Stage {
   blurb: string;
 }
 
+// A change to the custom stages that waits for the user to click Apply.
+export interface Proposal {
+  ops: string[];
+  order: Record<string, string[]>;
+  new: string[];
+  stale: boolean;
+}
+
+// The /api/<board>/stages payload: the stage order for one workflow, the custom stages' labels, and any waiting change.
+export interface StagesPayload {
+  order: string[];
+  custom: Record<string, { label: string; blurb: string }>;
+  proposal: Proposal | null;
+}
+
 export type Filter = "all" | "needs" | "done";
 
 // One engine's board: its stages and how its jobs read in the panel.
@@ -84,4 +99,6 @@ export interface View {
   sig: string;
   session: string;
   skillsOpen: boolean;
+  baseStages: Stage[];
+  proposal: Proposal | null;
 }

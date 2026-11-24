@@ -102,7 +102,8 @@ def ask_args(engine, exe, me, system, question, session, model, effort):
     if engine == "claude":
         args = [exe, "-p", "--output-format", "json", "--append-system-prompt", system,
                 "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--tools", "Read,Grep,Glob,Bash",
-                "--allowedTools", f"Bash({me} skill:*)", f"Bash({me} brief:*)", f"Bash({me} note:*)", "Read", "Grep", "Glob"]
+                "--allowedTools", f"Bash({me} skill:*)", f"Bash({me} brief:*)", f"Bash({me} note:*)",
+                f"Bash({me} pipeline show)", f"Bash({me} pipeline propose:*)", f"Bash({me} pipeline clear)", "Read", "Grep", "Glob"]
         args += (["--model", model] if model else []) + (["--effort", effort] if effort else [])
         return args + (["--resume", session] if session else []), question[:4000]
     prompt = f"{system}\n\nUser: {question[:4000]}"
@@ -297,10 +298,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, json.dumps({"mermaid": mermaid_library() is not None}))
         if u.path == "/api/engines":
             return self.send(200, json.dumps(model_choices()))
-        m = re.fullmatch(r"/api/([a-z]+)/(jobs|file)", u.path)
+        m = re.fullmatch(r"/api/([a-z]+)/(jobs|file|stages)", u.path)
         if not m or m.group(1) not in BOARD_SPECS:
             return self.send(404, "{}")
         board = m.group(1)
+        if m.group(2) == "stages":
+            return self.send(200, json.dumps({
+                "order": ENGINE.pipeline_order(board),
+                "custom": {c["id"]: {"label": c["label"], "blurb": c["brief"] or c["label"]} for c in ENGINE.pipeline_custom() if c["workflow"] == board},
+                "proposal": ENGINE.proposal_state()}))
         if m.group(2) == "jobs":
             return self.send(200, json.dumps([ENGINE.snapshot(j) for j in ENGINE.all_jobs() if BOARD_SPECS[board][1](j)]))
         return self.get_file(board, q.get("job", [""])[0], q.get("name", [""])[0])
