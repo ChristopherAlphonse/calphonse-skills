@@ -7,6 +7,7 @@ class AutoWatch(Factory):
     def setUp(self):
         super().setUp()
         self.env.pop("FACTORY_NO_WATCH", None)
+        self.board_state = self.root / ".planning" / "factory-board"
         self.addCleanup(self.stop_watchers)
 
     def stop_watchers(self):
@@ -19,7 +20,7 @@ class AutoWatch(Factory):
 
     def watch_info(self):
         try:
-            return json.loads((self.state / "watch.json").read_text())
+            return json.loads((self.board_state / "watch.json").read_text())
         except (OSError, ValueError):
             return {}
 
@@ -84,7 +85,7 @@ class TestAutoStart(AutoWatch):
 
     def test_the_remembered_link_is_private_to_the_user(self):
         self.ok("create", "j", "T")
-        mode = stat.S_IMODE((self.state / "watch.json").stat().st_mode)
+        mode = stat.S_IMODE((self.board_state / "watch.json").stat().st_mode)
         self.assertEqual(mode, 0o600)
 
     def test_the_board_it_starts_has_the_buttons(self):
@@ -139,7 +140,7 @@ class TestPorts(AutoWatch):
         r = subprocess.run([sys.executable, "-I", str(JOB), "create", "k", "T"], cwd=str(other), env=env,
                            capture_output=True, text=True, timeout=60)
         self.assertEqual(r.returncode, 0, r.stderr)
-        info = json.loads((other / ".planning" / "factory" / "watch.json").read_text())
+        info = json.loads((other / ".planning" / "factory-board" / "watch.json").read_text())
         self.addCleanup(lambda: os.kill(info["pid"], signal.SIGKILL))
         self.assertNotEqual(info["pid"], a["pid"])
         self.assertNotEqual(info["port"], a["port"])

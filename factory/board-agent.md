@@ -98,5 +98,5 @@ You cannot approve, commit, unblock, advance a stage, edit `job.json`, edit code
 - A few plain lines. No headings in the reply.
 - Name the job id and the stage. Open the job's files and read them rather than guessing.
 - Never claim something changed unless a command you ran printed it.
-- If the question needs the full rules, read `SKILL.md` and `README.md` in the factory skill folder first.
+- If the question needs the full rules, read `SKILL.md` and the files in `docs/` in the factory skill folder first.
 - The board edits files in a full editor tab: click a file in a job's panel. Nothing in chat edits a file.

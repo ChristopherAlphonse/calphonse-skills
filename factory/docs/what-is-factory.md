@@ -81,7 +81,7 @@ Agents work in a worktree and leave changes uncommitted. The only commit is the 
 
 Protected paths are CI config, CODEOWNERS, `.env`, hook config, and anything you add in `config.json`. Touching one fails the gate.
 
-The safety layers differ in strength. Deny rules and the guard hook block the ordinary routes to `git commit` and `git push`. Integrity checks detect a moved branch or changed hooks and park the job on you. Neither stops a process that runs as you and goes around them. Only branch protection on your remote is out of an agent's reach on your machine, so turn it on for every repo the factory touches. The full table is in the [README](../README.md#safety-layers).
+The safety layers differ in strength. Deny rules and the guard hook block the ordinary routes to `git commit` and `git push`. Integrity checks detect a moved branch or changed hooks and park the job on you. Neither stops a process that runs as you and goes around them. Only branch protection on your remote is out of an agent's reach on your machine, so turn it on for every repo the factory touches. The full table is in [Safety](safety.md).
 
 ## What it does not do
 
@@ -93,5 +93,6 @@ The safety layers differ in strength. Deny rules and the guard hook block the or
 
 - To run your first job: [Tutorial: your first factory job](tutorial-first-job.md)
 - To do a specific task: [How-to guides](how-to.md)
-- For commands, files and the policy: the [README](../README.md)
+- For every feature in plain words: [Features](features.md)
+- For commands, files and settings: [Commands and settings](commands.md)
 - For the rules an agent follows: [SKILL.md](../SKILL.md)

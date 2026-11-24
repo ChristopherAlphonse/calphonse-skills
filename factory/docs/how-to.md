@@ -136,4 +136,4 @@ $FACTORY/bin/tick install claude
 | `.planning/factory/audit.log` | One JSON line per state change, with the actor |
 | `$FACTORY/bin/job queue` | One row per job: `run`, `hold`, `wait`, or `done`, with the stage and a hint |
 
-For every command, see the [README commands table](../README.md#commands).
+For every command, see [Commands and settings](commands.md).

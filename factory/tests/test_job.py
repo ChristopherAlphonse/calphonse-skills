@@ -987,13 +987,16 @@ class TestServer(Factory):
         finally:
             s.close()
 
-    def test_root_needs_session_and_code_is_single_use(self):
+    def test_root_needs_session_and_code_is_reusable(self):
         st, body = self.http("GET", "/")
         self.assertEqual(st, 200)
         self.assertIn(b"<", body)
         self.assertEqual(self.http("GET", "/", cookie=False)[0], 403)
         self.assertEqual(self.http("GET", "/", cookie="wrong")[0], 403)
-        self.assertEqual(self.http("GET", f"/?c={self.code}", cookie=False)[0], 403)
+        # The link opens a session in any browser that has it, not just the first one.
+        st, _, headers = self.http_full("GET", f"/?c={self.code}", cookie=False)
+        self.assertEqual(st, 303)
+        self.assertIn("Set-Cookie", headers)
         self.assertEqual(self.http("GET", "/?c=wrong", cookie=False)[0], 403)
 
     def test_login_redirects_so_no_secret_stays_in_the_url(self):
@@ -1228,7 +1231,8 @@ class TestServer(Factory):
     def test_post_status_codes(self):
         self.new_spec("a")
         self.assertEqual(self.http("POST", "/api/build/approve", raw=b"not json")[0], 400)
-        self.assertEqual(self.http("POST", "/api/build/approve", body={"nope": 1})[0], 400)
+        # A missing id is an empty job id; the board passes it through and the engine refuses it.
+        self.assertEqual(self.http("POST", "/api/build/approve", body={"nope": 1})[0], 409)
         self.assertEqual(self.http("POST", "/api/build/approve", body={"id": "missing"})[0], 409)
         self.assertEqual(self.http("POST", "/api/build/commit", body={"id": "a"})[0], 409)
         self.assertEqual(self.http("POST", "/api/build/unblock", body={"id": "a"})[0], 409)

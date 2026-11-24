@@ -50,7 +50,7 @@ These hold in every harness and are enforced by structure, not by this text.
 - **Audit.** Every state change is one line in `.planning/factory/audit.log`.
 - **Board.** Started by `JOB board`. It binds to localhost, redeems the code in its link for a session cookie, and holds the approval key in memory. The user's clicks are the only approvals.
 
-Each layer's strength, the per-harness policy paths, and the probe results are in `README.md` (Safety layers, Harnesses). Your remote's protected branches are the only layer an agent on this machine cannot edit.
+Each layer's strength, the per-harness policy paths, and the probe results are in `docs/safety.md` and `docs/harnesses.md`. Your remote's protected branches are the only layer an agent on this machine cannot edit.
 
 ## Harnesses
 

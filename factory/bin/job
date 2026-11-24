@@ -642,6 +642,7 @@ WHY_REQUIRED = {
     "review": "it is the review",
     "report": "it is the result",
 }
+REQUIRED = {"build": ("spec", "build", "ship"), "review": ("scope", "review", "report")}
 BUILTIN_IDS = set(BASE_ORDER["build"]) | set(BASE_ORDER["review"]) | {"gate", "ready", "rejected", "needs-human"}
 STAGE_ID = re.compile(r"[a-z][a-z0-9-]{1,23}")
 MAX_CUSTOM = 12
@@ -693,7 +694,7 @@ def order_problems(wf, order, custom_ids):
         errs.append(f"a {wf} stage appears twice")
     errs += [f"{x} is not a {wf} stage" for x in order if x not in known]
     errs += [f"{x} is defined but not placed in the {wf} order" for x in sorted(custom_ids) if x not in order]
-    errs += [f"{x} cannot be removed: {WHY_REQUIRED[x]}" for x in BASE_ORDER[wf] if x in WHY_REQUIRED and x not in order]
+    errs += [f"{x} cannot be removed: {WHY_REQUIRED[x]}" for x in REQUIRED[wf] if x not in order]
     pos = {x: i for i, x in enumerate(order)}
 
     def before(a, b, why):

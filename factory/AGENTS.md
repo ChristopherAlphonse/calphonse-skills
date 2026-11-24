@@ -11,7 +11,8 @@ A board of jobs. Each job moves through fixed stages, one fresh agent per stage,
 | Path | What it is |
 | --- | --- |
 | `SKILL.md` | The orchestrator's rules and both stage tables. Front matter is `name` and `description` only. |
-| `README.md` | User-facing behavior, safety layers, commands, tests. |
+| `README.md` | What the factory is and how to start. Short on purpose. |
+| `docs/` | Everything else for users: `features.md` (every feature in plain words), `commands.md`, `safety.md`, `harnesses.md`, `how-to.md`, `tutorial-first-job.md`, `what-is-factory.md`, `developing.md`. |
 | `board-agent.md` | The chat bar assistant's reference. `ask_system()` in `bin/job` appends it to every chat prompt. |
 | `bin/job` | Only writer of `job.json`. Stage tables (`TRANSITIONS`, `HINT`, `REVIEW_TRANSITIONS`, `HINT_REVIEW`), the checks that justify a move, every command. |
 | `bin/board` | The board's HTTP server, the chat bar's `/api/ask`, saves, the chat log, the diagram frame. |
@@ -76,4 +77,4 @@ It prints a single-use link. Open it in a browser, click through what you change
 
 ## Done means
 
-Tests pass, `build.mjs --check` passes, `README.md`, `SKILL.md` and `board-agent.md` match the behavior, nothing is committed (the user commits), and you have said what you did not verify.
+Tests pass, `build.mjs --check` passes, `README.md`, `docs/`, `SKILL.md` and `board-agent.md` match the behavior (a new feature gets an entry in `docs/features.md`), nothing is committed (the user commits), and you have said what you did not verify.
