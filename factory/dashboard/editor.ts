@@ -1,5 +1,6 @@
 import { el } from "/static/dom.js";
 import { renderMarkdown } from "/static/markdown.js";
+import { enhanceMermaid } from "/static/mermaid.js";
 import { commentText } from "/static/annotate.js";
 
 export type Snapshot = { text: string; base: string };
@@ -15,6 +16,21 @@ export type EditorDeps = {
   save: (text: string, base: string) => Promise<SaveResult>;
   /** Sends a comment to the agent and resolves with its answer. */
   comment: (text: string) => Promise<string>;
+  /** Leave the editor open as a tab and go back to the board. */
+  back: () => void;
+  /** The unsaved state changed, so the tab label should too. */
+  changed: () => void;
+  /** The editor was closed for good. */
+  closed: () => void;
+};
+
+export type EditorHandle = {
+  root: HTMLElement;
+  dirty: () => boolean;
+  show: (lines?: [number, number]) => void;
+  hide: () => void;
+  /** Close it, asking first when there are unsaved edits. */
+  requestClose: () => void;
 };
 
 const GUARDED = /^[A-Z]{3,}:.*$/gm;
@@ -33,18 +49,17 @@ function btn(text: string, cls: string, onclick: () => void): HTMLButtonElement 
   return b;
 }
 
-/** A full-page, line-numbered text editor for one job file, with comments tied to line ranges. */
-export function openEditor(d: EditorDeps): void {
-  document.getElementById("ed")?.remove();
+/** A line-numbered text editor for one job file, with the rendered file beside it and comments tied to line ranges. It lives in a tab. */
+export function openEditor(d: EditorDeps): EditorHandle {
   let base = d.base;
   let saved = d.text;
   let sel: [number, number] = d.select ?? [1, 1];
   let anchor = sel[0];
   let shownLines = 0;
-  let closing = false;
+  let wasDirty = false;
 
-  const root = el("div");
-  root.id = "ed";
+  const root = el("div", "ed");
+  root.hidden = true;
   const state = el("span", "edstate");
   const banner = el("div", "edbanner");
   banner.hidden = true;
@@ -135,13 +150,20 @@ export function openEditor(d: EditorDeps): void {
     state.textContent = text || (dirty() ? "Unsaved changes" : "Saved");
     state.classList.toggle("dirty", dirty());
     paintGutter();
+    if (dirty() !== wasDirty) {
+      wasDirty = dirty();
+      d.changed();
+    }
   }
 
   let previewTimer = 0;
   function paintPreview(): void {
-    if (preview.hidden) return;
     clearTimeout(previewTimer);
-    previewTimer = window.setTimeout(() => preview.replaceChildren(renderMarkdown(area.value)), PREVIEW_MS);
+    previewTimer = window.setTimeout(() => {
+      const page = renderMarkdown(area.value);
+      void enhanceMermaid(page);
+      preview.replaceChildren(page);
+    }, PREVIEW_MS);
   }
 
   function selectLines(a: number, b: number, focus: boolean): void {
@@ -163,8 +185,8 @@ export function openEditor(d: EditorDeps): void {
     paintGutter();
   }
 
-  function showBanner(text: string, action?: HTMLButtonElement): void {
-    banner.replaceChildren(el("span", "", text), ...(action ? [action] : []));
+  function showBanner(text: string, ...actions: HTMLButtonElement[]): void {
+    banner.replaceChildren(el("span", "", text), ...actions);
     banner.hidden = false;
   }
 
@@ -208,33 +230,33 @@ export function openEditor(d: EditorDeps): void {
     paintThreads();
   }
 
-  const close = (): void => {
+  const destroy = (): void => {
     clearInterval(timer);
     root.remove();
+    d.closed();
   };
-  const closeBtn = btn("Close", "", () => {
-    if (dirty() && !closing) {
-      closing = true;
-      closeBtn.textContent = "Discard changes?";
-      return;
-    }
-    close();
-  });
-  const previewBtn = btn("Preview", "on", () => {
-    preview.hidden = !preview.hidden;
-    main.classList.toggle("split", !preview.hidden);
-    previewBtn.classList.toggle("on", !preview.hidden);
-    paintPreview();
-  });
+  const requestClose = (): void => {
+    if (!dirty()) return destroy();
+    showBanner(
+      "You have unsaved changes.",
+      btn("Discard and close", "", destroy),
+      btn("Keep editing", "", () => (banner.hidden = true)),
+    );
+  };
 
   const head = el("div", "edhead");
-  head.append(el("b", "edname", d.name), state, el("span", "grow"), previewBtn, btn("Save", "go", () => void save()), closeBtn);
+  head.append(
+    btn("\u2190 Board", "", d.back),
+    el("b", "edname", d.name),
+    state,
+    el("span", "grow"),
+    btn("Save", "go", () => void save()),
+    btn("Close", "", requestClose),
+  );
   main.classList.add("split");
   root.append(head, banner, main);
 
   area.addEventListener("input", () => {
-    closing = false;
-    closeBtn.textContent = "Close";
     fromCaret();
     paintState();
     paintPreview();
@@ -256,7 +278,7 @@ export function openEditor(d: EditorDeps): void {
     if ((e.metaKey || e.ctrlKey) && e.key === "s") {
       e.preventDefault();
       void save();
-    } else if (e.key === "Escape") closeBtn.click();
+    }
   });
 
   // Pick up the agent's changes. Clean text is swapped in; unsaved text is kept and flagged.
@@ -275,7 +297,22 @@ export function openEditor(d: EditorDeps): void {
   document.body.append(root);
   paintPreview();
   paintState();
-  selectLines(sel[0], sel[1], true);
-  area.scrollTop = Math.max(0, (sel[0] - 3) * 20);
-  gutter.scrollTop = area.scrollTop;
+  selectLines(sel[0], sel[1], false);
+
+  return {
+    root,
+    dirty,
+    requestClose,
+    hide: () => {
+      root.hidden = true;
+    },
+    show: (lines) => {
+      root.hidden = false;
+      if (lines) {
+        selectLines(lines[0], lines[1], true);
+        area.scrollTop = Math.max(0, (lines[0] - 3) * 20);
+        gutter.scrollTop = area.scrollTop;
+      } else area.focus();
+    },
+  };
 }

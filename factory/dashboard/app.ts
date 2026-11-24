@@ -1,7 +1,8 @@
 import { el, chip } from "/static/dom.js";
 import { renderMarkdown } from "/static/markdown.js";
 import { attachAnnotate } from "/static/annotate.js";
-import { openEditor } from "/static/editor.js";
+import { openEditor, type EditorHandle } from "/static/editor.js";
+import { enhanceMermaid } from "/static/mermaid.js";
 import type {
   BoardDef,
   Filter,
@@ -162,6 +163,9 @@ const views = new Map<string, View>();
 let order: string[] = [];
 let openTabs: string[] = [];
 let active = "";
+// Editors are tabs beside the boards. One stays alive while you look at a board, so nothing is lost.
+const editors = new Map<string, EditorHandle & { name: string }>();
+let activeEditor: string | null = null;
 let scale = 1;
 let loadToken = 0;
 
@@ -338,6 +342,7 @@ function dropOnTabs(e: DragEvent): void {
   openTabs = openTabs.filter((b) => b !== id);
   openTabs.splice(was >= 0 && was < at ? at - 1 : at, 0, id);
   active = id;
+  activeEditor = null;
   save();
   renderAll();
 }
@@ -347,6 +352,7 @@ function openBoard(id: string): void {
   if (!views.has(id)) return;
   if (!openTabs.includes(id)) openTabs.push(id);
   active = id;
+  activeEditor = null;
   save();
   renderAll();
 }
@@ -355,6 +361,7 @@ function closeBoard(id: string): void {
   const at = openTabs.indexOf(id);
   openTabs = openTabs.filter((b) => b !== id);
   if (active === id) active = openTabs[Math.min(at, openTabs.length - 1)];
+  activeEditor = null;
   save();
   renderAll();
 }
@@ -365,7 +372,7 @@ function renderTabs(): void {
     ...openTabs.map((id) => {
       const v = views.get(id);
       if (!v) return el("span");
-      const t = el("div", `btab${id === active ? " on" : ""}`);
+      const t = el("div", `btab${id === active && !activeEditor ? " on" : ""}`);
       t.draggable = true;
       t.dataset.board = id;
       t.append(boardIcon(id), el("span", "", v.def.label));
@@ -385,7 +392,12 @@ function renderTabs(): void {
       t.ondragend = dragEnd;
       return t;
     }),
+    ...[...editors].map(([key, h]) => editorTab(key, h)),
   );
+  for (const [key, h] of editors) {
+    if (key === activeEditor) continue;
+    h.hide();
+  }
   const v = view();
   const done = v.jobs.filter(finished).length;
   const defs: [Filter, string, number, string][] = [
@@ -406,6 +418,31 @@ function renderTabs(): void {
   $("meta").textContent =
     `${v.jobs.length} jobs, updated ${new Date().toLocaleTimeString()}`;
   showIcon();
+}
+
+function editorTab(key: string, h: EditorHandle & { name: string }): HTMLElement {
+  const t = el("div", `btab etab${key === activeEditor ? " on" : ""}`);
+  t.title = `Editing ${h.name}`;
+  t.append(el("span", "ename", h.name));
+  if (h.dirty()) t.append(el("span", "edot"));
+  const x = button("×", "tabx", () => h.requestClose());
+  x.setAttribute("aria-label", `Close ${h.name}`);
+  x.onclick = (e) => {
+    e.stopPropagation();
+    focusEditor(key);
+    h.requestClose();
+  };
+  t.append(x);
+  t.onclick = () => focusEditor(key);
+  return t;
+}
+
+function focusEditor(key: string, lines?: [number, number]): void {
+  const h = editors.get(key);
+  if (!h) return;
+  activeEditor = key;
+  renderTabs();
+  h.show(lines);
 }
 
 // The tab icon follows the active board; an amber dot and a count in the title mean something waits on you.
@@ -816,7 +853,9 @@ async function loadFile(): Promise<void> {
     const page = document.createDocumentFragment();
     const bar = el("div", "fbar");
     bar.append(button("Open editor", "", () => void openFileEditor()));
-    page.append(bar, renderMarkdown(file.text));
+    const body = renderMarkdown(file.text);
+    void enhanceMermaid(body);
+    page.append(bar, body);
     showBody("md", page);
   } else showBody("raw", file?.text ?? "not found");
 }
@@ -844,9 +883,12 @@ async function openFileEditor(select?: [number, number]): Promise<void> {
   const board = v.def.id;
   const job = String(v.openId);
   const name = v.openFile;
-  const file = name ? await readFile(board, job, name) : null;
-  if (!name || !file) return;
-  openEditor({
+  if (!name) return;
+  const key = `${board}/${job}/${name}`;
+  if (editors.has(key)) return focusEditor(key, select);
+  const file = await readFile(board, job, name);
+  if (!file) return;
+  const handle = openEditor({
     job,
     name,
     ...file,
@@ -865,7 +907,19 @@ async function openFileEditor(select?: [number, number]): Promise<void> {
       }
     },
     comment: (text) => ask(text),
+    back: () => {
+      activeEditor = null;
+      renderAll();
+    },
+    changed: renderTabs,
+    closed: () => {
+      editors.delete(key);
+      if (activeEditor === key) activeEditor = null;
+      renderAll();
+    },
   });
+  editors.set(key, { ...handle, name });
+  focusEditor(key, select);
 }
 
 function openJobPanel(id: string): void {

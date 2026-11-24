@@ -62,10 +62,11 @@ function readCode(
   i: number,
   fence: string,
 ): [HTMLPreElement, number] {
+  const lang = lines[i].slice(fence.length).trim().toLowerCase();
   const buf: string[] = [];
   i++;
   while (i < lines.length && !lines[i].startsWith(fence)) buf.push(lines[i++]);
-  const pre = el("pre");
+  const pre = el("pre", lang === "mermaid" ? "mermaid" : "");
   pre.append(el("code", "", buf.join("\n")));
   return [pre, i + 1];
 }

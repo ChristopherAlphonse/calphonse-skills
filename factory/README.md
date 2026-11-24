@@ -179,6 +179,12 @@ State lives in the project, never in this repo.
 | `.planning/factory/hooks/<id>/` | the per-worktree git hooks |
 | `.worktrees/<id>/` | the job's branch, `factory/<id>`, checked out locally |
 
+## Editing files and diagrams on the board
+
+Open a job file and choose **Open editor** for a full-screen, line-numbered editor with a live preview and a comments sidebar. Comments go to the board's chat agent with the file, the line range and the quoted text. Saves use the file's hash, so an edit made against an old copy is refused, and lines such as `STATUS:` and `VERDICT:` cannot change from the editor because they steer the stages.
+
+Fenced `mermaid` blocks draw as diagrams once `FACTORY_MERMAID` names a `mermaid.min.js` on your machine. Nothing is bundled. Each diagram is drawn in a sandboxed frame that has no cookie and no access to the board, and without the variable the block stays plain code.
+
 ## Dashboard source
 
 The board is written in TypeScript, in `dashboard/*.ts`. The server reads the generated `dashboard/dist/*.js`, which is committed and never edited by hand. `serve` and `watch` rebuild `dist/` at start when Node is on PATH and a `.ts` is newer than its `.js`. When a source is newer or a dist file is missing, and Node is absent or the build fails, they print one `dashboard:` warning, log it in `audit.log`, and serve the committed `dist/`. To build by hand, run `node factory/dashboard/build.mjs`, which needs Node 24 or later. `node factory/dashboard/build.mjs --check` fails when a `dist/*.js` is stale, missing or has no `.ts`, and `tests/test_dashboard_build.py` runs it. A running board does not reload, so restart it after you edit a `.ts` file. Only erasable syntax is allowed: no `enum`, `namespace` or constructor parameter properties. `dashboard/tsconfig.json` is for running `tsc` by hand and needs TypeScript 5.8 or later (`erasableSyntaxOnly`). Nothing runs it for you.

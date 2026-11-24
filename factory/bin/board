@@ -18,7 +18,7 @@ SKILLS = HERE.parent.parent
 DASH_DIR = HERE.parent / "dashboard"
 DIST_DIR = DASH_DIR / "dist"
 STATE = ROOT / ".planning" / "factory-board"
-STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript", "markdown.js": "text/javascript", "annotate.js": "text/javascript", "editor.js": "text/javascript"}
+STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript", "markdown.js": "text/javascript", "annotate.js": "text/javascript", "editor.js": "text/javascript", "mermaid.js": "text/javascript"}
 ENGINE_FILE = HERE / "job"
 # board id -> (label, which of the engine's jobs it shows)
 BOARD_SPECS = {"build": ("Build", lambda job: not job.get("review")), "review": ("Review", lambda job: bool(job.get("review")))}
@@ -28,8 +28,12 @@ PORT_TRIES = 11
 MAX_BODY = 64 * 1024
 ASK_TIMEOUT = 300
 COOKIE = "factory-board"
-CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; "
+CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; frame-src 'self'; "
        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+# Diagram frames run in an opaque origin, so they carry no session cookie. They may use inline styles, which Mermaid's SVG needs, and nothing else.
+FRAME_CSP = ("default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; "
+             "base-uri 'none'; form-action 'none'; sandbox allow-scripts")
+MAX_LIBRARY = 20_000_000
 # Tab icons: a rounded square with a board glyph. The amber dot means something waits on the user.
 FAVICON_GLYPH = {
     "factory": ("#e8e8e8", '<path d="M5 18V9l5 3V9l5 3V6h4v12z"/>'),
@@ -137,6 +141,20 @@ def ask(board, jid, question, session, engine, model, effort):
     return {"answer": text}
 
 
+FRAME_HEADERS = {"Content-Security-Policy": FRAME_CSP, "X-Frame-Options": "SAMEORIGIN"}
+FRAME_FILES = {"mermaid.html": (DASH_DIR, "text/html; charset=utf-8"), "mermaid-frame.js": (DIST_DIR, "text/javascript")}
+
+
+def mermaid_library():
+    """The mermaid.min.js named by FACTORY_MERMAID, or None. Diagrams stay plain code until one is set."""
+    path = os.environ.get("FACTORY_MERMAID", "")
+    try:
+        p = Path(path).expanduser().resolve() if path else None
+        return p if p and p.suffix == ".js" and p.is_file() and p.stat().st_size <= MAX_LIBRARY else None
+    except OSError:
+        return None
+
+
 GUARDED_LINE = re.compile(r"^[A-Z]{3,}:.*$", re.M)
 
 
@@ -155,11 +173,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("X-Frame-Options", "DENY")
-        self.send_header("Referrer-Policy", "no-referrer")
+        headers = {"X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer"}
         if ctype.startswith("text/html"):
-            self.send_header("Content-Security-Policy", CSP)
-        for k, v in (extra or {}).items():
+            headers["Content-Security-Policy"] = CSP
+        for k, v in {**headers, **(extra or {})}.items():
             self.send_header(k, v)
         self.end_headers()
         self.wfile.write(data)
@@ -188,6 +205,18 @@ class Handler(BaseHTTPRequestHandler):
             cookie = f"{COOKIE}-{self.server.server_port}={SESSION}; HttpOnly; SameSite=Strict; Path=/"
             return self.send(303, "", extra={"Location": "/", "Set-Cookie": cookie})
         return self.send(403, "{}")
+
+    def get_frame(self, name):
+        """Files for the sandboxed diagram frame. It has no cookie, so only the Host check guards them; none holds anything private."""
+        if not self.host_ok():
+            return self.send(403, "{}")
+        if name == "mermaid.js":
+            lib = mermaid_library()
+            return self.send(200, lib.read_bytes(), "text/javascript", FRAME_HEADERS) if lib else self.send(404, "{}")
+        if name not in FRAME_FILES:
+            return self.send(404, "{}")
+        base, ctype = FRAME_FILES[name]
+        return self.send(200, (base / name).read_bytes(), ctype, FRAME_HEADERS)
 
     def get_static(self, name):
         if not (self.host_ok() and self.session_ok()) or name not in STATIC:
@@ -253,10 +282,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, favicon_svg(icon.group(1), q.get("dot", ["0"])[0] == "1"), "image/svg+xml")
         if u.path.startswith("/static/"):
             return self.get_static(u.path[len("/static/"):])
+        if u.path.startswith("/frame/"):
+            return self.get_frame(u.path[len("/frame/"):])
         if not self.trusted():
             return self.send(403, "{}")
         if u.path == "/api/boards":
             return self.send(200, json.dumps([{"id": b, "label": spec[0]} for b, spec in BOARD_SPECS.items()]))
+        if u.path == "/api/features":
+            return self.send(200, json.dumps({"mermaid": mermaid_library() is not None}))
         if u.path == "/api/engines":
             return self.send(200, json.dumps(model_choices()))
         m = re.fullmatch(r"/api/([a-z]+)/(jobs|file)", u.path)

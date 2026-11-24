@@ -1154,6 +1154,19 @@ class TestServer(Factory):
         self.assertEqual(self.http("POST", "/api/build/save", cookie=False, body={"id": "a", "name": "spec.md", "base": base, "text": "x"})[0], 403)
         self.assertEqual(self.http("POST", "/api/build/save", xfactory=False, body={"id": "a", "name": "spec.md", "base": base, "text": "x"})[0], 403)
 
+    def test_every_script_the_page_imports_is_served(self):
+        self.board()
+        dist = Path(JOB).resolve().parents[1] / "dashboard" / "dist"
+        imported = {m for f in dist.glob("*.js") for m in re.findall(r'from "/static/([\w-]+\.js)"', f.read_text())}
+        self.assertIn("markdown.js", imported)
+        for name in sorted(imported | {"app.js"}):
+            self.assertEqual(self.http("GET", f"/static/{name}")[0], 200, name)
+
+    def test_diagrams_are_off_until_a_library_is_named(self):
+        self.board()
+        self.assertEqual(json.loads(self.http("GET", "/api/features")[1]), {"mermaid": False})
+        self.assertEqual(self.http("GET", "/frame/mermaid.js", cookie=False)[0], 404)
+
     def test_approve_over_http(self):
         self.new_spec("a")
         self.assertEqual(self.http("POST", "/api/build/approve", body={"id": "a"})[0], 200)
@@ -1347,6 +1360,31 @@ class TestProtectedPaths(Factory):
         self.to_gate("b")
         self.set_config(protected_paths="nope")
         self.no("gate", "b")
+
+
+class TestDiagrams(Factory):
+    def setUp(self):
+        super().setUp()
+        lib = self.base / "mermaid.min.js"
+        lib.write_text("window.mermaid = {};\n")
+        self.env["FACTORY_MERMAID"] = str(lib)
+        self.start_server()
+
+    def test_the_diagram_frame_is_sandboxed_and_cookieless(self):
+        self.assertEqual(json.loads(self.http("GET", "/api/features")[1]), {"mermaid": True})
+        st, _, headers = self.http_full("GET", "/frame/mermaid.html", cookie=False)
+        self.assertEqual(st, 200)
+        self.assertEqual(headers["X-Frame-Options"], "SAMEORIGIN")
+        self.assertIn("sandbox allow-scripts", headers["Content-Security-Policy"])
+        self.assertNotIn("unsafe-eval", headers["Content-Security-Policy"])
+        self.assertEqual(self.http("GET", "/frame/mermaid-frame.js", cookie=False)[0], 200)
+        self.assertEqual(self.http("GET", "/frame/mermaid.js", cookie=False)[1], b"window.mermaid = {};\n")
+        self.assertEqual(self.http("GET", "/frame/job.json", cookie=False)[0], 404)
+        self.assertEqual(self.http("GET", "/frame/mermaid.html", cookie=False, host="evil.example:80")[0], 403)
+
+    def test_the_page_itself_still_cannot_be_framed(self):
+        self.assertEqual(self.http_full("GET", "/static/app.js")[2]["X-Frame-Options"], "DENY")
+        self.assertIn("frame-src 'self'", self.http_full("GET", "/")[2]["Content-Security-Policy"])
 
 
 if __name__ == "__main__":
