@@ -40,15 +40,14 @@ button { cursor: pointer; }
 .badge.ok { background: var(--ok); color: #0b1f12; }
 
 /* Canvas */
-#canvas { position: fixed; inset: 64px 0 0 0; overflow: auto; background-image: radial-gradient(var(--grid) 1px, transparent 1px); background-size: 22px 22px; padding: 28px 28px 150px; }
+#canvas { position: fixed; inset: 64px 0 0 0; overflow: auto; display: flex; background-image: radial-gradient(var(--grid) 1px, transparent 1px); background-size: 22px 22px; padding: 28px 28px 150px; }
 body.with-panel #canvas { right: 392px; }
 #wires { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
-#wires path { fill: none; stroke: var(--hair-2); stroke-width: 1.5; }
-#wires path.lit { stroke: var(--acc); }
-#rows { position: relative; width: max-content; transform-origin: 0 0; }
+#stage { position: relative; margin: auto; flex: none; }
+#rows { position: absolute; left: 0; top: 0; width: max-content; transform-origin: 0 0; }
 #lanes { display: grid; gap: 40px; width: max-content; }
 .rowlabel { color: var(--text-3); font-size: 12px; margin-bottom: 12px; }
-.nodes { display: grid; grid-template-columns: repeat(4, 250px); gap: 44px 56px; align-items: start; }
+.nodes { display: grid; grid-template-columns: repeat(4, 250px); gap: 100px 56px; align-items: stretch; }
 .node { width: 250px; min-height: 130px; background: var(--surface); border-radius: var(--r-card); padding: 14px 16px; box-shadow: 0 0 0 1px var(--hair), 0 12px 32px -20px rgba(0, 0, 0, 0.7); }
 .node.lit { box-shadow: 0 0 0 1px var(--ok), 0 12px 32px -20px rgba(0, 0, 0, 0.7); }
 .node.hold { box-shadow: 0 0 0 1px var(--warn), 0 12px 32px -20px rgba(0, 0, 0, 0.7); }
@@ -160,3 +159,24 @@ select.pill { padding-right: 28px; background-image: linear-gradient(45deg, tran
 #zoom { position: fixed; left: 20px; bottom: 20px; z-index: 6; display: flex; gap: 2px; padding: 4px; border-radius: 16px; background: var(--elev); backdrop-filter: blur(20px); box-shadow: 0 0 0 1px var(--hair-2); }
 #zoom button { width: 34px; height: 34px; border: 0; border-radius: 12px; background: transparent; color: var(--text-2); font-size: 16px; }
 #zoom button:hover { background: var(--raise); color: var(--text); }
+
+#engines { display: flex; gap: 2px; }
+.eng { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 9px; border: 0; border-radius: 999px; background: transparent; color: var(--text-3); font: 12px/1 var(--sans); cursor: pointer; }
+.eng svg { width: 16px; height: 16px; flex: none; }
+.eng:hover { background: var(--raise); color: var(--text); }
+.eng.on { background: rgba(var(--ink), 0.08); color: var(--text); }
+.eng:not(.on) svg { opacity: 0.7; }
+@media (max-width: 800px) { .eng:not(.on) span { display: none; } }
+
+.sel { position: relative; display: inline-flex; align-items: center; color: var(--text-3); }
+.sel[hidden] { display: none; }
+.sel svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; pointer-events: none; }
+.sel select.pill { padding-left: 32px; }
+.sel:hover { color: var(--text); }
+#effort-icon .b { fill: currentColor; opacity: 0.25; }
+#effort-icon .b.on { opacity: 1; }
+
+#wires .wire { fill: none; stroke: rgba(var(--ink), 0.28); stroke-width: 1.5; }
+#wires .wire.lit { stroke: var(--acc); }
+#wires .port { fill: var(--bg); stroke: rgba(var(--ink), 0.4); stroke-width: 1.5; }
+#wires .port.lit { stroke: var(--acc); }

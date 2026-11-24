@@ -13,7 +13,7 @@
       <button id="panel-toggle" type="button" title="Show or hide the side panel">Panel</button>
     </nav>
     <main id="canvas">
-      <div id="rows"><svg id="wires" aria-hidden="true"></svg><div id="lanes"></div></div>
+      <div id="stage"><div id="rows"><svg id="wires" aria-hidden="true"></svg><div id="lanes"></div></div></div>
       <div id="zoom"><button id="zoom-out" type="button" aria-label="Zoom out">−</button><button id="zoom-fit" type="button" aria-label="Fit to window">⤢</button><button id="zoom-in" type="button" aria-label="Zoom in">+</button></div>
     </main>
     <aside id="panel"></aside>
@@ -25,10 +25,10 @@
       <form id="ask-form" autocomplete="off">
         <textarea id="ask-input" rows="1" placeholder="Ask anything. Say: skip qa-review, or turn off simplify" spellcheck="false"></textarea>
         <div id="ask-opts">
-          <button class="pill flat" id="engine" type="button" title="Switch the CLI that answers"><i></i><span id="engine-name">Claude Code</span></button>
+          <div id="engines" role="radiogroup" aria-label="CLI that answers"></div>
           <span class="grow"></span>
-          <select class="pill flat" id="model" title="Model for this CLI"><option value="">model</option></select>
-          <select class="pill flat" id="effort" title="Effort"><option value="">effort</option><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select>
+          <label class="sel" id="model-wrap" title="Model for this CLI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.200 1.800L12 17l-1.800-5.200L5 10l5.200-1.800z"/><path d="M19 16v4M17 18h4"/></svg><select class="pill flat" id="model"><option value="">model</option></select></label>
+          <label class="sel" title="Effort"><svg id="effort-icon" viewBox="0 0 24 24" aria-hidden="true"><rect class="b" x="3" y="15" width="3.500" height="6" rx="1"/><rect class="b" x="8.500" y="11" width="3.500" height="10" rx="1"/><rect class="b" x="14" y="7" width="3.500" height="14" rx="1"/><rect class="b" x="19.500" y="3" width="3.500" height="18" rx="1"/></svg><select class="pill flat" id="effort"><option value="">effort</option><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select></label>
           <button id="ask-send" type="submit" aria-label="Send">↑</button>
         </div>
       </form>
