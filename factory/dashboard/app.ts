@@ -404,6 +404,7 @@ function renderTabs(): void {
   $("filters").replaceChildren(
     ...defs.map(([id, label, n, cls]) => {
       const b = button(label, `tab${v.filter === id ? " on" : ""}`, () => {
+        activeEditor = null;
         v.filter = id;
         renderAll();
       });
@@ -1146,11 +1147,21 @@ $("zoom-fit").onclick = () => {
   view().userZoom = null;
   applyScale();
 };
+// The editor covers the board, so a board control first takes you back to the board.
+const leaveEditor = (): boolean => {
+  if (!activeEditor) return false;
+  activeEditor = null;
+  renderAll();
+  return true;
+};
 $("panel-toggle").onclick = () => {
+  if (leaveEditor()) return;
   document.body.classList.toggle("with-panel");
   applyScale();
 };
-$("side-toggle").onclick = () => setSide(!sideCollapsed);
+$("side-toggle").onclick = () => {
+  if (!leaveEditor()) setSide(!sideCollapsed);
+};
 for (const zone of [$("boardtabs"), $("canvas")]) {
   zone.ondragover = (e) => {
     e.preventDefault();
