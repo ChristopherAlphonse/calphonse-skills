@@ -24,13 +24,13 @@ To build a feature, use the separate `factory` skill. The two have the same layo
    ~/.claude/skills/factory-review/bin/job create pr-42-review "Review PR 42" main pr-42
    ```
 
-5. Follow along on the read-only board. `create` and `queue` print its link. `bin/job board` prints it again.
+5. Follow along on the board. `create` and `queue` print its link. `bin/job board` prints it again.
 6. Keep passes going with `/loop 5m /factory-review run`, or schedule `bin/tick claude` with cron.
 7. When the job reaches Ready to land, read `.planning/factory-review/jobs/pr-42-review/report.md` and paste the comments from `comments.md` into the MR yourself.
 
 Gitignore `.planning/` and `.worktrees/` in the project.
 
-Other keys for `.planning/factory-review/config.json`: `concurrency` (default 1), `auto_watch` (set `false` to stop the read-only board starting by itself), and `allow` (extra shell patterns reviewers may run unattended, such as `make verify*`). Reviewers can already run the common test, lint, and type-check commands. Run `bin/tick install` after changing `allow`.
+Other keys for `.planning/factory-review/config.json`: `concurrency` (default 1), `auto_watch` (set `false` to stop the board starting by itself), and `allow` (extra shell patterns reviewers may run unattended, such as `make verify*`). Reviewers can already run the common test, lint, and type-check commands. Run `bin/tick install` after changing `allow`.
 
 ## How a review moves
 
@@ -128,30 +128,9 @@ Then it has a summary with a recommendation and the ranked findings. `comments.m
 
 ## Following along
 
-Two boards read the same files and look the same.
+One board, started with `bin/job board` by you, an agent, or `create` and `queue` on their own. It has the Unblock button, a skill switch and note per review, and a chat bar. `watch` and `serve` are the same board. Its link works in several tabs until the process stops.
 
-| | `bin/job serve` | `bin/job watch` |
-| --- | --- | --- |
-| Who starts it | you, in your terminal | you, an agent, or `create` and `queue` on their own |
-| Buttons | Unblock | none |
-| Holds the key | yes, in memory | no |
-| Link | one-time code, valid 5 minutes | stays valid until the process stops, works in several tabs |
-| Default port | 8765 | 8766, or the next free port up to 8776 when started automatically |
-
-Use `watch` to see what an agent is doing. Use `serve` only to unblock a parked job.
-
-## Who can do what
-
-| Action | Agent | You, on the board |
-| --- | --- | --- |
-| Create, advance, route, note | yes, through `bin/job` | no need |
-| Read and run the reviewed code | yes, in the worktree or a scratch copy | |
-| Edit the reviewed code | no | |
-| Unblock a parked job | no | yes |
-| Post `comments.md` to the MR | only after you say so, once | or paste it yourself |
-| Push, open a PR or MR, approve | no | your own step, outside factory-review |
-
-`unblock` is not a CLI command. It runs only inside `bin/job serve`. The board starts only in an interactive terminal. It binds to localhost and prints a one-time code that is valid for 5 minutes. The code becomes a session cookie. Every action also needs a custom header and a loopback `Host`. The key lives only in the server's memory, and the git hooks check its hash.
+`unblock` is not a CLI command. It runs only from the board. The board binds to localhost and prints a code in its link. The code becomes a session cookie. Every action also needs a custom header and a loopback `Host`. The key lives only in the server's memory, and the git hooks check its hash.
 
 ## Safety layers
 
@@ -192,9 +171,10 @@ State lives in the project, never in this repo.
 | `bin/job advance <id> <stage>` | move a job if the evidence allows it |
 | `bin/job route <id> architecture` | add a reviewer |
 | `bin/job note <id> "<text>"` | record what the agent is doing now; the card shows the latest note |
-| `bin/job board` | print the link of the read-only board, starting it if needed |
-| `bin/job serve [port]` | start the board with the Unblock button (needs your terminal, default port 8765) |
-| `bin/job watch [port]` | start a read-only board to follow along (no terminal needed, no buttons, default port 8766) |
+| `bin/job board` | print the link of the board, starting it if needed |
+| `bin/job serve [port]` / `bin/job watch [port]` | run the board in the foreground (default ports 8765 / 8766) |
+| `bin/job skill <id> <name> on\|off` | switch a skill off or on for one review |
+| `bin/job brief <id> <stage> <text>` | set a note the reviewers for that stage follow (empty text clears) |
 | `bin/tick <harness> [--dry-run]` | run one headless pass if the policy is installed |
 | `bin/tick install`, `check`, `print`, `list` | install, verify, show, or list the policy |
 
@@ -246,4 +226,4 @@ The allow list is a set of command patterns. It cannot see what a command does i
 
 ## Board source
 
-The board and the `/map` page are the same UI as `factory`, written in TypeScript in `dashboard/*.ts`. The server reads the generated `dashboard/dist/*.js`, which is committed and never edited by hand. `serve` and `watch` rebuild `dist/` at start when Node 24 or later is on PATH and a `.ts` is newer. Otherwise they warn once, log it in `audit.log`, and serve the committed `dist/`. To build by hand, run `node factory-review/dashboard/build.mjs`. Add `--check` to fail on a stale `dist/`, as `tests/test_dashboard_build.py` does. A running board does not reload, so restart it after you edit a `.ts` file.
+The board is the same canvas UI as `factory`, written in TypeScript in `dashboard/*.ts`. The server reads the generated `dashboard/dist/*.js`, which is committed and never edited by hand. `serve` and `watch` rebuild `dist/` at start when Node 24 or later is on PATH and a `.ts` is newer. Otherwise they warn once, log it in `audit.log`, and serve the committed `dist/`. To build by hand, run `node factory-review/dashboard/build.mjs`. Add `--check` to fail on a stale `dist/`, as `tests/test_dashboard_build.py` does. A running board does not reload, so restart it after you edit a `.ts` file.

@@ -24,12 +24,9 @@ class TestWatch(Review):
         self.assertEqual(status, 303)
         self.cookie = headers["Set-Cookie"].split(";")[0].split("=", 1)[1]
 
-    def test_it_starts_without_a_terminal_and_the_real_board_still_refuses_to(self):
+    def test_it_starts_without_a_terminal(self):
         self.start_watch()
-        r = subprocess.run([sys.executable, "-I", str(JOB), "serve", "0"], cwd=str(self.base), env=self.env,
-                           capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL)
-        self.assertNotEqual(r.returncode, 0)
-        self.assertIn("interactive terminal", r.stderr)
+        self.assertEqual(self.http("GET", "/api/jobs")[0], 200)
 
     def test_login_rules(self):
         self.start_watch()
@@ -48,45 +45,35 @@ class TestWatch(Review):
         status, _, headers = self.http_full("GET", "/static/app.js", xfactory=False)
         self.assertEqual((status, headers["Content-Type"]), (200, "text/javascript"))
 
-    def test_it_serves_the_board_and_says_it_is_read_only(self):
+    def test_it_serves_the_board(self):
         self.new_review()
         self.start_watch()
         status, page = self.http("GET", "/")
         self.assertEqual(status, 200)
         self.assertIn(b"Factory review", page)
-        self.assertEqual(json.loads(self.http("GET", "/api/mode")[1]), {"readonly": True})
         self.assertEqual([j["id"] for j in json.loads(self.http("GET", "/api/jobs")[1])], ["r"])
 
-    def test_no_action_route_works_and_nothing_changes(self):
+    def test_unblock_works_from_the_board_an_agent_started(self):
         self.new_review()
         self.park("r")
         self.start_watch()
-        before = self.js("r")
-        for body in ({"id": "r"}, {}):
-            self.assertEqual(self.http("POST", "/api/unblock", body=body)[0], 403)
-        self.assertEqual(self.js("r"), before)
-        self.assertFalse(any(e["actor"] == "human" for e in self.audit_lines()))
-
-    def test_the_unblock_button_is_never_offered(self):
-        self.new_review()
-        self.park("r")
-        self.start_watch()
-        job = json.loads(self.http("GET", "/api/jobs")[1])[0]
-        self.assertTrue(job["needs_human"])
-        self.assertFalse(job["can_unblock"])
-
-    def test_the_real_board_offers_the_button_for_the_same_job(self):
-        self.new_review()
-        self.park("r")
-        self.board()
         self.assertTrue(json.loads(self.http("GET", "/api/jobs")[1])[0]["can_unblock"])
+        self.assertEqual(self.http("POST", "/api/unblock", body={"id": "r"})[0], 200)
+        self.assertEqual(self.stage("r"), "scope")
+        self.assertTrue(any(e["actor"] == "human" and e["action"] == "unblock" for e in self.audit_lines()))
 
-    def test_it_never_touches_the_real_boards_key_file(self):
-        self.state.mkdir(parents=True, exist_ok=True)
-        key_file = self.state / "human.sha256"
-        key_file.write_text("a" * 64 + "\n")
+    def test_the_board_changes_skills_and_stage_notes(self):
+        self.new_review()
         self.start_watch()
-        self.assertEqual(key_file.read_text(), "a" * 64 + "\n")
+        self.assertEqual(self.http("POST", "/api/skill", body={"id": "r", "name": "test-review", "off": True})[0], 200)
+        self.assertEqual(self.http("POST", "/api/brief", body={"id": "r", "stage": "scope", "text": "keep it small"})[0], 200)
+        job = self.js("r")
+        self.assertEqual(job["skills_off"], ["test-review"])
+        self.assertEqual(job["briefs"], {"scope": "keep it small"})
+        hint = self.ok("queue").stdout
+        self.assertIn("USER TURNED OFF, do not use: test-review", hint)
+        self.assertIn("USER NOTE for this stage, follow it: keep it small", hint)
+        self.assertEqual(self.http("POST", "/api/skill", body={"id": "r", "name": "../x", "off": True})[0], 409)
 
     def test_the_start_is_audited_as_an_agent_action(self):
         self.start_watch()

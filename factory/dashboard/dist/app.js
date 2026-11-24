@@ -18,14 +18,6 @@ const BUILD          = [
   { id: "ship", label: "Ship", blurb: "PR body and commit message. You commit." },
   { id: "ready", label: "Ready", blurb: "Committed locally." },
 ];
-const REVIEW          = [
-  { id: "scope", label: "Scope", blurb: "Find the diff and the repo's own checks." },
-  { id: "review", label: "Review", blurb: "Reviewers read the diff in parallel." },
-  { id: "reconcile", label: "Reconcile", blurb: "Merge the reviews into one ranked list." },
-  { id: "verify", label: "Verify", blurb: "Rerun the evidence, drop what fails." },
-  { id: "report", label: "Report", blurb: "Write the report and paste-ready comments." },
-  { id: "ready", label: "Ready", blurb: "Report written." },
-];
 const POLL_MS = 2000;
                                     
 
@@ -58,7 +50,7 @@ const api = (path        , opts                                     = {}) =>
 
 const openJob = ()                  => state.jobs.find((j) => j.id === state.openId);
 const stageOf = (j     )         => {
-  const s = j.stage === "needs-human" ? (j.parked_from ?? (j.kind === "review" ? "scope" : "build")) : j.stage;
+  const s = j.stage === "needs-human" ? (j.parked_from ?? "build") : j.stage;
   return s === "gate" ? "build" : s === "rejected" ? "ready" : s;
 };
 const visible = (j     )          =>
@@ -129,17 +121,12 @@ function node(s       , jobs       )              {
 
 function render()       {
   renderTabs();
-  const rows                = [];
-  const kinds                                   = [["build", "Build jobs", BUILD], ["review", "Review jobs", REVIEW]];
-  for (const [kind, label, stages] of kinds) {
-    if (kind === "review" && !state.jobs.some((j) => j.kind === "review")) continue;
-    const mine = state.jobs.filter((j) => j.kind === kind && visible(j));
-    const wrap = el("div", "lane");
-    const nodes = el("div", "nodes");
-    nodes.append(...stages.map((s) => node(s, mine.filter((j) => stageOf(j) === s.id))));
-    wrap.append(el("div", "rowlabel", label), nodes);
-    rows.push(wrap);
-  }
+  const mine = state.jobs.filter(visible);
+  const wrap = el("div", "lane");
+  const nodes = el("div", "nodes");
+  nodes.append(...BUILD.map((s) => node(s, mine.filter((j) => stageOf(j) === s.id))));
+  wrap.append(el("div", "rowlabel", "Build jobs"), nodes);
+  const rows                = [wrap];
   $("lanes").replaceChildren(...rows);
   applyScale();
   renderPanel();
@@ -314,21 +301,15 @@ function statusChips(j     )                {
   const chips                = [];
   if (j.stage === "gate" || j.gate) chips.push(chip(`gate ${j.gate || "pending"}`, j.gate || ""));
   if (j.commit) chips.push(chip(`committed locally ${j.commit.slice(0, 7)}`, "PASS"));
-  if (j.kind === "review" && j.review) chips.push(chip(`${j.review.base_ref} .. ${j.review.head_ref}`));
   if (chips.length) rows.push(row(...chips));
   if (j.stack?.length) rows.push(row(...j.stack.map((k) => chip(k))));
-  if (j.report?.FINDINGS !== undefined) {
-    const c = [chip(`${j.report.FINDINGS} findings`)];
-    if (j.report.BLOCKERS !== undefined) c.push(chip(`${j.report.BLOCKERS} blockers`, Number(j.report.BLOCKERS) ? "FAIL" : "PASS"));
-    rows.push(row(...c));
-  }
   if (j.stage === "review") rows.push(row(...Object.entries(j.reviews).map(([name, v]) => chip(v ? `${name} ${v}` : `${name} ...`, v ?? ""))));
   return rows;
 }
 
 function jobView(j     )                {
   const ph = el("div", "ph");
-  ph.append(button("←", "iconbtn", closeJob), el("span", "kindlabel", j.kind === "review" ? "Review job" : "Build job"));
+  ph.append(button("←", "iconbtn", closeJob), el("span", "kindlabel", "Build job"));
   const [done, total] = j.progress;
   const last = j.activity?.at(-1);
   const where = j.branch ?? j.worktree;
@@ -356,7 +337,7 @@ function jobView(j     )                {
       el("p", `pd${last ? "" : " empty"}`, last ? `now: ${last.text}` : j.id),
       pp,
       el("div", "gap"),
-      stats([j.kind === "review" || !j.round ? "-" : `${j.round}/${j.round_limit}`, "round"], [total ? `${done}/${total}` : "-", "tasks"], [j.files.length, "files"]),
+      stats([!j.round ? "-" : `${j.round}/${j.round_limit}`, "round"], [total ? `${done}/${total}` : "-", "tasks"], [j.files.length, "files"]),
     ),
     ...(j.needs ? [sec(needsBox(j.needs, j))] : []),
     ...(statusChips(j).length ? [sec(heading("Status"), ...statusChips(j))] : []),

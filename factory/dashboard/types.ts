@@ -1,4 +1,4 @@
-// The /api/jobs payload: the job.json fields from cmd_create and the later stages, plus what snapshot() adds.
+// The /api/<board>/jobs payload: the job.json fields of either engine, plus what its snapshot() adds.
 export interface Needs {
   action: string;
   files: string;
@@ -22,53 +22,67 @@ export interface Job {
   id: string;
   title: string;
   stage: string;
-  round: number;
-  round_limit: number;
+  round?: number;
+  round_limit?: number;
   reviewers: string[];
-  polished: boolean;
-  approvals: Record<string, string>;
-  progress: [number, number];
   stack: string[];
   skills_off?: string[];
   briefs?: Record<string, string>;
   skills: string[];
   branch: string | null;
   worktree: string | null;
-  commit: string | null;
-  tip: string | null;
-  started: string;
-  ended: string | null;
+  commit?: string | null;
   note: string;
   review?: ReviewRange;
   activity?: Activity[];
-  base_commit?: string;
-  base_tip?: string;
-  hooks_path?: string;
-  hooks_sha?: string;
   parked_from?: string;
-  kind: "build" | "review";
+  progress?: [number, number];
   report: Record<string, string | undefined>;
-  gate: string | null;
+  gate?: string | null;
   reviews: Record<string, string | null>;
   files: string[];
   needs_human: boolean;
   needs: Needs | null;
-  can_approve: boolean;
-  can_commit: boolean;
+  can_approve?: boolean;
+  can_commit?: boolean;
+  can_unblock?: boolean;
 }
 
-export interface Column {
+export interface Stage {
+  id: string;
   label: string;
-  stages: string[];
-  kinds?: Job["kind"][];
-  you?: boolean;
-  always?: boolean;
+  blurb: string;
 }
 
-export interface State {
+export type Filter = "all" | "needs" | "done";
+
+// One engine's board: its stages and how its jobs read in the panel.
+export interface BoardDef {
+  id: string;
+  label: string;
+  blurb: string;
+  icon: string;
+  stages: Stage[];
+  lane: string;
+  columns: number;
+  homeStage: string;
+  doneLabel: string;
+  intro: string;
+  kind: string;
+  stats: (j: Job) => [string | number, string][];
+  place: (j: Job) => string | null;
+  needsPath: (j: Job) => string;
+  statusBits: (j: Job) => { text: string; cls?: string }[][];
+}
+
+export interface View {
+  def: BoardDef;
   jobs: Job[];
   openId: string | null;
   openFile: string | null;
-  lastSig: string;
-  loadToken: number;
+  filter: Filter;
+  userZoom: number | null;
+  sig: string;
+  session: string;
+  skillsOpen: boolean;
 }

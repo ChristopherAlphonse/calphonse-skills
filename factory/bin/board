@@ -1,0 +1,362 @@
+#!/usr/bin/env python3
+"""One board for the factory skills. It loads each skill's engine (factory builds, factory-review reviews),
+serves their jobs as tabs on one page, runs their button actions, and answers the chat bar.
+
+  board watch [port|auto]   run the board in the foreground
+  board ensure              print the link of the running board, starting one if needed
+"""
+import fcntl, hashlib, hmac, importlib.machinery, importlib.util, json, os, re, secrets, select, shutil, socket, subprocess, sys, tempfile, time
+from http.cookies import CookieError, SimpleCookie
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+ROOT = Path(os.environ.get("FACTORY_ROOT", Path.cwd())).resolve()
+os.environ["FACTORY_ROOT"] = str(ROOT)
+HERE = Path(__file__).resolve().parent
+SKILLS = HERE.parent.parent
+DASH_DIR = HERE.parent / "dashboard"
+DIST_DIR = DASH_DIR / "dist"
+STATE = ROOT / ".planning" / "factory-board"
+STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript", "markdown.js": "text/javascript"}
+ENGINE_FILES = {"build": SKILLS / "factory" / "bin" / "job", "review": SKILLS / "factory-review" / "bin" / "job"}
+WATCH_FILE = "watch.json"
+FIRST_PORT = 8766
+PORT_TRIES = 11
+MAX_BODY = 64 * 1024
+ASK_TIMEOUT = 300
+COOKIE = "factory-board"
+CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
+       "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+SESSION = ""
+CODE = ""
+KEYS = {}
+
+ENGINES = {"claude": "claude", "opencode": "opencode", "kiro": "kiro-cli"}
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
+MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@#-]{0,99}")
+CLAUDE_MODELS = ["opus", "sonnet", "haiku", "claude-fable-5-2", "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]
+
+
+def load_boards():
+    """Import each skill's bin/job as a module. They are scripts with a main guard, so importing runs nothing."""
+    boards = {}
+    for name, path in ENGINE_FILES.items():
+        if not path.exists():
+            continue
+        loader = importlib.machinery.SourceFileLoader(f"factory_{name}", str(path))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        mod = importlib.util.module_from_spec(spec)
+        loader.exec_module(mod)
+        boards[name] = mod
+    return boards
+
+
+BOARDS = {}
+
+
+def engines():
+    return [name for name, exe in ENGINES.items() if shutil.which(exe)]
+
+
+def model_choices():
+    """Model names to suggest per installed CLI."""
+    out = {name: [] for name in engines()}
+    if "claude" in out:
+        out["claude"] = CLAUDE_MODELS
+    if "opencode" in out:
+        try:
+            r = subprocess.run([ENGINES["opencode"], "models"], capture_output=True, text=True, timeout=8)
+            out["opencode"] = r.stdout.split()[:200]
+        except (OSError, subprocess.SubprocessError):
+            pass
+    if "kiro" in out:
+        try:
+            r = subprocess.run([ENGINES["kiro"], "chat", "--list-models"], capture_output=True, text=True, timeout=8)
+            out["kiro"] = [l.split()[1 if l.startswith("*") else 0] for l in r.stdout.splitlines()[2:] if l.strip()]
+        except (OSError, subprocess.SubprocessError, IndexError):
+            pass
+    return out
+
+
+def ask_args(engine, exe, me, system, question, session, model, effort):
+    """The command line for one chat turn. Only claude can limit the shell commands; the others run with the user's own tools."""
+    if engine == "claude":
+        args = [exe, "-p", "--output-format", "json", "--append-system-prompt", system,
+                "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--tools", "Read,Grep,Glob,Bash",
+                "--allowedTools", f"Bash({me} skill:*)", f"Bash({me} brief:*)", f"Bash({me} note:*)", "Read", "Grep", "Glob"]
+        args += (["--model", model] if model else []) + (["--effort", effort] if effort else [])
+        return args + (["--resume", session] if session else []), question[:4000]
+    prompt = f"{system}\n\nUser: {question[:4000]}"
+    if engine == "opencode":
+        pick = f"{model}#{effort}" if model and effort and "#" not in model else model
+        return [exe, "run", "--auto"] + (["--model", pick] if pick else []) + (["--session", session] if session else []) + [prompt], None
+    return ([exe, "chat", "--v3", "--no-interactive", "--trust-tools=execute_bash,fs_read"] + (["--model", model] if model else [])
+            + (["--effort", effort] if effort else []) + [prompt], None)
+
+
+def ask(board, jid, question, session, engine, model, effort):
+    """One chat turn through the chosen CLI for one board."""
+    mod = BOARDS.get(board)
+    if not mod:
+        return {"error": f"no board {board!r}"}
+    engine = engine if engine in ENGINES else "claude"
+    exe = shutil.which(ENGINES[engine])
+    if not exe:
+        return {"error": f"{ENGINES[engine]} was not found on PATH"}
+    if model and not MODEL_NAME.fullmatch(model):
+        return {"error": f"bad model name {model!r}"}
+    args, stdin = ask_args(engine, exe, str(mod.SELF), mod.ask_system(jid), question, session, model, effort if effort in EFFORTS else "")
+    try:
+        r = subprocess.run(args, input=stdin, capture_output=True, text=True, timeout=ASK_TIMEOUT,
+                           cwd=str(ROOT), env={**os.environ, "FACTORY_ROOT": str(ROOT)})
+    except (OSError, subprocess.SubprocessError) as e:
+        return {"error": f"chat failed: {e}"}
+    if engine == "claude":
+        try:
+            out = json.loads(r.stdout)
+        except ValueError:
+            return {"error": (r.stderr or r.stdout).strip()[-500:] or "claude returned nothing"}
+        if out.get("is_error"):
+            return {"error": str(out.get("result", "claude reported an error"))[:500]}
+        return {"answer": out.get("result", ""), "session": out.get("session_id", "")}
+    ansi = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+    text = ansi.sub("", r.stdout).strip()
+    if r.returncode or not text:
+        return {"error": (ansi.sub("", r.stderr).strip() or text or f"{engine} exited {r.returncode}")[-500:]}
+    return {"answer": text}
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def send(self, code, body, ctype="application/json", extra=None):
+        data = body if isinstance(body, bytes) else body.encode()
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        if ctype.startswith("text/html"):
+            self.send_header("Content-Security-Policy", CSP)
+        for k, v in (extra or {}).items():
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(data)
+
+    def host_ok(self):
+        return self.headers.get("Host", "") in (f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}")
+
+    def session_ok(self):
+        try:
+            got = SimpleCookie(self.headers.get("Cookie", "")).get(f"{COOKIE}-{self.server.server_port}")
+        except CookieError:
+            return False
+        return bool(got and SESSION) and hmac.compare_digest(got.value.encode(), SESSION.encode())
+
+    def trusted(self):
+        """Loopback Host, the session cookie, and a custom header a cross-site page cannot send."""
+        return self.host_ok() and self.session_ok() and self.headers.get("X-Factory") == "1"
+
+    def get_root(self, q):
+        if not self.host_ok():
+            return self.send(403, "{}")
+        if self.session_ok():
+            return self.send(200, (DASH_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
+        supplied = q.get("c", [""])[0]
+        if supplied and CODE and hmac.compare_digest(supplied.encode(), CODE.encode()):
+            cookie = f"{COOKIE}-{self.server.server_port}={SESSION}; HttpOnly; SameSite=Strict; Path=/"
+            return self.send(303, "", extra={"Location": "/", "Set-Cookie": cookie})
+        return self.send(403, "{}")
+
+    def get_static(self, name):
+        if not (self.host_ok() and self.session_ok()) or name not in STATIC:
+            return self.send(403, "{}")
+        base = DIST_DIR if name.endswith(".js") else DASH_DIR
+        return self.send(200, (base / name).read_bytes(), STATIC[name])
+
+    def get_file(self, mod, jid, name):
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", jid):
+            return self.send(404, "{}")
+        try:
+            p = (mod.jobdir(jid) / name).resolve()
+            if mod.jobdir(jid).resolve() not in p.parents or p.suffix != ".md" or not p.is_file():
+                return self.send(404, "{}")
+            return self.send(200, p.read_text(), "text/plain; charset=utf-8")
+        except (ValueError, OSError):
+            return self.send(404, "{}")
+
+    def do_GET(self):
+        u = urlparse(self.path)
+        q = parse_qs(u.query)
+        if u.path == "/":
+            return self.get_root(q)
+        if u.path.startswith("/static/"):
+            return self.get_static(u.path[len("/static/"):])
+        if not self.trusted():
+            return self.send(403, "{}")
+        if u.path == "/api/boards":
+            return self.send(200, json.dumps([{"id": b, "label": m.LABEL} for b, m in BOARDS.items()]))
+        if u.path == "/api/engines":
+            return self.send(200, json.dumps(model_choices()))
+        m = re.fullmatch(r"/api/([a-z]+)/(jobs|file)", u.path)
+        mod = BOARDS.get(m.group(1)) if m else None
+        if not mod:
+            return self.send(404, "{}")
+        if m.group(2) == "jobs":
+            return self.send(200, json.dumps([mod.snapshot(j) for j in mod.all_jobs()]))
+        return self.get_file(mod, q.get("job", [""])[0], q.get("name", [""])[0])
+
+    def do_POST(self):
+        if not self.trusted():
+            return self.send(403, "{}")
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return self.send(400, "{}")
+        if not 0 <= n <= MAX_BODY:
+            return self.send(413, "{}")
+        try:
+            body = json.loads(self.rfile.read(n) or b"{}")
+            jid = body.get("id", "")
+        except (ValueError, AttributeError):
+            return self.send(400, "{}")
+        if not isinstance(jid, str):
+            return self.send(400, "{}")
+        text = lambda k: body.get(k) if isinstance(body.get(k), str) else ""
+        if self.path == "/api/ask":
+            out = ask(text("board"), jid, text("question"), text("session"), text("engine"), text("model"), text("effort"))
+            return self.send(200, json.dumps(out))
+        m = re.fullmatch(r"/api/([a-z]+)/([a-z]+)", self.path)
+        mod = BOARDS.get(m.group(1)) if m else None
+        action = mod.ACTIONS.get(m.group(2)) if mod else None
+        if not action:
+            return self.send(404, "{}")
+        mod.CTX.human = True
+        try:
+            action(jid, body)
+        except SystemExit:
+            return self.send(409, "{}")
+        except Exception as e:
+            if type(e).__name__ == "Refused":
+                return self.send(409, "{}")
+            print(f"board request {self.path} failed: {e!r}", file=sys.stderr)
+            return self.send(500, "{}")
+        finally:
+            mod.CTX.human = False
+        self.send(200, "{}")
+
+
+def rebuild_dashboard():
+    """Regenerate dist/ when a .ts is newer. The committed dist is the fallback, so this never raises."""
+    def warn(msg):
+        print(f"dashboard: {msg}; serving the committed dist", file=sys.stderr)
+
+    try:
+        stale = any(not (DIST_DIR / f"{src.stem}.js").exists()
+                    or src.stat().st_mtime > (DIST_DIR / f"{src.stem}.js").stat().st_mtime
+                    for src in DASH_DIR.glob("*.ts"))
+    except OSError as e:
+        return warn(f"cannot compare sources with dist/ ({e})")
+    if not stale:
+        return
+    node = shutil.which("node")
+    if not node:
+        return warn("a source is newer than dist/ but node is not on PATH")
+    try:
+        r = subprocess.run([node, str(DASH_DIR / "build.mjs")], cwd=DASH_DIR, capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError) as e:
+        return warn(f"rebuild failed ({e})")
+    if r.returncode:
+        warn(f"rebuild failed ({(r.stderr.strip().splitlines() or ['no output'])[-1]})")
+
+
+def bind(port):
+    if port != "auto":
+        return ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
+    for p in range(FIRST_PORT, FIRST_PORT + PORT_TRIES):
+        try:
+            return ThreadingHTTPServer(("127.0.0.1", p), Handler)
+        except OSError:
+            continue
+    sys.exit(f"refused: no free port from {FIRST_PORT} to {FIRST_PORT + PORT_TRIES - 1}")
+
+
+def write_private(path, text):
+    fd, tmp = tempfile.mkstemp(dir=path.parent)
+    with os.fdopen(fd, "w") as f:
+        f.write(text)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, path)
+
+
+def cmd_watch(port):
+    """Run the board. Each engine gets the one key, whose hash its git hooks check."""
+    global SESSION, CODE, BOARDS
+    BOARDS = load_boards()
+    rebuild_dashboard()
+    SESSION, CODE = secrets.token_urlsafe(32), secrets.token_urlsafe(24)
+    key = secrets.token_urlsafe(32)
+    for mod in BOARDS.values():
+        mod.KEY = key
+        mod.STATE.mkdir(parents=True, exist_ok=True)
+        write_private(mod.STATE / mod.HASH_FILE, hashlib.sha256(key.encode()).hexdigest() + "\n")
+    srv = bind(port)
+    for mod in BOARDS.values():
+        mod.audit("watch", "", f"port {srv.server_port}")
+    print(f"watch: 127.0.0.1:{srv.server_port}/?c={CODE}", flush=True)
+    srv.serve_forever()
+
+
+def port_listening(port):
+    with socket.socket() as sock:
+        sock.settimeout(0.3)
+        return sock.connect_ex(("127.0.0.1", int(port))) == 0
+
+
+def pid_alive(pid):
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def cmd_ensure():
+    """Print the link of the running board for this project, starting one if needed. It outlives this command."""
+    STATE.mkdir(parents=True, exist_ok=True)
+    with open(STATE / "watch.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            info = json.loads((STATE / WATCH_FILE).read_text())
+        except (OSError, ValueError):
+            info = {}
+        if info.get("url") and pid_alive(info.get("pid")) and port_listening(info.get("port", 0)):
+            print(info["url"])
+            return
+        child = subprocess.Popen(
+            [sys.executable, "-I", str(Path(__file__).resolve()), "watch", "auto"], cwd=str(ROOT),
+            env={**os.environ, "FACTORY_ROOT": str(ROOT)}, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, start_new_session=True, text=True)
+        ready, _, _ = select.select([child.stdout], [], [], 10)
+        line = child.stdout.readline() if ready else ""
+        m = re.match(r"watch: (127\.0\.0\.1:(\d+)/\?c=\S+)", line)
+        child.stdout.close()
+        if not m:
+            child.kill()
+            child.wait()
+            sys.exit("refused: the board could not start")
+        write_private(STATE / WATCH_FILE, json.dumps({"pid": child.pid, "port": int(m.group(2)), "url": m.group(1)}))
+        print(m.group(1))
+
+
+if __name__ == "__main__":
+    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    if cmd == "watch":
+        cmd_watch(sys.argv[2] if len(sys.argv) > 2 else str(FIRST_PORT))
+    elif cmd == "ensure":
+        cmd_ensure()
+    else:
+        sys.exit("usage: board watch [port|auto] | board ensure")

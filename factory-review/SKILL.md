@@ -1,6 +1,6 @@
 ---
 name: factory-review
-description: Run a code review through the review and QA skills in this repo as a staged workflow, with a kanban board, a scripted state machine, and a headless tick. Point it at a branch or diff and it scopes the change, runs independent reviewers in parallel, reconciles them into one ranked list, verifies every finding by rerunning the evidence, and writes a report with paste-ready comments. Picks skills for the codebase automatically (TypeScript and React get typescript-strict-style and vercel-react-best-practices, C# gets dotnet, Python gets python). Use when the user wants a branch, PR, or MR reviewed end to end, a verified review, or a review pipeline. Read-only. Never edits the code under review, commits, or pushes. Posts `comments.md` to the MR only after the user explicitly says so. To build a feature, use factory instead.
+description: Run a code review through the review and QA skills in this repo as a staged workflow, with a board of connected stages, a scripted state machine, and a headless tick. Point it at a branch or diff and it scopes the change, runs independent reviewers in parallel, reconciles them into one ranked list, verifies every finding by rerunning the evidence, and writes a report with paste-ready comments. Picks skills for the codebase automatically (TypeScript and React get typescript-strict-style and vercel-react-best-practices, C# gets dotnet, Python gets python). Use when the user wants a branch, PR, or MR reviewed end to end, a verified review, or a review pipeline. Read-only. Never edits the code under review, commits, or pushes. Posts `comments.md` to the MR only after the user explicitly says so. To build a feature, use factory instead.
 ---
 
 # Factory-review
@@ -11,11 +11,17 @@ You are the orchestrator of a review. You do no review work yourself. For each s
 
 ## First action
 
-Before any other tool call, including `JOB create` and `JOB queue`, run `JOB board`. It starts the read-only board if none is running and prints its link as `127.0.0.1:PORT/?c=CODE`. Then write that link to the user as a message of its own, with the `http` scheme added and the code included, so it is clickable, and only then continue. The point is that the user watches the work happen, so the link must reach them before the first stage starts, never in the final report. Do not spawn a subagent, read the repo, or plan first. Repeat the link in every report that ends a pass. The board keeps running between passes and the link stays the same while it does. If `JOB board` refuses, say so in that first message and give `JOB watch` as the fallback. Do not use `JOB serve`: only the user starts that.
+Before any other tool call, including `JOB create` and `JOB queue`, run `JOB board`. It starts the board if none is running and prints its link as `127.0.0.1:PORT/?c=CODE`. Write that link to the user as a message of its own, with the `http` scheme added and the code included, so it is clickable, and only then continue. Do not spawn a subagent, read the repo, or plan first. Repeat the link in every report that ends a pass. The board keeps running between passes and the link stays the same while it does.
+
+The board has a canvas of review stages, an Unblock button, a skill switch and a note box per review, and a chat bar. The user does everything there and never needs a terminal.
 
 ## Waiting on the user
 
-Whenever a job is in Needs you, end the message with the command that opens the board with the Unblock button, in its own code block, with absolute paths and without being asked: `cd <project root> && <absolute path of JOB> serve`. `JOB advance`, `JOB create`, and `JOB queue` print it on stderr as well; copy it from there. Say that the read-only link has no button and this board does. Never run the command yourself: `serve` prints its one-time link in the user's terminal.
+When a job is in Needs you, say so and point at the board link. Then do not end your turn: poll `JOB queue` until the job is no longer on hold (the user clicks Unblock on the board), or until the user answers in chat or says to stop.
+
+## User choices on the board
+
+`JOB queue` hints can end with `USER TURNED OFF, do not use: ...` and `USER NOTE for this stage, follow it: ...`. Obey both, and pass them to every reviewer. The user sets them on the board or in its chat bar. You can set them too: `JOB skill <id> <name> on|off`, `JOB brief <id> <stage> <text>`.
 
 ## Workflows
 
@@ -27,7 +33,7 @@ To build a feature, use the `factory` skill. It is a separate skill with its own
 | --- | --- |
 | `/factory-review <base> <head>` | Create a review job for the changes between two local refs, then start a pass |
 | `/factory-review run` | One pass over the queue |
-| `/factory-review watch` | Start the read-only board and give the user the link |
+| `/factory-review watch` | Start the board and give the user the link |
 
 The review never reaches a forge, so the user fetches the PR or MR branch first, for example `git fetch origin pull/42/head:pr-42`.
 
@@ -40,9 +46,9 @@ These hold in every harness and are enforced by structure, not by this text.
 - **No commit, push, PR, or MR.** Nothing is ever committed. The worktree's hooks refuse every commit and every push of the review branch.
 - **Never post, unless the user says so.** No comments, reviews, or approvals reach any forge on the agent's own initiative, and never in a headless `TICK` pass. The one exception is the job's own `comments.md` (for example `.planning/factory-review/jobs/mr-95-r2/comments.md`), after the user explicitly tells you in this session to post it. Post each comment once, through the forge MCP tool (never `glab`, `curl`, or `wget`), then write `posted.md` in the job folder listing what went out. If `posted.md` exists, do not post again unless the user asks. Approvals and reviews are never posted. `reconcile-reviews` is used only for its merge step.
 - **Never run** `git commit`, `git push`, `git merge`, `git rebase`, `git config`, `git -c`, `git -C`, `gh`, `glab`, `curl`, or `wget`. Never use the network.
-- **Never** try to run `unblock`, or to start `JOB serve`. They belong to the user, and the CLI refuses them. `JOB watch` is the exception: it is a read-only board with no key and no action routes, and you may start it so the user can follow along.
+- **Never** try to run `unblock` from the CLI. It is the user's button on the board, and the CLI refuses it. Starting the board (`JOB board`, `JOB watch`) is yours to do.
 - **Audit.** Every state change is one line in `.planning/factory-review/audit.log`.
-- **Board.** The user starts `JOB serve` in their own terminal. It binds to localhost, redeems a one-time code for a session cookie, and holds the key in memory. Unblock is the only button.
+- **Board.** Started by `JOB board`. It binds to localhost, redeems the code in its link for a session cookie, and holds the key in memory. Unblock is the only approval button.
 
 Each layer's strength and the probe results are in `README.md` (Safety layers, Harnesses).
 
@@ -168,9 +174,9 @@ A pass finds nothing to run, or only `hold` rows, and ends. To repeat passes, sc
 
 ## Board
 
-`JOB board` starts the read-only view if needed and prints its link (see First action); `JOB watch [port]` (default 8766) runs it in the foreground. It needs no terminal, holds no key, and answers no unblock request. Its link stays valid until the process stops and can open in several tabs. Anyone, including an agent, may start it. `JOB serve [port]` serves the same board on 127.0.0.1 with the one button, and prints an address with a one-time code. It only starts in an interactive terminal. The board reads `.planning/factory-review/jobs/*/job.json` every 2 seconds.
+`JOB board` starts the board if needed and prints its link (see First action); `JOB watch [port]` (default 8766) runs it in the foreground, and `JOB serve` is the same. It needs no terminal. Its link stays valid until the process stops and can open in several tabs. The board reads `.planning/factory-review/jobs/*/job.json` every 2 seconds.
 
-Columns: Scope, Review, Reconcile, Verify, Report, Needs you, Ready to land. A card shows the compared refs, the stack skills, one chip per reviewer, and the findings and blockers counts once the report exists. A parked job sits in Needs you, outlined, with Unblock on `serve` only. Click a card to read every file in its folder.
+The page is a canvas of connected stage nodes (Scope, Review, Reconcile, Verify, Report, Ready), a top bar with Pipeline, Needs you and Reported tabs, a side panel, and an ask bar at the bottom. Each review is a chip on its stage. A parked review sits on its stage, outlined, and its panel has Unblock. The panel also shows the compared refs, the stack skills, one chip per reviewer, the findings and blockers counts once the report exists, a skill switch, a stage note, and every file in the job folder. The ask bar answers questions about the review and makes the same skill and note changes. It never edits code.
 
 ## Out of scope
 

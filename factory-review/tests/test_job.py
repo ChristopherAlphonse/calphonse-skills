@@ -1,7 +1,9 @@
 import json
+import subprocess
+import sys
 import unittest
 
-from base import STAGE_FILES, Review
+from base import JOB, STAGE_FILES, Review
 
 
 class TestCreate(Review):
@@ -303,14 +305,6 @@ class TestServer(Review):
         status, _, headers = self.http_full("GET", "/static/app.js", xfactory=False)
         self.assertEqual((status, headers["Content-Type"]), (200, "text/javascript"))
 
-    def test_the_map_page_and_its_assets_need_a_session(self):
-        self.assertEqual(self.http_full("GET", "/map", cookie=False)[0], 403)
-        status, body, _ = self.http_full("GET", "/map")
-        self.assertEqual(status, 200)
-        self.assertIn(b"Factory review map", body)
-        for name in ("map.js", "drawer.js", "map.css"):
-            self.assertEqual(self.http_full("GET", f"/static/{name}")[0], 200, name)
-
     def test_the_api_needs_the_cookie_the_header_and_a_loopback_host(self):
         self.new_review()
         self.assertIn("r", self.jobs())
@@ -354,7 +348,7 @@ class TestServer(Review):
         self.assertTrue(self.jobs()["r"]["can_unblock"])
         n = self.jobs()["r"]["needs"]
         self.assertEqual(n["action"], "Unblock")
-        self.assertTrue(n["command"].startswith("cd ") and n["command"].endswith(" serve"))
+        self.assertNotIn("command", n)
         self.assertEqual(self.http("POST", "/api/unblock", body={"id": "r"})[0], 200)
         self.assertEqual(self.stage("r"), "scope")
 
@@ -368,7 +362,7 @@ class TestServer(Review):
             self.assertEqual(self.http("POST", f"/api/{gone}", body={"id": "r"})[0], 404)
 
     def test_serve_is_audited(self):
-        self.assertTrue(any(e["action"] == "serve" for e in self.audit_lines()))
+        self.assertTrue(any(e["action"] == "watch" for e in self.audit_lines()))
 
 
 class TestHumanGate(Review):
@@ -380,9 +374,14 @@ class TestHumanGate(Review):
             self.assertIn("board", out.stderr)
         self.assertEqual(self.stage("r"), "needs-human")
 
-    def test_serve_refuses_without_a_terminal(self):
-        r = self.no("serve", "0")
-        self.assertIn("interactive terminal", r.stderr)
+    def test_the_board_starts_without_a_terminal_and_writes_the_key_hash(self):
+        p = subprocess.Popen([sys.executable, "-I", str(JOB), "serve", "0"], cwd=str(self.base), env=self.env,
+                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        self.addCleanup(p.wait)
+        self.addCleanup(p.kill)
+        self.addCleanup(p.stdout.close)
+        self.assertTrue(p.stdout.readline().startswith("watch: 127.0.0.1:"))
+        self.assertTrue((self.state / "human.sha256").exists())
 
     def test_the_hash_file_holds_a_hash_not_the_key(self):
         self.start_server()

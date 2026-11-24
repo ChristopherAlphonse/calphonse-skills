@@ -1,19 +1,13 @@
 #!/usr/bin/env python3
 """Only writer of job.json. Refuses illegal stage moves. Serves the board and its chat."""
-import fcntl, fnmatch, hashlib, hmac, json, os, re, secrets, select, shlex, shutil, socket, subprocess, sys, tempfile, threading, time
+import fcntl, fnmatch, hashlib, json, os, re, shlex, shutil, subprocess, sys, tempfile, threading, time
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from http.cookies import CookieError, SimpleCookie
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(os.environ.get("FACTORY_ROOT", Path.cwd())).resolve()
 STATE = ROOT / ".planning" / "factory"
 JOBS = STATE / "jobs"
-DASH_DIR = Path(__file__).resolve().parent.parent / "dashboard"
-DIST_DIR = DASH_DIR / "dist"
-STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript",
-          "markdown.js": "text/javascript"}
 DEFAULTS = {
     "concurrency": 1, "max_rounds": 3, "checks": "", "base_branch": "main", "checks_timeout": 1800,
 }
@@ -25,12 +19,11 @@ PROTECTED_FLOOR = [
     ".npmrc", "**/.npmrc",
 ]
 KEY = ""
-SESSION = ""
-CODE = ""
-CODE_EXP = 0.0
-AUTH_LOCK = threading.Lock()
+LABEL = "Build"
+SELF = Path(__file__).resolve()
+WATCH_FIRST_PORT = 8766
+BOARD_SCRIPT = SELF.parent / "board"
 HASH_FILE = "human.sha256"
-MAX_BODY = 64 * 1024
 CTX = threading.local()
 BASE_REVIEWERS = ["code", "qa", "test"]
 EXTRA_REVIEWERS = {"architecture"}
@@ -907,327 +900,20 @@ def snapshot(job):
 
 def skill_names():
     """The sibling skills the board lets the user switch off."""
-    root = DASH_DIR.parent.parent
+    root = SELF.parent.parent.parent
     return sorted(p.parent.name for p in root.glob("*/SKILL.md") if p.parent.name not in ("factory", "factory-review"))
 
 
-CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
-       "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
-COOKIE = "factory"
-
-
-class Handler(BaseHTTPRequestHandler):
-    def log_message(self, *a):
-        pass
-
-    def send(self, code, body, ctype="application/json", extra=None):
-        data = body if isinstance(body, bytes) else body.encode()
-        self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("X-Frame-Options", "DENY")
-        self.send_header("Referrer-Policy", "no-referrer")
-        if ctype.startswith("text/html"):
-            self.send_header("Content-Security-Policy", CSP)
-        for k, v in (extra or {}).items():
-            self.send_header(k, v)
-        self.end_headers()
-        self.wfile.write(data)
-
-    def host_ok(self):
-        return self.headers.get("Host", "") in (f"127.0.0.1:{self.server.server_port}",
-                                                f"localhost:{self.server.server_port}")
-
-    def session_ok(self):
-        try:
-            got = SimpleCookie(self.headers.get("Cookie", "")).get(f"{COOKIE}-{self.server.server_port}")
-        except CookieError:
-            return False
-        return bool(got and SESSION) and hmac.compare_digest(got.value.encode(), SESSION.encode())
-
-    def trusted(self):
-        """Loopback Host, the session cookie, and a custom header a cross-site page cannot send."""
-        return self.host_ok() and self.session_ok() and self.headers.get("X-Factory") == "1"
-
-    def redeem_code(self, supplied):
-        with AUTH_LOCK:
-            good = bool(supplied and CODE) and time.time() < CODE_EXP and \
-                hmac.compare_digest(supplied.encode(), CODE.encode())
-            return good
-
-    def get_root(self, q):
-        if not self.host_ok():
-            return self.send(403, "{}")
-        if self.session_ok():
-            return self.send(200, (DASH_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
-        if self.redeem_code(q.get("c", [""])[0]):
-            cookie = f"{COOKIE}-{self.server.server_port}={SESSION}; HttpOnly; SameSite=Strict; Path=/"
-            return self.send(303, "", extra={"Location": "/", "Set-Cookie": cookie})
-        return self.send(403, "{}")
-
-    def get_static(self, name):
-        if not (self.host_ok() and self.session_ok()) or name not in STATIC:
-            return self.send(403, "{}")
-        base = DIST_DIR if name.endswith(".js") else DASH_DIR
-        return self.send(200, (base / name).read_bytes(), STATIC[name])
-
-    def get_file(self, jid, name):
-        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", jid):
-            return self.send(404, "{}")
-        try:
-            p = (jobdir(jid) / name).resolve()
-            if jobdir(jid).resolve() not in p.parents or p.suffix != ".md" or not p.is_file():
-                return self.send(404, "{}")
-            return self.send(200, p.read_text(), "text/plain; charset=utf-8")
-        except (ValueError, OSError):
-            return self.send(404, "{}")
-
-    def do_GET(self):
-        from urllib.parse import urlparse, parse_qs
-        u = urlparse(self.path)
-        q = parse_qs(u.query)
-        if u.path == "/":
-            return self.get_root(q)
-        if u.path.startswith("/static/"):
-            return self.get_static(u.path[len("/static/"):])
-        if not self.trusted():
-            return self.send(403, "{}")
-        if u.path == "/api/engines":
-            return self.send(200, json.dumps(model_choices()))
-        if u.path == "/api/jobs":
-            return self.send(200, json.dumps([snapshot(j) for j in all_jobs()]))
-        if u.path == "/api/file":
-            return self.get_file(q.get("job", [""])[0], q.get("name", [""])[0])
-        self.send(404, "{}")
-
-    def do_POST(self):
-        if not self.trusted():
-            return self.send(403, "{}")
-        try:
-            n = int(self.headers.get("Content-Length") or 0)
-        except ValueError:
-            return self.send(400, "{}")
-        if not 0 <= n <= MAX_BODY:
-            return self.send(413, "{}")
-        try:
-            body = json.loads(self.rfile.read(n) or b"{}")
-            jid = body.get("id", "")
-        except (ValueError, AttributeError):
-            return self.send(400, "{}")
-        text = lambda k: body.get(k) if isinstance(body.get(k), str) else ""
-        if not isinstance(jid, str):
-            return self.send(400, "{}")
-        if self.path == "/api/ask":
-            return self.send(200, json.dumps(ask_engine(jid, text("question"), text("session"), text("engine"), text("model"), text("effort"))))
-        routes = {"/api/approve": lambda: cmd_approve(jid, "spec"),
-                  "/api/commit": lambda: cmd_commit(jid),
-                  "/api/unblock": lambda: cmd_unblock(jid),
-                  "/api/skill": lambda: cmd_skill(jid, text("name"), "off" if body.get("off") else "on"),
-                  "/api/brief": lambda: cmd_brief(jid, text("stage"), text("text"))}
-        if self.path not in routes:
-            return self.send(404, "{}")
-        CTX.human = True
-        try:
-            routes[self.path]()
-        except SystemExit:
-            return self.send(409, "{}")
-        except Exception as e:
-            print(f"board request {self.path} failed: {e!r}", file=sys.stderr)
-            return self.send(500, "{}")
-        finally:
-            CTX.human = False
-        self.send(200, "{}")
-
-
-ASK_TIMEOUT = 300
-
-
-ENGINES = {"claude": "claude", "opencode": "opencode", "kiro": "kiro-cli"}
-
-
-def engines():
-    return [name for name, exe in ENGINES.items() if shutil.which(exe)]
-
-
-EFFORTS = ("low", "medium", "high", "xhigh", "max")
-MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@#-]{0,99}")
-CLAUDE_MODELS = ["opus", "sonnet", "haiku", "claude-fable-5-2", "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]
-
-
-def model_choices():
-    """Model names to suggest per installed CLI. The box also takes any name the CLI accepts."""
-    out = {name: [] for name in engines()}
-    if "claude" in out:
-        out["claude"] = CLAUDE_MODELS
-    if "opencode" in out:
-        try:
-            r = subprocess.run([ENGINES["opencode"], "models"], capture_output=True, text=True, timeout=8)
-            out["opencode"] = r.stdout.split()[:200]
-        except (OSError, subprocess.SubprocessError):
-            pass
-    if "kiro" in out:
-        try:
-            r = subprocess.run([ENGINES["kiro"], "chat", "--list-models"], capture_output=True, text=True, timeout=8)
-            out["kiro"] = [l.split()[1 if l.startswith("*") else 0] for l in r.stdout.splitlines()[2:] if l.strip()]
-        except (OSError, subprocess.SubprocessError, IndexError):
-            pass
-    return out
-
-
-def ask_args(engine, exe, system, question, session, model="", effort=""):
-    """The command line for one chat turn. Only claude can limit the shell commands; the others run with the user's own tools."""
-    me = str(Path(__file__).resolve())
-    if engine == "claude":
-        args = [exe, "-p", "--output-format", "json", "--append-system-prompt", system,
-                "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--tools", "Read,Grep,Glob,Bash",
-                "--allowedTools", f"Bash({me} skill:*)", f"Bash({me} brief:*)", f"Bash({me} note:*)", "Read", "Grep", "Glob"]
-        args += (["--model", model] if model else []) + (["--effort", effort] if effort else [])
-        return args + (["--resume", session] if session else []), question[:4000]
-    prompt = f"{system}\n\nUser: {question[:4000]}"
-    if engine == "opencode":
-        pick = f"{model}#{effort}" if model and effort and "#" not in model else model
-        return [exe, "run", "--auto"] + (["--model", pick] if pick else []) + (["--session", session] if session else []) + [prompt], None
-    return [exe, "chat", "--v3", "--no-interactive", "--trust-tools=execute_bash,fs_read"] + (["--model", model] if model else []) + (["--effort", effort] if effort else []) + [prompt], None
-
-
-def ask_engine(jid, question, session, engine, model="", effort=""):
-    """One chat turn through the chosen CLI. It may read the job files and change the board with skill, brief, and note."""
-    engine = engine if engine in ENGINES else "claude"
-    exe = shutil.which(ENGINES[engine])
-    if not exe:
-        return {"error": f"{ENGINES[engine]} was not found on PATH"}
-    me = str(Path(__file__).resolve())
-    system = (f"You are the factory board's assistant, working in {ROOT}. Job state is under .planning/factory/jobs/. "
-              f"The user is looking at job {jid or '(none)'}. To change the board run only: {me} skill <id> <name> on|off, "
-              f"{me} brief <id> <stage> <text> (empty text clears), {me} note <id> <text>. "
-              "Approve spec, Commit locally and Unblock are buttons the user clicks: say which one. Answer in a few plain lines.")
-    if model and not MODEL_NAME.fullmatch(model):
-        return {"error": f"bad model name {model!r}"}
-    args, stdin = ask_args(engine, exe, system, question, session, model, effort if effort in EFFORTS else "")
-    try:
-        r = subprocess.run(args, input=stdin, capture_output=True, text=True, timeout=ASK_TIMEOUT,
-                           cwd=str(ROOT), env={**os.environ, "FACTORY_ROOT": str(ROOT)})
-    except (OSError, subprocess.SubprocessError) as e:
-        return {"error": f"chat failed: {e}"}
-    if engine == "claude":
-        try:
-            out = json.loads(r.stdout)
-        except ValueError:
-            return {"error": (r.stderr or r.stdout).strip()[-500:] or "claude returned nothing"}
-        if out.get("is_error"):
-            return {"error": str(out.get("result", "claude reported an error"))[:500]}
-        return {"answer": out.get("result", ""), "session": out.get("session_id", "")}
-    text = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", r.stdout).strip()
-    if r.returncode or not text:
-        return {"error": (re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", r.stderr).strip() or text or f"{engine} exited {r.returncode}")[-500:]}
-    return {"answer": text}
-
-
-def rebuild_dashboard():
-    """Regenerate dist/ when a .ts is newer. The committed dist is the fallback, so this never raises."""
-    def warn(msg):
-        print(f"dashboard: {msg}; serving the committed dist", file=sys.stderr)
-        audit("dashboard-build", "", msg)
-
-    try:
-        stale = any(not (DIST_DIR / f"{src.stem}.js").exists()
-                    or src.stat().st_mtime > (DIST_DIR / f"{src.stem}.js").stat().st_mtime
-                    for src in DASH_DIR.glob("*.ts"))
-    except OSError as e:
-        return warn(f"cannot compare sources with dist/ ({e})")
-    if not stale:
-        return
-    node = shutil.which("node")
-    if not node:
-        return warn("a source is newer than dist/ but node is not on PATH")
-    try:
-        r = subprocess.run([node, str(DASH_DIR / "build.mjs")], cwd=DASH_DIR, capture_output=True, text=True, timeout=5)
-    except (OSError, subprocess.SubprocessError) as e:
-        return warn(f"rebuild failed ({e})")
-    if r.returncode:
-        warn(f"rebuild failed ({(r.stderr.strip().splitlines() or ['no output'])[-1]})")
-
-
-WATCH_FILE = "watch.json"
-WATCH_FIRST_PORT = 8766
-WATCH_PORT_TRIES = 11
-
-
-def bind_watch(port):
-    if port != "auto":
-        return ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
-    for p in range(WATCH_FIRST_PORT, WATCH_FIRST_PORT + WATCH_PORT_TRIES):
-        try:
-            return ThreadingHTTPServer(("127.0.0.1", p), Handler)
-        except OSError:
-            continue
-    die(f"no free port from {WATCH_FIRST_PORT} to {WATCH_FIRST_PORT + WATCH_PORT_TRIES - 1}")
-
-
-def cmd_watch(port):
-    """The board, with buttons and chat. The key and session live in this process's memory only."""
-    global KEY, SESSION, CODE, CODE_EXP
-    rebuild_dashboard()
-    KEY, SESSION, CODE = (secrets.token_urlsafe(n) for n in (32, 32, 24))
-    CODE_EXP = float("inf")
-    STATE.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=STATE)
-    with os.fdopen(fd, "w") as f:
-        f.write(hashlib.sha256(KEY.encode()).hexdigest() + "\n")
-    os.chmod(tmp, 0o600)
-    os.replace(tmp, STATE / HASH_FILE)
-    srv = bind_watch(port)
-    print(f"watch: 127.0.0.1:{srv.server_port}/?c={CODE}", flush=True)
-    audit("watch", "", f"port {srv.server_port}")
-    srv.serve_forever()
-
-
-def port_listening(port):
-    with socket.socket() as sock:
-        sock.settimeout(0.3)
-        return sock.connect_ex(("127.0.0.1", int(port))) == 0
-
-
-def pid_alive(pid):
-    try:
-        os.kill(int(pid), 0)
-        return True
-    except (OSError, ValueError, TypeError):
-        return False
-
-
 def ensure_watcher():
-    """Return the link of a running board for this project, starting one if needed. It outlives the command that started it."""
+    """The link of the shared board for this project, starting it if needed. None when auto_watch is off."""
     if os.environ.get("FACTORY_NO_WATCH") == "1" or config().get("auto_watch") is False:
         return None
-    STATE.mkdir(parents=True, exist_ok=True)
-    with open(STATE / "watch.lock", "w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        try:
-            info = json.loads((STATE / WATCH_FILE).read_text())
-        except (OSError, ValueError):
-            info = {}
-        if info.get("url") and pid_alive(info.get("pid")) and port_listening(info.get("port", 0)):
-            return info["url"]
-        child = subprocess.Popen(
-            [sys.executable, "-I", str(Path(__file__).resolve()), "watch", "auto"], cwd=str(ROOT),
-            env={**os.environ, "FACTORY_ROOT": str(ROOT)}, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL, start_new_session=True, text=True)
-        ready, _, _ = select.select([child.stdout], [], [], 10)
-        line = child.stdout.readline() if ready else ""
-        m = re.match(r"watch: (127\.0\.0\.1:(\d+)/\?c=\S+)", line)
-        child.stdout.close()
-        if not m:
-            child.kill()
-            child.wait()
-            return None
-        fd, tmp = tempfile.mkstemp(dir=STATE)
-        with os.fdopen(fd, "w") as f:
-            json.dump({"pid": child.pid, "port": int(m.group(2)), "url": m.group(1)}, f)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, STATE / WATCH_FILE)
-        return m.group(1)
+    try:
+        r = subprocess.run([sys.executable, "-I", str(BOARD_SCRIPT), "ensure"], cwd=str(ROOT), capture_output=True,
+                           text=True, timeout=20, env={**os.environ, "FACTORY_ROOT": str(ROOT)})
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return r.stdout.strip() or None
 
 
 def announce_board():
@@ -1240,6 +926,34 @@ def cmd_board():
     url = ensure_watcher()
     need(url, "auto_watch is off, or the board could not start. Run `job watch` yourself")
     print(url)
+
+
+def cmd_watch(port):
+    """Run the shared board in the foreground. It replaces this process."""
+    os.execv(sys.executable, [sys.executable, "-I", str(BOARD_SCRIPT), "watch", port])
+
+
+def _text(body, key):
+    return body.get(key) if isinstance(body.get(key), str) else ""
+
+
+# What the shared board may run for this engine, by button or chat action.
+ACTIONS = {
+    "approve": lambda jid, body: cmd_approve(jid, "spec"),
+    "commit": lambda jid, body: cmd_commit(jid),
+    "unblock": lambda jid, body: cmd_unblock(jid),
+    "skill": lambda jid, body: cmd_skill(jid, _text(body, "name"), "off" if body.get("off") else "on"),
+    "brief": lambda jid, body: cmd_brief(jid, _text(body, "stage"), _text(body, "text")),
+}
+
+
+def ask_system(jid):
+    """The chat bar's instructions for this engine."""
+    me = str(SELF)
+    return (f"You are the factory board's assistant, working in {ROOT}. Job state is under .planning/factory/jobs/. "
+            f"The user is looking at job {jid or '(none)'}. To change the board run only: {me} skill <id> <name> on|off, "
+            f"{me} brief <id> <stage> <text> (empty text clears), {me} note <id> <text>. "
+            "Approve spec, Commit locally and Unblock are buttons the user clicks: say which one. Answer in a few plain lines.")
 
 
 HUMAN_ONLY = {"approve", "commit", "unblock"}

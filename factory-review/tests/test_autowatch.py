@@ -49,12 +49,11 @@ class AutoWatch(Review):
 
 
 class TestAutoStart(AutoWatch):
-    def test_create_starts_a_read_only_board_and_prints_its_link(self):
+    def test_create_starts_a_board_and_prints_its_link(self):
         r = self.create("j")
         self.redeem(self.link(r))
-        self.assertEqual(json.loads(self.http("GET", "/api/mode")[1]), {"readonly": True})
         self.assertEqual([j["id"] for j in json.loads(self.http("GET", "/api/jobs")[1])], ["j"])
-        self.assertEqual(self.http("POST", "/api/unblock", body={"id": "j"})[0], 403)
+        self.assertEqual(self.http("POST", "/api/unblock", body={"id": "j"})[0], 409)
 
     def test_queue_reuses_the_running_board(self):
         first = self.link(self.create("j"))
@@ -93,15 +92,15 @@ class TestAutoStart(AutoWatch):
         mode = stat.S_IMODE((self.state / "watch.json").stat().st_mode)
         self.assertEqual(mode, 0o600)
 
-    def test_the_board_it_starts_is_never_the_one_with_the_buttons(self):
+    def test_the_board_it_starts_has_the_button(self):
         self.new_review("s")
         self.park("s")
         self.ok("queue")
         self.redeem(self.watch_info()["url"])
         job = json.loads(self.http("GET", "/api/jobs")[1])[0]
         self.assertTrue(job["needs_human"])
-        self.assertFalse(job["can_unblock"])
-        self.assertFalse((self.state / "human.sha256").exists())
+        self.assertTrue(job["can_unblock"])
+        self.assertTrue((self.state / "human.sha256").exists())
 
 
 class TestOptOut(AutoWatch):

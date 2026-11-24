@@ -1,29 +1,20 @@
 #!/usr/bin/env python3
-"""Only writer of job.json for review jobs. Refuses illegal stage moves. Serves the board."""
-import fcntl, hashlib, hmac, json, os, re, secrets, select, shlex, shutil, socket, subprocess, sys, tempfile, threading, time
+"""Only writer of job.json for review jobs. Refuses illegal stage moves. Serves the board and its chat."""
+import fcntl, hashlib, json, os, re, shlex, shutil, subprocess, sys, tempfile, threading
 from datetime import datetime, timezone
-from http.cookies import CookieError, SimpleCookie
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(os.environ.get("FACTORY_ROOT", Path.cwd())).resolve()
 STATE = ROOT / ".planning" / "factory-review"
 JOBS = STATE / "jobs"
-DASH_DIR = Path(__file__).resolve().parent.parent / "dashboard"
-DIST_DIR = DASH_DIR / "dist"
-JS = "text/javascript"
-STATIC = {"dashboard.css": "text/css", "map.css": "text/css", "app.js": JS, "dom.js": JS,
-          "markdown.js": JS, "map.js": JS, "drawer.js": JS}
 HOOKS_PATH_KEY = "core.hooksPath"
 DEFAULTS = {"concurrency": 1}
-READONLY = False
 KEY = ""
-SESSION = ""
-CODE = ""
-CODE_EXP = 0.0
-AUTH_LOCK = threading.Lock()
+LABEL = "Review"
+SELF = Path(__file__).resolve()
+WATCH_FIRST_PORT = 8766
+BOARD_SCRIPT = SELF.parent.parent.parent / "factory" / "bin" / "board"
 HASH_FILE = "human.sha256"
-MAX_BODY = 64 * 1024
 CTX = threading.local()
 BRANCH_PREFIX = "factory-review"
 REVIEW_DIR = "reviews"
@@ -64,8 +55,13 @@ def detect_stack(files):
 
 def hint_for(job):
     hint = HINT.get(job["stage"], "")
-    stack = job.get("stack") or []
-    return hint + (f" | stack skills: {', '.join(stack)}" if stack and hint else "")
+    off = set(job.get("skills_off", []))
+    stack = [s for s in job.get("stack") or [] if s not in off]
+    out = hint + (f" | stack skills: {', '.join(stack)}" if stack and hint else "")
+    if hint and off:
+        out += f" | USER TURNED OFF, do not use: {', '.join(sorted(off))}"
+    note = job.get("briefs", {}).get(job["stage"])
+    return out + (f" | USER NOTE for this stage, follow it: {' '.join(note.split())}" if hint and note else "")
 
 
 class Refused(Exception):
@@ -380,7 +376,8 @@ def cmd_advance(jid, to):
     save(job)
     audit("advance", jid, f"{cur} -> {to}")
     print(f"{jid}: {cur} -> {to}")
-    announce_serve()
+    if to in HUMAN_STAGES:
+        announce_board()
 
 
 def cmd_route(jid, extras):
@@ -405,6 +402,33 @@ def cmd_note(jid, text):
     job["activity"] = log[-ACTIVITY_KEEP:]
     save(job)
     audit("note", jid, text.strip()[:200])
+
+
+SKILL_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")
+
+
+def cmd_skill(jid, name, state):
+    """Turn a skill (or a reviewer) off or on for one review. The queue hint tells the orchestrator."""
+    need(SKILL_NAME.fullmatch(name) and state in ("on", "off"), "usage: skill <id> <name> on|off")
+    job = load(jid)
+    off = set(job.get("skills_off", [])) - {name}
+    job["skills_off"] = sorted(off | ({name} if state == "off" else set()))
+    save(job)
+    audit("skill", jid, f"{name} {state}")
+
+
+def cmd_brief(jid, stage, text):
+    """Set (or clear, with empty text) the user's note for one stage of one review."""
+    job = load(jid)
+    need(stage in TRANSITIONS, f"no stage {stage!r}")
+    briefs = job.setdefault("briefs", {})
+    text = text.strip()[:1000]
+    if text:
+        briefs[stage] = text
+    else:
+        briefs.pop(stage, None)
+    save(job)
+    audit("brief", jid, f"{stage}: {text[:100]}")
 
 
 def human_only():
@@ -454,12 +478,10 @@ def needs_you(job):
     """What the user must do, and why, for a parked job. None when it is not parked."""
     if job["stage"] not in HUMAN_STAGES:
         return None
-    cmd = f"cd {shlex.quote(str(ROOT))} && {shlex.quote(str(Path(__file__).resolve()))} serve"
     return {"action": "Unblock", "files": "blocked.md",
             "why": job.get("note") or "The review stopped and cannot continue on its own. It may be blocked, or the worktree was touched.",
-            "todo": (f"Read blocked.md or the activity log to see why. Then click Unblock on the board the command below opens. "
-                     f"It resets the worktree to the reviewed commit and resumes at {job.get('parked_from') or 'scope'}."),
-            "command": cmd}
+            "todo": (f"Read blocked.md or the activity log to see why. Then click Unblock. "
+                     f"It resets the worktree to the reviewed commit and resumes at {job.get('parked_from') or 'scope'}.")}
 
 
 def snapshot(job):
@@ -468,212 +490,13 @@ def snapshot(job):
     waiting = job["stage"] in HUMAN_STAGES
     return {**job, "kind": "review", "report": kv(d / "report.md"), "reviews": reviews,
             "files": sorted(str(p.relative_to(d)) for p in d.rglob("*.md")),
-            "needs_human": waiting, "needs": needs_you(job), "can_unblock": waiting and not READONLY}
+            "needs_human": waiting, "needs": needs_you(job), "skills": skill_names(), "can_unblock": waiting}
 
 
-CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
-       "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
-COOKIE = "factory-review"
-
-
-class Handler(BaseHTTPRequestHandler):
-    def log_message(self, *a):
-        """Intentionally silent: the board must not write request lines to the terminal."""
-
-    def send(self, code, body, ctype="application/json", extra=None):
-        data = body if isinstance(body, bytes) else body.encode()
-        self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("X-Frame-Options", "DENY")
-        self.send_header("Referrer-Policy", "no-referrer")
-        if ctype.startswith("text/html"):
-            self.send_header("Content-Security-Policy", CSP)
-        for k, v in (extra or {}).items():
-            self.send_header(k, v)
-        self.end_headers()
-        self.wfile.write(data)
-
-    def host_ok(self):
-        return self.headers.get("Host", "") in (f"127.0.0.1:{self.server.server_port}",
-                                                f"localhost:{self.server.server_port}")
-
-    def session_ok(self):
-        try:
-            got = SimpleCookie(self.headers.get("Cookie", "")).get(f"{COOKIE}-{self.server.server_port}")
-        except CookieError:
-            return False
-        return bool(got and SESSION) and hmac.compare_digest(got.value.encode(), SESSION.encode())
-
-    def trusted(self):
-        """Loopback Host, the session cookie, and a custom header a cross-site page cannot send."""
-        return self.host_ok() and self.session_ok() and self.headers.get("X-Factory") == "1"
-
-    def redeem_code(self, supplied):
-        global CODE
-        with AUTH_LOCK:
-            good = bool(supplied and CODE) and time.time() < CODE_EXP and \
-                hmac.compare_digest(supplied.encode(), CODE.encode())
-            if good and not READONLY:
-                CODE = ""
-            return good
-
-    def get_root(self, q):
-        if not self.host_ok():
-            return self.send(403, "{}")
-        if self.session_ok():
-            return self.send(200, (DASH_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
-        if self.redeem_code(q.get("c", [""])[0]):
-            cookie = f"{COOKIE}-{self.server.server_port}={SESSION}; HttpOnly; SameSite=Strict; Path=/"
-            return self.send(303, "", extra={"Location": "/", "Set-Cookie": cookie})
-        return self.send(403, "{}")
-
-    def get_static(self, name):
-        if not (self.host_ok() and self.session_ok()) or name not in STATIC:
-            return self.send(403, "{}")
-        base = DIST_DIR if name.endswith(".js") else DASH_DIR
-        return self.send(200, (base / name).read_bytes(), STATIC[name])
-
-    def get_file(self, jid, name):
-        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", jid):
-            return self.send(404, "{}")
-        try:
-            p = (jobdir(jid) / name).resolve()
-            if jobdir(jid).resolve() not in p.parents or p.suffix != ".md" or not p.is_file():
-                return self.send(404, "{}")
-            return self.send(200, p.read_text(), "text/plain; charset=utf-8")
-        except (ValueError, OSError):
-            return self.send(404, "{}")
-
-    def do_GET(self):
-        from urllib.parse import urlparse, parse_qs
-        u = urlparse(self.path)
-        q = parse_qs(u.query)
-        if u.path == "/":
-            return self.get_root(q)
-        if u.path == "/map":
-            if not (self.host_ok() and self.session_ok()):
-                return self.send(403, "{}")
-            return self.send(200, (DASH_DIR / "map.html").read_bytes(), "text/html; charset=utf-8")
-        if u.path.startswith("/static/"):
-            return self.get_static(u.path[len("/static/"):])
-        if not self.trusted():
-            return self.send(403, "{}")
-        if u.path == "/api/mode":
-            return self.send(200, json.dumps({"readonly": READONLY}))
-        if u.path == "/api/jobs":
-            return self.send(200, json.dumps([snapshot(j) for j in all_jobs()]))
-        if u.path == "/api/file":
-            return self.get_file(q.get("job", [""])[0], q.get("name", [""])[0])
-        self.send(404, "{}")
-
-    def do_POST(self):
-        if READONLY or not self.trusted():
-            return self.send(403, "{}")
-        try:
-            n = int(self.headers.get("Content-Length") or 0)
-        except ValueError:
-            return self.send(400, "{}")
-        if not 0 <= n <= MAX_BODY:
-            return self.send(413, "{}")
-        try:
-            body = json.loads(self.rfile.read(n) or b"{}")
-            jid = body["id"]
-        except (ValueError, KeyError, TypeError):
-            return self.send(400, "{}")
-        if self.path != "/api/unblock":
-            return self.send(404, "{}")
-        CTX.human = True
-        try:
-            cmd_unblock(jid)
-        except Refused:
-            return self.send(409, "{}")
-        finally:
-            CTX.human = False
-        self.send(200, "{}")
-
-
-def rebuild_dashboard():
-    """Regenerate dist/ when a .ts is newer. The committed dist is the fallback, so this never raises."""
-    def warn(msg):
-        print(f"dashboard: {msg}; serving the committed dist", file=sys.stderr)
-        audit("dashboard-build", "", msg)
-
-    try:
-        stale = any(not (DIST_DIR / f"{src.stem}.js").exists()
-                    or src.stat().st_mtime > (DIST_DIR / f"{src.stem}.js").stat().st_mtime
-                    for src in DASH_DIR.glob("*.ts"))
-    except OSError as e:
-        return warn(f"cannot compare sources with dist/ ({e})")
-    if not stale:
-        return
-    node = shutil.which("node")
-    if not node:
-        return warn("a source is newer than dist/ but node is not on PATH")
-    try:
-        r = subprocess.run([node, str(DASH_DIR / "build.mjs")], cwd=DASH_DIR, capture_output=True, text=True, timeout=5)
-    except (OSError, subprocess.SubprocessError) as e:
-        return warn(f"rebuild failed ({e})")
-    if r.returncode:
-        warn(f"rebuild failed ({(r.stderr.strip().splitlines() or ['no output'])[-1]})")
-
-
-def cmd_serve(port):
-    """The only place human actions run. The key and session live in this process's memory only."""
-    global KEY, SESSION, CODE, CODE_EXP
-    need(sys.stdin.isatty() and sys.stdout.isatty(),
-         "serve needs an interactive terminal: the board belongs to the user, not to an agent")
-    rebuild_dashboard()
-    KEY, SESSION, CODE = (secrets.token_urlsafe(n) for n in (32, 32, 24))
-    CODE_EXP = time.time() + 300
-    STATE.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=STATE)
-    with os.fdopen(fd, "w") as f:
-        f.write(hashlib.sha256(KEY.encode()).hexdigest() + "\n")
-    os.chmod(tmp, 0o600)
-    os.replace(tmp, STATE / HASH_FILE)
-    srv = ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
-    print(f"board: http://127.0.0.1:{srv.server_port}/?c={CODE}  (opens once, valid 5 minutes)", flush=True)
-    audit("serve", "", f"port {srv.server_port}")
-    # Bound to 127.0.0.1 only, so TLS adds nothing on loopback.
-    srv.serve_forever()  # NOSONAR
-
-
-WATCH_FILE = "watch.json"
-WATCH_FIRST_PORT = 8766
-WATCH_PORT_TRIES = 11
-
-
-def bind_watch(port):
-    if port != "auto":
-        return ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
-    for p in range(WATCH_FIRST_PORT, WATCH_FIRST_PORT + WATCH_PORT_TRIES):
-        try:
-            return ThreadingHTTPServer(("127.0.0.1", p), Handler)
-        except OSError:
-            continue
-    die(f"no free port from {WATCH_FIRST_PORT} to {WATCH_FIRST_PORT + WATCH_PORT_TRIES - 1}")
-
-
-def cmd_watch(port):
-    """Read-only board. It holds no key and has no action routes, so an agent may start it."""
-    global READONLY, SESSION, CODE, CODE_EXP
-    rebuild_dashboard()
-    READONLY = True
-    SESSION, CODE = secrets.token_urlsafe(32), secrets.token_urlsafe(24)
-    CODE_EXP = float("inf")
-    srv = bind_watch(port)
-    print(f"watch: 127.0.0.1:{srv.server_port}/?c={CODE}  (read-only, valid until this process stops)", flush=True)
-    audit("watch", "", f"port {srv.server_port}")
-    # Bound to 127.0.0.1 only, so TLS adds nothing on loopback.
-    srv.serve_forever()  # NOSONAR
-
-
-def port_listening(port):
-    with socket.socket() as sock:
-        sock.settimeout(0.3)
-        return sock.connect_ex(("127.0.0.1", int(port))) == 0
+def skill_names():
+    """The sibling skills the board lets the user switch off for a review."""
+    root = SELF.parent.parent.parent
+    return sorted(p.parent.name for p in root.glob("*/SKILL.md") if p.parent.name not in ("factory", "factory-review"))
 
 
 def pid_alive(pid):
@@ -685,39 +508,15 @@ def pid_alive(pid):
 
 
 def ensure_watcher():
-    """Return the link of a running read-only board for this project, starting one if needed.
-
-    The board outlives the command that started it. It never starts the board with the buttons.
-    """
+    """The link of the shared board for this project, starting it if needed. None when auto_watch is off."""
     if os.environ.get("FACTORY_NO_WATCH") == "1" or config().get("auto_watch") is False:
         return None
-    STATE.mkdir(parents=True, exist_ok=True)
-    with open(STATE / "watch.lock", "w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        try:
-            info = json.loads((STATE / WATCH_FILE).read_text())
-        except (OSError, ValueError):
-            info = {}
-        if info.get("url") and pid_alive(info.get("pid")) and port_listening(info.get("port", 0)):
-            return info["url"]
-        child = subprocess.Popen(
-            [sys.executable, "-I", str(Path(__file__).resolve()), "watch", "auto"], cwd=str(ROOT),
-            env={**os.environ, "FACTORY_ROOT": str(ROOT)}, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL, start_new_session=True, text=True)
-        ready, _, _ = select.select([child.stdout], [], [], 10)
-        line = child.stdout.readline() if ready else ""
-        m = re.match(r"watch: (127\.0\.0\.1:(\d+)/\?c=\S+)", line)
-        child.stdout.close()
-        if not m:
-            child.kill()
-            child.wait()
-            return None
-        fd, tmp = tempfile.mkstemp(dir=STATE)
-        with os.fdopen(fd, "w") as f:
-            json.dump({"pid": child.pid, "port": int(m.group(2)), "url": m.group(1)}, f)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, STATE / WATCH_FILE)
-        return m.group(1)
+    try:
+        r = subprocess.run([sys.executable, "-I", str(BOARD_SCRIPT), "ensure"], cwd=str(ROOT), capture_output=True,
+                           text=True, timeout=20, env={**os.environ, "FACTORY_ROOT": str(ROOT)})
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return r.stdout.strip() or None
 
 
 def keep_awake():
@@ -741,30 +540,49 @@ def keep_awake():
         (STATE / "awake.pid").write_text(str(child.pid))
 
 
-def announce_serve():
-    """Tell the user the exact command to run when a job waits on them, so they never have to ask for it."""
-    if any(j["stage"] in HUMAN_STAGES for j in all_jobs()):
-        print(f"waiting on you. To unblock, run this in your terminal:\n"
-              f"  cd {shlex.quote(str(ROOT))} && {shlex.quote(str(Path(__file__).resolve()))} serve", file=sys.stderr)
-
-
 def announce_board():
     url = ensure_watcher()
     if url:
         print(f"board: {url}", file=sys.stderr)
-    announce_serve()
 
 
 def cmd_board():
     url = ensure_watcher()
-    need(url, "auto_watch is off, or the read-only board could not start. Run `job watch` yourself")
+    need(url, "auto_watch is off, or the board could not start. Run `job watch` yourself")
     print(url)
+
+
+def cmd_watch(port):
+    """Run the shared board in the foreground. It replaces this process."""
+    os.execv(sys.executable, [sys.executable, "-I", str(BOARD_SCRIPT), "watch", port])
+
+
+def _text(body, key):
+    return body.get(key) if isinstance(body.get(key), str) else ""
+
+
+# What the shared board may run for this engine, by button or chat action.
+ACTIONS = {
+    "unblock": lambda jid, body: cmd_unblock(jid),
+    "skill": lambda jid, body: cmd_skill(jid, _text(body, "name"), "off" if body.get("off") else "on"),
+    "brief": lambda jid, body: cmd_brief(jid, _text(body, "stage"), _text(body, "text")),
+}
+
+
+def ask_system(jid):
+    """The chat bar's instructions for this engine."""
+    me = str(SELF)
+    return (f"You are the factory-review board's assistant, working in {ROOT}. Review state is under .planning/factory-review/jobs/. "
+            f"The user is looking at review {jid or '(none)'}. This is a read-only review: never edit, create, or delete code, and never post anywhere. "
+            f"To change the board run only: {me} skill <id> <name> on|off, {me} brief <id> <stage> <text> (empty text clears), {me} note <id> <text>. "
+            "Unblock is a button the user clicks. Answer in a few plain lines.")
 
 
 HUMAN_ONLY = {"unblock"}
 COMMANDS = {
     "create": (cmd_create, 4), "advance": (cmd_advance, 2), "route": (cmd_route, 2), "note": (cmd_note, 2),
-    "queue": (cmd_queue, 0), "board": (cmd_board, 0), "watch": (cmd_watch, 1), "serve": (cmd_serve, 1),
+    "queue": (cmd_queue, 0), "board": (cmd_board, 0), "watch": (cmd_watch, 1), "serve": (cmd_watch, 1),
+    "skill": (cmd_skill, 3), "brief": (cmd_brief, 3),
 }
 
 
