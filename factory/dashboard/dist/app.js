@@ -361,7 +361,7 @@ $("ask-form").onsubmit = async (e) => {
   $("ask-q").textContent = question;
   bubble("me", question);
   try {
-    const res = await api("/api/ask", { method: "POST", body: JSON.stringify({ id: state.openId ?? "", question, session, engine, model: ($("model")                    ).value.trim(), effort: ($("effort")                     ).value }) });
+    const res = await api("/api/ask", { method: "POST", body: JSON.stringify({ id: state.openId ?? "", question, session, engine, model: ($("model")                     ).value, effort: ($("effort")                     ).value }) });
     const out                                                        = await res.json();
     session = out.session ?? session;
     bubble(out.error ? "err" : "bot", out.error ?? out.answer ?? "");
@@ -378,12 +378,13 @@ $("engine").onclick = () => {
 };
 function showEngine()       {
   $("engine-name").textContent = ENGINE_LABEL[engine] ?? engine;
-  ($("model")                    ).value = "";
-  $("models").replaceChildren(...(modelChoices[engine] ?? []).map((m) => {
-    const o = el("option");
+  const model = $("model")                     ;
+  model.replaceChildren(...["", ...(modelChoices[engine] ?? [])].map((m) => {
+    const o = el("option", "", m || "model");
     o.value = m;
     return o;
   }));
+  model.hidden = !modelChoices[engine]?.length;
 }
 try {
   modelChoices = await (await api("/api/engines")).json();

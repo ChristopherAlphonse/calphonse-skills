@@ -360,7 +360,7 @@ $("ask-form").onsubmit = async (e) => {
   $("ask-q").textContent = question;
   bubble("me", question);
   try {
-    const res = await api("/api/ask", { method: "POST", body: JSON.stringify({ id: state.openId ?? "", question, session, engine, model: ($("model") as HTMLInputElement).value.trim(), effort: ($("effort") as HTMLSelectElement).value }) });
+    const res = await api("/api/ask", { method: "POST", body: JSON.stringify({ id: state.openId ?? "", question, session, engine, model: ($("model") as HTMLSelectElement).value, effort: ($("effort") as HTMLSelectElement).value }) });
     const out: { answer?: string; session?: string; error?: string } = await res.json();
     session = out.session ?? session;
     bubble(out.error ? "err" : "bot", out.error ?? out.answer ?? "");
@@ -377,12 +377,13 @@ $("engine").onclick = () => {
 };
 function showEngine(): void {
   $("engine-name").textContent = ENGINE_LABEL[engine] ?? engine;
-  ($("model") as HTMLInputElement).value = "";
-  $("models").replaceChildren(...(modelChoices[engine] ?? []).map((m) => {
-    const o = el("option");
+  const model = $("model") as HTMLSelectElement;
+  model.replaceChildren(...["", ...(modelChoices[engine] ?? [])].map((m) => {
+    const o = el("option", "", m || "model");
     o.value = m;
     return o;
   }));
+  model.hidden = !modelChoices[engine]?.length;
 }
 try {
   modelChoices = await (await api("/api/engines")).json();

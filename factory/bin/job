@@ -1066,6 +1066,12 @@ def model_choices():
             out["opencode"] = r.stdout.split()[:200]
         except (OSError, subprocess.SubprocessError):
             pass
+    if "kiro" in out:
+        try:
+            r = subprocess.run([ENGINES["kiro"], "chat", "--list-models"], capture_output=True, text=True, timeout=8)
+            out["kiro"] = [l.split()[1 if l.startswith("*") else 0] for l in r.stdout.splitlines()[2:] if l.strip()]
+        except (OSError, subprocess.SubprocessError, IndexError):
+            pass
     return out
 
 
