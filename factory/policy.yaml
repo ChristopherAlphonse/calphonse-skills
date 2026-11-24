@@ -7,6 +7,13 @@ rules:
       - git -C * push*
       - aws s3 rm*
       - curl -X POST*
+      # Never bypass git hooks: `--no-verify`, `commit -n`, a hooks path override, or pre-commit's skip variables.
+      - *--no-verify*
+      - *git commit -n*
+      - *git commit * -n*
+      - *core.hooksPath*
+      - *SKIP=*
+      - *PRE_COMMIT_ALLOW_NO_CONFIG*
   # Backstop: ask beats allow, so the `git -C *` allow patterns cannot pass mutating verbs.
   - capability: shell
     effect: ask

@@ -49,6 +49,14 @@ class Guard:
             with self.subTest(c):
                 self.assertEqual(self.sh(c), 2)
 
+    def test_hook_bypass_is_denied_even_on_an_allowed_command(self):
+        for ok, bad in (("npm test", "npm test -- --no-verify"), ("make check", "make check SKIP=lint"),
+                        ("pytest -q", "pytest -c core.hooksPath"), ("pytest -q", "pytest --env PRE_COMMIT_ALLOW_NO_CONFIG=1"),
+                        ("echo git commit -m x", "echo git commit -n -m x"), ("echo git commit -m x", "echo git commit -m x -n")):
+            with self.subTest(bad):
+                self.assertEqual(self.sh(ok), 0)
+                self.assertEqual(self.sh(bad), 2)
+
     def test_file_tools_cannot_touch_policy_or_engine_state(self):
         for p in (".kiro/agents/x.json", ".claude/settings.json", "opencode.jsonc", ".planning/%s/job.json" % SKILL, ".git/hooks/pre-commit"):
             with self.subTest(p):
