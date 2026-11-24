@@ -26,7 +26,7 @@ Stress-test before committing. Optimize for one useful pass, not exhaustive ques
 
 ## Output
 
-Return only what the task needs. When the output is a document someone must approve (a factory `shape.md`, a plan), put **Decisions to approve** first, one plain sentence each, below any `STATUS:` line, then check the wording with [simplify](../simplify/SKILL.md) and its [writing rules](../simplify/references/writing-rules.md).
+Return only what the task needs. When the output is a document someone must approve (a factory `shape.md`, a plan), put **Decisions to approve** right under the title, one plain sentence each, with any `STATUS:` line still on line 1, then check the wording with [simplify](../simplify/SKILL.md) and its [writing rules](../simplify/references/writing-rules.md).
 
 - Recommendation
 - Assumptions / open questions

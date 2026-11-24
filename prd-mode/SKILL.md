@@ -91,7 +91,7 @@ Use AI tools to generate the majority of technical documentation so product mana
 
 Every PRD, spec or task list this skill writes, including a factory `spec.md`, goes through [simplify](../simplify/SKILL.md) before anyone reads it:
 
-1. Open with **Decisions to approve**: each assumption or choice the reader must say yes to, one plain sentence each, before any table. A `STATUS:` line, when the file needs one, stays on line 1 above it. A task list skips this step; its decisions live in the PRD. Say what it does, not its row number ("The job logs in as the shared `swa_readonly` user").
+1. Open with **Decisions to approve**: each assumption or choice the reader must say yes to, one plain sentence each, right under the title and before any table. A `STATUS:` line, when the file needs one, stays on line 1 above it. A task list skips this step; its decisions live in the PRD. Say what it does, not its row number ("The job logs in as the shared `swa_readonly` user").
 2. Cut what another doc already says and link to it.
 3. Check the wording against [simplify's writing rules](../simplify/references/writing-rules.md).
 
