@@ -5,7 +5,7 @@ Build (jobs that write code) and Review (read-only code reviews). It runs the bu
   board watch [port|auto]   run the board in the foreground
   board ensure              print the link of the running board, starting one if needed
 """
-import fcntl, hashlib, hmac, importlib.machinery, importlib.util, json, os, re, secrets, select, shutil, socket, subprocess, sys, tempfile, time
+import contextlib, fcntl, hashlib, io, hmac, importlib.machinery, importlib.util, json, os, re, secrets, select, shutil, socket, subprocess, sys, tempfile, time
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -114,7 +114,7 @@ def ask_args(engine, exe, me, system, question, session, model, effort):
             + (["--effort", effort] if effort else []) + [prompt], None)
 
 
-def ask(board, jid, question, session, engine, model, effort):
+def ask(board, jid, question, session, engine, model, effort, act=False):
     """One chat turn through the chosen CLI for one board."""
     if board not in BOARD_SPECS:
         return {"error": f"no board {board!r}"}
@@ -124,7 +124,7 @@ def ask(board, jid, question, session, engine, model, effort):
         return {"error": f"{ENGINES[engine]} was not found on PATH"}
     if model and not MODEL_NAME.fullmatch(model):
         return {"error": f"bad model name {model!r}"}
-    args, stdin = ask_args(engine, exe, str(ENGINE.SELF), ENGINE.ask_system(jid, board), question, session, model, effort if effort in EFFORTS else "")
+    args, stdin = ask_args(engine, exe, str(ENGINE.SELF), ENGINE.ask_system(jid, board, act), question, session, model, effort if effort in EFFORTS else "")
     try:
         r = subprocess.run(args, input=stdin, capture_output=True, text=True, timeout=ASK_TIMEOUT,
                            cwd=str(ROOT), env={**os.environ, "FACTORY_ROOT": str(ROOT)})
@@ -329,8 +329,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(400, "{}")
         text = lambda k: body.get(k) if isinstance(body.get(k), str) else ""
         if self.path == "/api/ask":
-            out = ask(text("board"), jid, text("question"), text("session"), text("engine"), text("model"), text("effort"))
-            chat_append({"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "board": text("board"), "job": jid, "question": text("question"),
+            act = text("mode") == "act"
+            out = ask(text("board"), jid, text("question"), text("session"), text("engine"), text("model"), text("effort"), act)
+            if act and not out.get("error"):
+                out["answer"] = (out.get("answer", "") + "\n\n" + apply_for_act()).strip()
+            chat_append({"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "board": text("board"), "job": jid, "question": text("question"), "mode": "act" if act else "chat",
                          "answer": out.get("answer", ""), "error": out.get("error", "")})
             return self.send(200, json.dumps(out))
         m = re.fullmatch(r"/api/([a-z]+)/save", self.path)
@@ -388,6 +391,22 @@ def bind(port):
         except OSError:
             continue
     sys.exit(f"refused: no free port from {FIRST_PORT} to {FIRST_PORT + PORT_TRIES - 1}")
+
+
+def apply_for_act():
+    """In Act mode the user's choice of mode is the click: apply the change the agent just proposed, as the board, never as the agent."""
+    if not ENGINE.proposal_state():
+        return ""
+    out, err = io.StringIO(), io.StringIO()
+    ENGINE.CTX.human = True
+    try:
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            ENGINE.cmd_pipeline("apply")
+    except SystemExit:
+        return "Not applied: " + (err.getvalue().strip().removeprefix("refused: ") or "the board refused it") + ". The change is still waiting under Pipeline change."
+    finally:
+        ENGINE.CTX.human = False
+    return "Applied. The pipeline is now:\n" + "\n".join(f"- {l}" for l in out.getvalue().strip().splitlines())
 
 
 def chat_append(entry):

@@ -658,8 +658,6 @@ BUILTIN_IDS = set(TRANSITIONS) | set(REVIEW_TRANSITIONS) | {"ready", "rejected",
 STAGE_ID = re.compile(r"[a-z][a-z0-9-]{1,23}")
 MAX_CUSTOM = 12
 MAX_LABEL, MAX_BRIEF = 24, 200
-# Only the user's Commit locally click commits, and no agent pushes or pulls, so a stage brief may not tell one to.
-FORBIDDEN_BRIEF = re.compile(r"\bgit\s+(add|commit|push|pull|fetch|merge|rebase|reset|checkout|clean)\b|\bcommit(s|ting)?\s+(all|everything|the\s+(changes|code|diff|branch))\b|\b(push|pull)(es|ing)?\s+(to|from)\s+(the\s+)?(remote|origin|upstream)\b", re.I)
 _PIPE_CACHE = [None, None]
 
 
@@ -689,8 +687,6 @@ def check_custom(stages):
             errs.append(f"{i}: label must be 1 to {MAX_LABEL} characters")
         if len(c["brief"]) > MAX_BRIEF:
             errs.append(f"{i}: brief must be at most {MAX_BRIEF} characters")
-        if FORBIDDEN_BRIEF.search(c["brief"]) or FORBIDDEN_BRIEF.search(c["label"]):
-            errs.append(f"{i}: a stage cannot tell an agent to commit, push or pull. Only the user's Commit locally click commits")
         skill = c.get("skill", "")
         if skill and not (SKILL_NAME.fullmatch(skill) and (SELF.parent.parent.parent / skill / "SKILL.md").is_file()):
             errs.append(f"{i}: no skill named {skill!r}")
@@ -1267,7 +1263,7 @@ def board_agent_guide():
         return ""
 
 
-def ask_system(jid, board="build"):
+def ask_system(jid, board="build", act=False):
     """The chat bar's instructions for one board."""
     me = str(SELF)
     review = board == "review"
@@ -1277,6 +1273,8 @@ def ask_system(jid, board="build"):
             + f"To change the board run only: {me} skill <id> <name> on|off, "
             f"{me} brief <id> <stage> <text> (empty text clears), {me} note <id> <text>. "
             + ("Unblock is a button the user clicks. " if review else "Approve spec, Commit locally and Unblock are buttons the user clicks: say which one. ")
+            + ("ACT MODE: the user chose Act. A pipeline change you propose is applied for them the moment you finish, so propose exactly what they asked and nothing else, and do not tell them to click Apply. " if act else
+               "CHAT MODE: a pipeline change you propose waits for the user's Apply click on the board. ")
             + "Answer in a few plain lines."
             + f"\n\nThe factory skill is in {SELF.parent.parent}.\n\n{board_agent_guide()}")
 
