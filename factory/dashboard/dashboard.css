@@ -121,7 +121,7 @@ button.callout:hover { background: rgba(240, 195, 107, 0.16); }
 .sec textarea { width: 100%; background: rgba(var(--ink), 0.05); border: 0; border-radius: var(--r-ctl); padding: 8px 10px; resize: vertical; }
 
 /* Ask bar */
-#ask { position: fixed; left: calc(var(--side-w) + (100vw - var(--side-w) - var(--pw)) / 2); bottom: 20px; transform: translateX(-50%); width: min(720px, calc(100vw - var(--side-w) - var(--pw) - 32px)); z-index: 7; transition: left 0.25s; }
+#ask { position: fixed; left: calc(var(--side-w) + (100vw - var(--side-w) - var(--pw)) / 2); bottom: 20px; transform: translateX(-50%); width: min(720px, max(300px, calc(100vw - var(--side-w) - var(--pw) - 300px))); z-index: 7; transition: left 0.25s; }
 #ask-sheet { margin-bottom: 10px; max-height: 50vh; overflow: auto; border-radius: var(--r-panel); background: var(--surface); box-shadow: 0 0 0 1px var(--hair-2), 0 24px 64px -24px rgba(0, 0, 0, 0.7); }
 #ask-sheet[hidden] { display: none; }
 #ask-head { display: flex; justify-content: space-between; gap: 12px; padding: 14px 18px; color: var(--text-2); position: sticky; top: 0; z-index: 1; background: var(--surface); box-shadow: 0 1px 0 var(--hair); }
