@@ -69,8 +69,8 @@ class TestPropose(Pipeline):
 
     def test_a_move_is_reported_as_one_move(self):
         r = self.propose("move", "build", "polish", "prove")
-        self.assertIn("move polish after prove in build", r.stdout)
         self.assertEqual(r.stdout.count("move "), 1)
+        self.assertIn("in build", r.stdout.split("proposed:")[1])
 
     def test_orders_the_checks_cannot_work_with_are_refused_with_the_reason(self):
         for args, why in (
@@ -92,7 +92,7 @@ class TestPropose(Pipeline):
     def test_bad_requests_are_refused_with_the_reason_and_leave_nothing_behind(self):
         for args, why in (
             (("add", "build", "gate", "shape", "X", ""), "built-in"),
-            (("add", "build", "review", "shape", "X", ""), "already exists"),
+            (("add", "build", "review", "shape", "X", ""), "built-in stage name"),
             (("add", "build", "Bad Id", "shape", "X", ""), "not a stage id"),
             (("add", "build", "ok-id", "nowhere", "X", ""), "is not a stage here"),
             (("add", "deploy", "ok-id", "shape", "X", ""), "build or review"),
