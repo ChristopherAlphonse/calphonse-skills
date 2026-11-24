@@ -32,6 +32,12 @@ This skill runs two workflows on one engine and one board, as two tabs:
 
 The sections below say which workflow they belong to. A review job never edits code, commits, pushes, or posts.
 
+## Custom stages
+
+`pipeline.json` beside this file can add stages to either workflow. A custom stage is not special to you: the queue hint names it, the skill to run and the file to write, and you spawn a fresh agent for it like any other stage. It writes `<stage-id>.md` in the job folder with `STATUS: READY` on the first line, or `STATUS: BLOCKED` when it cannot go on. Then `JOB advance <id> <next>` moves the job, and `BLOCKED` parks it on the user, whose Unblock retries that stage. Custom stages never wait on the user themselves.
+
+Only the user changes the pipeline: an agent can propose a change with `JOB pipeline propose ...`, and the user clicks Apply on the board. Never run `JOB pipeline apply`. The CLI refuses it.
+
 ## Enterprise policy
 
 These hold in every harness and are enforced by structure, not by this text.

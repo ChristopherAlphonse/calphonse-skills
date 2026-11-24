@@ -185,6 +185,19 @@ Click a file in a job's panel to open it in an editor tab beside the board tabs:
 
 Fenced `mermaid` blocks draw as diagrams once `FACTORY_MERMAID` names a `mermaid.min.js` on your machine. Nothing is bundled. Each diagram is drawn in a sandboxed frame that has no cookie and no access to the board, and without the variable the block stays plain code.
 
+## Custom stages
+
+The built-in stages and their order are locked. `pipeline.json`, beside `SKILL.md`, adds extra stages (nodes) to the Build or Review board. It applies to every project and is a plain file you can commit. Each custom stage has an id, a workflow (`build` or `review`), the stage it follows, a label, a short brief, and optionally one of this repo's skills. It runs like any stage: the agent writes `<id>.md` with `STATUS: READY`, or `STATUS: BLOCKED` to park the job on you.
+
+A stage can follow `shape`, `spec`, `build`, `review`, `polish` or `prove` (Build), or `scope`, `review`, `reconcile` or `verify` (Review), or another custom stage. Nothing can follow `gate`, `ship` or `report`, because those carry the safety checks and the commit click.
+
+Changing it takes two steps, so a small model gets it right and you stay in control:
+
+1. Ask in the chat bar, for example "add a QA pass after review". The agent runs `job pipeline propose add|remove|move ...`. The command checks everything and prints the new order, or says exactly what is allowed. The board shows the waiting change under **Pipeline change**, with the new stage highlighted.
+2. You click **Apply** (or **Discard**). Only then is `pipeline.json` written. Apply is refused if a job sits in a stage the change removes, or if the pipeline changed since it was proposed.
+
+`job pipeline show` prints the current order and where a stage can go. `FACTORY_PIPELINE` points the engine at another file, which the tests use.
+
 ## Dashboard source
 
 The board is written in TypeScript, in `dashboard/*.ts`. The server reads the generated `dashboard/dist/*.js`, which is committed and never edited by hand. `serve` and `watch` rebuild `dist/` at start when Node is on PATH and a `.ts` is newer than its `.js`. When a source is newer or a dist file is missing, and Node is absent or the build fails, they print one `dashboard:` warning, log it in `audit.log`, and serve the committed `dist/`. To build by hand, run `node factory/dashboard/build.mjs`, which needs Node 24 or later. `node factory/dashboard/build.mjs --check` fails when a `dist/*.js` is stale, missing or has no `.ts`, and `tests/test_dashboard_build.py` runs it. A running board does not reload, so restart it after you edit a `.ts` file. Only erasable syntax is allowed: no `enum`, `namespace` or constructor parameter properties. `dashboard/tsconfig.json` is for running `tsc` by hand and needs TypeScript 5.8 or later (`erasableSyntaxOnly`). Nothing runs it for you.

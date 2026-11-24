@@ -100,6 +100,32 @@ class TestPropose(Pipeline):
         self.assertEqual(set(self.stages()), {"zz"})
 
 
+class TestBoard(Pipeline):
+    def stages_payload(self, board="build"):
+        self.board()
+        st, body = self.http("GET", f"/api/{board}/stages")
+        self.assertEqual(st, 200)
+        return json.loads(body)
+
+    def test_the_board_gets_the_order_the_labels_and_the_waiting_change(self):
+        first = self.stages_payload()
+        self.assertEqual(first["order"], ["shape", "spec", "build", "review", "polish", "prove", "ship", "ready"])
+        self.assertEqual((first["custom"], first["proposal"]), ({}, None))
+        self.propose("add", "qa-pass", "build", "review", "QA pass", "Check by hand")
+        waiting = self.stages_payload()["proposal"]
+        self.assertEqual(waiting["new"], ["qa-pass"])
+        self.assertEqual(waiting["order"]["build"][3:6], ["review", "qa-pass", "polish"])
+        self.assertIn("add qa-pass", waiting["ops"][0])
+        self.assertFalse(waiting["stale"])
+        self.apply()
+        done = self.stages_payload()
+        self.assertEqual(done["order"][3:6], ["review", "qa-pass", "polish"])
+        self.assertEqual(done["custom"]["qa-pass"], {"label": "QA pass", "blurb": "Check by hand"})
+        self.assertIsNone(done["proposal"])
+        self.assertNotIn("qa-pass", self.stages_payload("review")["order"])
+        self.assertEqual(self.http("GET", "/api/build/stages", cookie=False)[0], 403)
+
+
 class TestRunning(Pipeline):
     def test_a_job_goes_through_the_new_stage_and_not_around_it(self):
         self.propose("add", "extra", "build", "shape", "Extra", "Do the extra thing")
