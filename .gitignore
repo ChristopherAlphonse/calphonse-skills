@@ -1,8 +1,3 @@
 .planning/
 .worktrees/
 __pycache__/
-.claude
-.kiro
-.opencode
-.codex
-.pixi/
