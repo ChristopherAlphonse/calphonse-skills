@@ -19,6 +19,7 @@ the diff, a config file, or declared as an [ASSUMPTION]. This skill does not fix
 - Review only the changed behavior and its direct integration points.
 - Do not recommend broad rewrites, abstractions, or style churn unless they prevent a verified bug.
 - If evidence is weak, label the assumption or omit the finding.
+- To read a PR/MR (diff, comments, CI), use `gh` or `glab`, and `git` for the repository. Never `curl` or `wget`. Read-only: do not post. See [forge-cli](../pr-follow-up/references/forge-cli.md).
 - Prefer findings with a concrete repro, failing test, config violation, or line-level reasoning.
 - Apply [review-blind-spots](../review-blind-spots/SKILL.md) to every changed line, in every agent. Reading only the diff does not verify the database, schema, other repo, or consumer it talks to. Those gaps become findings, not footnotes.
 

@@ -10,6 +10,7 @@ Judge the tests that go with a change, not the change itself. The question is: i
 ## Guardrails
 
 - Scope is the diff against the base branch. Report only gaps in tests for the lines the diff adds or changes. Do not report missing tests for code the author did not touch.
+- To read a PR/MR (diff, CI), use `gh` or `glab`, and `git` for the repository. Never `curl` or `wget`. Read-only: do not post. See [forge-cli](../pr-follow-up/references/forge-cli.md).
 - Never edit, stage, or commit files in the user's checkout. All runs happen in a throwaway git worktree.
 - Throwaway tests are allowed inside the worktree to prove a gap. Never present them as the author's tests.
 - Do not install a tool or dependency without asking. If a tool is missing, say so and use the fallback in the focus reference.

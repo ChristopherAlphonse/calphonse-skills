@@ -12,6 +12,7 @@ An unusually strict review of the quality and maintainability of the code the au
 
 Review what the author wrote or modified in this change. Nothing else.
 
+- To read a PR/MR instead of a local diff, use `gh` or `glab`, never `curl` or `wget`. See [forge-cli](../pr-follow-up/references/forge-cli.md).
 - Get the change set from the diff against the base branch. Every finding must point to a line the diff adds or modifies, or to code whose behavior the diff directly changes.
 - Never report a problem that already existed in code the author did not touch. This includes old spaghetti, oversized files, missing types, duplicated helpers, and outdated patterns. Do not mention them as "side notes", "while I was here", or "for a follow-up". Unbounded scope is the failure this rule prevents.
 - Touching a file does not put the whole file in scope. Only the changed lines, and what those lines do to their immediate surroundings, are in scope.

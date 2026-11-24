@@ -259,7 +259,7 @@ glab api --method POST projects/:id/merge_requests \
 glab api --method PUT projects/:id/merge_requests/<iid> --field description=@<file>
 ```
 
-Prefer the CLI (`gh pr create`, `glab mr create`) over raw API calls; reach for the API only for automation or fields the CLI does not expose. Resolve `:id` as the URL-encoded project path when needed.
+Prefer the CLI (`gh pr create`, `glab mr create`) over raw API calls; reach for the API only for automation or fields the CLI does not expose. Resolve `:id` as the URL-encoded project path when needed. Never use `curl` or `wget` for git or forge work; if the CLI is missing or logged out, stop and tell the user. Full command reference: [forge-cli](../pr-follow-up/references/forge-cli.md).
 
 ### Factory branches
 

@@ -27,6 +27,8 @@ Pick the tool before writing commands. Do not mix hosts.
 
 Detect from the URL if given, otherwise from `git remote get-url origin`. If neither is clear, ask once and name the candidates. Everything below says "PR/MR" — use the host's vocabulary in replies. Resolve `:id` as the URL-encoded project path when needed.
 
+Use only `git`, `gh`, and `glab`. Never use `curl` or `wget` for git or forge work; if the CLI is missing or logged out, stop and tell the user. Full command reference and rules: [references/forge-cli.md](references/forge-cli.md).
+
 ## 1. Study the PR/MR
 
 Fetch the PR/MR to get file changes (diffs), reviewer comments (inline and general), CI status and logs, the description, and any linked ticket.

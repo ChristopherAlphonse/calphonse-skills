@@ -53,6 +53,8 @@ Reply in plain words. If the user asks to simplify, load the `simplify` skill.
 
 Posting is visible to other people. Do it only on an explicit request, and say whose account it posts as.
 
+Post with `gh` (GitHub) or `glab` (GitLab), never `curl` or `wget`. The inline-comment payloads for both are in [forge-cli](../pr-follow-up/references/forge-cli.md#inline-comments). If the CLI is missing or logged out, stop and tell the user.
+
 1. Find the MR from the project and branch; confirm the source branch matches the checkout.
 2. Post inline comments only. Do not post a top-level summary comment. Items with no single line (scope, unverified risks, missing approvals) stay in your reply to the user.
 3. Inline comments go on lines the MR changed. GitLab rejects any other line.
