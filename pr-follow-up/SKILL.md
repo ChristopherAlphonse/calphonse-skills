@@ -120,7 +120,7 @@ git status -sb   # nothing in brackets after the branch name, no [ahead N]
 
 Push every commit in the same turn; a commit is not done until it is pushed. If the rebase in step 3 rewrote commits that were already pushed, the plain push is rejected and needs `--force-with-lease` (never a bare `--force`). Ask the user before running it, and only force-push if the branch is yours alone; check the PR/MR participants first.
 
-**If the branch is a factory worktree branch**, follow the push convention in [pr-body-style](../pr-body-style/SKILL.md) instead: push with `--no-verify -u origin <branch>` only when `git rev-parse HEAD` equals the job's recorded `commit`.
+**If the branch is a factory worktree branch**, follow the push convention in [pr-body-style](../pr-body-style/SKILL.md) instead: push from the main checkout, not the worktree, and only when `git rev-parse <branch>` equals the job's recorded `commit`. Never use `--no-verify`.
 
 **If a commit-scanning bot blocks the push** (GitGuardian, TruffleHog, etc.): this usually means unrelated test fixtures contain strings that look like secrets. The agent cannot override these. Tell the user to push manually or temporarily disable the scanner per the org's docs.
 
