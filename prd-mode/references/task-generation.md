@@ -71,4 +71,4 @@ Use `/lets-talk-about-it` before finalizing the task list. Let it stress-test th
   - [ ] 1.3 Implement repository pattern for CRUD operations
 ```
 
-**Ask the user whether each task or subtask should be committed to git, and keep the work sequential.**
+**Ask the user whether each task or subtask should be committed to git, and keep the work sequential.** Push each commit right after it: `git pull --rebase`, `git push`, then `git status -sb` shows no `[ahead N]`.

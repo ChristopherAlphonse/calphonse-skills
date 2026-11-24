@@ -114,10 +114,11 @@ Prefer filter/target flags to scope runs to affected areas — faster than the w
 ```bash
 git add -A
 git commit -m "<type>(<scope>): <description>"
-git push origin <branch-name> --force-with-lease
+git push origin <branch-name>
+git status -sb   # nothing in brackets after the branch name, no [ahead N]
 ```
 
-Use `--force-with-lease` (never a bare `--force`) after a rebase so you cannot clobber someone else's push. Only amend or force-push if the branch is yours alone; check the PR/MR participants first.
+Push every commit in the same turn; a commit is not done until it is pushed. If the rebase in step 3 rewrote commits that were already pushed, the plain push is rejected and needs `--force-with-lease` (never a bare `--force`). Ask the user before running it, and only force-push if the branch is yours alone; check the PR/MR participants first.
 
 **If the branch is a factory worktree branch**, follow the push convention in [pr-body-style](../pr-body-style/SKILL.md) instead: push with `--no-verify -u origin <branch>` only when `git rev-parse HEAD` equals the job's recorded `commit`.
 

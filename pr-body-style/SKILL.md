@@ -216,7 +216,7 @@ Root cause: `retryLoop()` in `jobs/report.ts` was deleted, `sleep()` in `jobs/ex
 
 A request to write or update a body is the user's standing approval to publish it: do not stop at a draft and do not ask first. A question about an existing body (is it accurate, too long, ready) gets the answer and a corrected body, and publishes only if the user then says so.
 
-1. Push the branch if it has no upstream or is ahead of it: `git push -u origin <branch>`.
+1. Push the branch if it has no upstream or is ahead of it: `git pull --rebase` when it has an upstream, then `git push -u origin <branch>`. Confirm with `git status -sb` that no `[ahead N]` is left. Never force push without asking.
 2. Write the body to a temp file and pass it as a file so the shell does not mangle quotes or backticks (e.g. `/tmp/pr-body.md`).
 3. If a PR/MR for the branch exists, replace its body. Otherwise create it against the default branch with the Conventional Commits title.
 4. Reply with the PR/MR links, one line each. Do not paste the bodies back unless asked.
