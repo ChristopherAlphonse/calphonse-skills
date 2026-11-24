@@ -51,6 +51,7 @@ Use `/lets-talk-about-it` before finalizing the task list. Let it stress-test th
   - **Task List:** Hierarchical checkboxes (`- [ ] 1.0 ...`, `- [ ] 1.1 ...`).
   - **Relevant Files:** Potential code and test files involved.
   - **Notes:** Testing commands and architectural reminders tied to the PRD.
+- **Before handing over:** run the list through the "Before You Hand It Over" steps in `../SKILL.md`. Each task is one plain sentence a developer can act on.
 
 ---
 

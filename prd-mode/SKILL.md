@@ -87,6 +87,14 @@ Use AI tools to generate the majority of technical documentation so product mana
 - **Ignoring non-goals** - Failing to establish what you are not building leads to scope creep and loss of focus on the primary problem.
 - **Waterfall handoffs** - Excluding designers and engineers from early planning creates inefficiencies and misses opportunities for innovation.
 
+## Before You Hand It Over
+
+Every PRD, spec or task list this skill writes, including a factory `spec.md`, goes through [simplify](../simplify/SKILL.md) before anyone reads it:
+
+1. Open with **Decisions to approve**: each assumption or choice the reader must say yes to, one plain sentence each, before any table. A `STATUS:` line, when the file needs one, stays on line 1 above it. A task list skips this step; its decisions live in the PRD. Say what it does, not its row number ("The job logs in as the shared `swa_readonly` user").
+2. Cut what another doc already says and link to it.
+3. Check the wording against [simplify's writing rules](../simplify/references/writing-rules.md).
+
 ## From PRD to Tasks
 
 When the user has a PRD and wants an implementation task list, follow `references/task-generation.md`. It runs two phases with a user checkpoint between them and writes `.planning/tasks/tasks-[prd-file-name].md`.

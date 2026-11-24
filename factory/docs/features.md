@@ -70,11 +70,11 @@ A build job rides nine places on the belt. A fresh agent does each stage, writes
 
 ### 2.1 Shape: "what are we really making?"
 
-An agent asks you good questions and works out what to build. It uses the `lets-talk-about-it` skill. If the plan depends on something nobody knows yet, it may try a quick throwaway experiment with the `spike` skill first. If the idea is a bad one, it writes `rejection.md` and the job stops as **rejected**.
+An agent asks you good questions and works out what to build. It uses the `lets-talk-about-it` skill. If the plan depends on something nobody knows yet, it may try a quick throwaway experiment with the `spike` skill first. If the idea is a bad one, it writes `rejection.md` and the job stops as **rejected**. Otherwise it rewrites `shape.md` in plain words with `simplify`, with the decisions you need to approve at the top.
 
 ### 2.2 Spec: "write the plan"
 
-An agent writes the plan (`spec.md`) and a list of small tasks, using `prd-mode`. Then the belt **stops and waits for you**.
+An agent writes the plan (`spec.md`) and a list of small tasks, using `prd-mode`, then rewrites the plan and the task list in plain words with `simplify`. The decisions you need to approve come first. Then the belt **stops and waits for you**.
 
 ### 2.3 Approve spec (your button)
 

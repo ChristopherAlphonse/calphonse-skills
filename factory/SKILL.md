@@ -75,8 +75,8 @@ Each stage's agent writes the file named here with the status line first. `JOB a
 
 | Stage | Skill | Writes | Advance when |
 | --- | --- | --- | --- |
-| shape | `lets-talk-about-it`, plus `spike` only if the shape rests on an unknown | `shape.md` with `STATUS: READY`, or `rejection.md` | to `spec`, or `rejected` |
-| spec | `prd-mode`, then its task list | `spec.md`, tasks file under `.planning/tasks/` | **user approves on the board**, then to `build` (this creates the local worktree and branch) |
+| shape | `lets-talk-about-it`, plus `spike` only if the shape rests on an unknown, then `simplify` on `shape.md` (decisions to approve at the top, below the status line) | `shape.md` with `STATUS: READY`, or `rejection.md` | to `spec`, or `rejected` |
+| spec | `prd-mode`, then its task list, then `simplify` on `spec.md` and the tasks file (decisions to approve at the top, below the status line) | `spec.md`, tasks file under `.planning/tasks/` | **user approves on the board**, then to `build` (this creates the local worktree and branch) |
 | build | `swe` plus stack skills, one task at a time, no commits | `build.md` with `STATUS: READY` or `BLOCKED`. Run `JOB progress <id> <done> <total>` after each task | to `gate`, or `needs-human` when blocked |
 | gate | `JOB gate <id>` (a script, not an agent) | `round-N/checks.md` with `GATE: PASS` or `FAIL` | to `review` on pass, `build` on fail |
 | review | see Reviewers | `round-N/review-<name>.md` with `VERDICT: PASS` or `CHANGES`, then `reconcile.md` from `reconcile-reviews` when anything is CHANGES | to `polish` when all pass, else `build` |

@@ -31,8 +31,8 @@ SPEC_FILE = "spec.md"
 HUMAN_STAGES = {"needs-human"}
 TERMINAL = {"ready", "rejected"}
 HINT = {
-    "shape": "lets-talk-about-it -> shape.md (STATUS: READY, or reject with rejection.md)",
-    "spec": "prd-mode -> spec.md and the tasks file, then wait for the user to approve",
+    "shape": "lets-talk-about-it then simplify on shape.md (decisions to approve first, below the STATUS line) -> shape.md (STATUS: READY, or reject with rejection.md)",
+    "spec": "prd-mode then simplify on spec.md and the tasks file (decisions to approve first, below the STATUS line) -> spec.md and the tasks file, then wait for the user to approve",
     "build": "swe plus stack skill, one task at a time -> build.md (STATUS: READY, or STATUS: BLOCKED)",
     "gate": "job gate <id>: it passes the job on, or sends it back to build",
     "review": "reviewers -> round-N/review-<name>.md, reconcile-reviews -> reconcile.md when anything is CHANGES",

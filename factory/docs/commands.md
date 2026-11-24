@@ -136,8 +136,8 @@ State lives in the project, never in this repo.
 
 | Stage | Skill | File it writes | Next move needs |
 | --- | --- | --- | --- |
-| shape | `lets-talk-about-it` | `shape.md` | `STATUS: READY` |
-| spec | `prd-mode` | `spec.md` | your approval on the board |
+| shape | `lets-talk-about-it`, then `simplify` | `shape.md` | `STATUS: READY` |
+| spec | `prd-mode`, then `simplify` | `spec.md` | your approval on the board |
 | build | `swe` plus stack skills | `build.md` | `STATUS: READY`, changes left uncommitted |
 | gate | `bin/job gate` (a script) | `round-N/checks.md` | `GATE: PASS` |
 | review | a `code` reviewer whose skill follows the diff (`code-review-frontend` for TS/JS/React only, `python`, `dotnet`, `aws`), `qa-review`, `test-review`, plus `architecture-review` when the diff calls for it | `round-N/review-<name>.md`, then `reconcile.md` if anything is CHANGES | `VERDICT: PASS` from every reviewer |
