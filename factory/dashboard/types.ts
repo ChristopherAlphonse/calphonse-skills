@@ -79,7 +79,6 @@ export interface View {
   def: BoardDef;
   jobs: Job[];
   openId: string | null;
-  openFile: string | null;
   filter: Filter;
   userZoom: number | null;
   sig: string;

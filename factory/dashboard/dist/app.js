@@ -1,9 +1,6 @@
 // Generated from app.ts by build.mjs. Do not edit.
 import { el, chip } from "/static/dom.js";
-import { renderMarkdown } from "/static/markdown.js";
-import { attachAnnotate } from "/static/annotate.js";
 import { openEditor,                   } from "/static/editor.js";
-import { enhanceMermaid } from "/static/mermaid.js";
              
            
          
@@ -168,7 +165,6 @@ let active = "";
 const editors = new Map                                         ();
 let activeEditor                = null;
 let scale = 1;
-let loadToken = 0;
 
 
 let sideCollapsed = false;
@@ -438,12 +434,12 @@ function editorTab(key        , h                                 )             
   return t;
 }
 
-function focusEditor(key        , lines                   )       {
+function focusEditor(key        )       {
   const h = editors.get(key);
   if (!h) return;
   activeEditor = key;
   renderTabs();
-  h.show(lines);
+  h.show();
 }
 
 // The tab icon follows the active board; an amber dot and a count in the title mean something waits on you.
@@ -778,21 +774,17 @@ function jobView(j     )                {
   const where = v.def.place(j);
   const bits = v.def.statusBits(j).filter((r) => r.length);
   const files = j.files.map((f) => {
-    const r = el("button", `lrow${f === v.openFile ? " on" : ""}`);
+    const r = el("button", `lrow${editors.has(editorKey(v.def.id, j.id, f)) ? " on" : ""}`);
     r.type = "button";
+    r.title = "Open in the editor";
     const t = el("div", "rt");
     t.append(el("div", "rn", f));
     r.append(el("span", "dot file"), t);
-    r.onclick = () => {
-      v.openFile = f;
-      renderPanel();
-    };
+    r.onclick = () => void openFileEditor(f);
     return r;
   });
   const fileList = el("div", "list");
   fileList.append(...files);
-  const body = el("div");
-  body.id = "dbody";
   return [
     sec(
       ph,
@@ -813,7 +805,7 @@ function jobView(j     )                {
       : []),
     skillsSection(j),
     noteSection(j),
-    sec(heading("Files", j.files.length), fileList, body),
+    sec(heading("Files", j.files.length), fileList),
   ];
 }
 
@@ -821,44 +813,6 @@ function renderPanel()       {
   if (document.activeElement?.tagName === "TEXTAREA") return;
   const j = openJob();
   $("panel").replaceChildren(...(j ? jobView(j) : overview()));
-  if (j) void loadFile();
-}
-
-function showBody(className        , content               )       {
-  const body = document.getElementById("dbody");
-  if (!body) return;
-  body.className = className;
-  if (typeof content === "string") body.textContent = content;
-  else body.replaceChildren(content);
-}
-
-async function loadFile()                {
-  const token = ++loadToken;
-  const v = view();
-  const name = v.openFile;
-  if (!name) {
-    const log = openJob()?.activity ?? [];
-    return showBody(
-      "raw",
-      log.length
-        ? log
-            .toReversed()
-            .map((a) => `${a.ts.slice(11, 19)}  ${a.text}`)
-            .join("\n")
-        : "No files or notes yet.",
-    );
-  }
-  const file = await readFile(v.def.id, String(v.openId), name);
-  if (token !== loadToken) return;
-  if (file && /\.(md|markdown)$/i.test(name)) {
-    const page = document.createDocumentFragment();
-    const bar = el("div", "fbar");
-    bar.append(button("Open editor", "", () => void openFileEditor()));
-    const body = renderMarkdown(file.text);
-    void enhanceMermaid(body);
-    page.append(bar, body);
-    showBody("md", page);
-  } else showBody("raw", file?.text ?? "not found");
 }
 
                                                
@@ -879,21 +833,20 @@ const SAVE_ERRORS                         = {
   400: "That edit was refused.",
 };
 
-async function openFileEditor(select                   )                {
+const editorKey = (board        , job        , name        )         => `${board}/${job}/${name}`;
+
+async function openFileEditor(name        )                {
   const v = view();
   const board = v.def.id;
   const job = String(v.openId);
-  const name = v.openFile;
-  if (!name) return;
-  const key = `${board}/${job}/${name}`;
-  if (editors.has(key)) return focusEditor(key, select);
+  const key = editorKey(board, job, name);
+  if (editors.has(key)) return focusEditor(key);
   const file = await readFile(board, job, name);
   if (!file) return;
   const handle = openEditor({
     job,
     name,
     ...file,
-    select,
     load: () => readFile(board, job, name),
     save: async (text, base) => {
       try {
@@ -920,19 +873,17 @@ async function openFileEditor(select                   )                {
     },
   });
   editors.set(key, { ...handle, name });
-  focusEditor(key, select);
+  focusEditor(key);
 }
 
 function openJobPanel(id        )       {
   const v = view();
   v.openId = id;
-  v.openFile = openJob()?.files.at(-1) ?? null;
   document.body.classList.add("with-panel");
   renderAll();
 }
 function closeJob()       {
   view().openId = null;
-  loadToken++;
   renderAll();
 }
 
@@ -1016,17 +967,6 @@ $("ask-form").onsubmit = (e) => {
   composer.style.height = "auto";
   void ask(question);
 };
-
-attachAnnotate(
-  () => {
-    const v = view();
-    return v.openId && v.openFile
-      ? { job: String(v.openId), file: v.openFile }
-      : null;
-  },
-  (text) => void ask(text),
-  (r) => void openFileEditor([r.l1, r.l2]),
-);
 
 async function ask(question        )                  {
   const v = view();
@@ -1247,7 +1187,6 @@ async function start()                {
           def: { ...def, id: b.id, label: b.label },
           jobs: [],
           openId: null,
-          openFile: null,
           filter: "all",
           userZoom: null,
           sig: "",

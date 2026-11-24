@@ -2,7 +2,6 @@
 import { el } from "/static/dom.js";
 import { renderMarkdown } from "/static/markdown.js";
 import { enhanceMermaid } from "/static/mermaid.js";
-import { commentText } from "/static/annotate.js";
 
                                                       
                                                                                    
@@ -11,8 +10,6 @@ import { commentText } from "/static/annotate.js";
                
                
                
-                                                                    
-                            
                                        
                                                             
                                                                    
@@ -28,7 +25,7 @@ import { commentText } from "/static/annotate.js";
                             
                     
                        
-                                           
+                   
                    
                                                              
                            
@@ -38,6 +35,16 @@ const GUARDED = /^[A-Z]{3,}:.*$/gm;
 const POLL_MS = 3000;
 const PREVIEW_MS = 150;
 const MAX_QUOTE = 600;
+
+/** The text sent to the agent. The quote is the anchor; the line range is a hint that can drift after an edit. */
+function commentText(job        , file        , l1        , l2        , quote        , note        )         {
+  return [
+    `Comment on .planning/factory/jobs/${job}/${file}, lines ${label(l1, l2)} (job ${job}):`,
+    `> ${quote}`,
+    note,
+    "Re-find the quoted text in the file before acting, because line numbers may have moved.",
+  ].join("\n");
+}
 
 const guarded = (text        )           => text.match(GUARDED) ?? [];
 const lineCount = (text        )         => text.split("\n").length;
@@ -54,7 +61,7 @@ function btn(text        , cls        , onclick            )                    
 export function openEditor(d            )               {
   let base = d.base;
   let saved = d.text;
-  let sel                   = d.select ?? [1, 1];
+  let sel                   = [1, 1];
   let anchor = sel[0];
   let shownLines = 0;
   let wasDirty = false;
@@ -227,7 +234,7 @@ export function openEditor(d            )               {
     threads.unshift(thread);
     note.value = "";
     paintThreads();
-    thread.answer = await d.comment(commentText({ job: d.job, file: d.name }, { l1, l2, quote }, text));
+    thread.answer = await d.comment(commentText(d.job, d.name, l1, l2, quote, text));
     paintThreads();
   }
 
@@ -307,13 +314,9 @@ export function openEditor(d            )               {
     hide: () => {
       root.hidden = true;
     },
-    show: (lines) => {
+    show: () => {
       root.hidden = false;
-      if (lines) {
-        selectLines(lines[0], lines[1], true);
-        area.scrollTop = Math.max(0, (lines[0] - 3) * 20);
-        gutter.scrollTop = area.scrollTop;
-      } else area.focus();
+      area.focus();
     },
   };
 }

@@ -1,7 +1,6 @@
 import { el } from "/static/dom.js";
 import { renderMarkdown } from "/static/markdown.js";
 import { enhanceMermaid } from "/static/mermaid.js";
-import { commentText } from "/static/annotate.js";
 
 export type Snapshot = { text: string; base: string };
 export type SaveResult = { ok: true; base: string } | { ok: false; error: string };
@@ -10,8 +9,6 @@ export type EditorDeps = {
   name: string;
   text: string;
   base: string;
-  /** Lines (1-based, inclusive) to select when the editor opens. */
-  select?: [number, number];
   load: () => Promise<Snapshot | null>;
   save: (text: string, base: string) => Promise<SaveResult>;
   /** Sends a comment to the agent and resolves with its answer. */
@@ -27,7 +24,7 @@ export type EditorDeps = {
 export type EditorHandle = {
   root: HTMLElement;
   dirty: () => boolean;
-  show: (lines?: [number, number]) => void;
+  show: () => void;
   hide: () => void;
   /** Close it, asking first when there are unsaved edits. */
   requestClose: () => void;
@@ -37,6 +34,16 @@ const GUARDED = /^[A-Z]{3,}:.*$/gm;
 const POLL_MS = 3000;
 const PREVIEW_MS = 150;
 const MAX_QUOTE = 600;
+
+/** The text sent to the agent. The quote is the anchor; the line range is a hint that can drift after an edit. */
+function commentText(job: string, file: string, l1: number, l2: number, quote: string, note: string): string {
+  return [
+    `Comment on .planning/factory/jobs/${job}/${file}, lines ${label(l1, l2)} (job ${job}):`,
+    `> ${quote}`,
+    note,
+    "Re-find the quoted text in the file before acting, because line numbers may have moved.",
+  ].join("\n");
+}
 
 const guarded = (text: string): string[] => text.match(GUARDED) ?? [];
 const lineCount = (text: string): number => text.split("\n").length;
@@ -53,7 +60,7 @@ function btn(text: string, cls: string, onclick: () => void): HTMLButtonElement 
 export function openEditor(d: EditorDeps): EditorHandle {
   let base = d.base;
   let saved = d.text;
-  let sel: [number, number] = d.select ?? [1, 1];
+  let sel: [number, number] = [1, 1];
   let anchor = sel[0];
   let shownLines = 0;
   let wasDirty = false;
@@ -226,7 +233,7 @@ export function openEditor(d: EditorDeps): EditorHandle {
     threads.unshift(thread);
     note.value = "";
     paintThreads();
-    thread.answer = await d.comment(commentText({ job: d.job, file: d.name }, { l1, l2, quote }, text));
+    thread.answer = await d.comment(commentText(d.job, d.name, l1, l2, quote, text));
     paintThreads();
   }
 
@@ -306,13 +313,9 @@ export function openEditor(d: EditorDeps): EditorHandle {
     hide: () => {
       root.hidden = true;
     },
-    show: (lines) => {
+    show: () => {
       root.hidden = false;
-      if (lines) {
-        selectLines(lines[0], lines[1], true);
-        area.scrollTop = Math.max(0, (lines[0] - 3) * 20);
-        gutter.scrollTop = area.scrollTop;
-      } else area.focus();
+      area.focus();
     },
   };
 }
