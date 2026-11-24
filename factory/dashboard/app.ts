@@ -412,7 +412,7 @@ function renderTabs(): void {
     }),
   );
   $("meta").textContent =
-    `${v.jobs.length} jobs, updated ${new Date().toLocaleTimeString()}`;
+    `updated ${new Date().toLocaleTimeString()}`;
   showIcon();
 }
 
@@ -668,7 +668,6 @@ function overview(): HTMLElement[] {
       el("p", "pd", v.def.intro),
       el("div", "gap"),
       stats(
-        [v.jobs.length, "jobs"],
         [waiting.length, "need you"],
         [v.jobs.filter(finished).length, "done"],
       ),
@@ -691,7 +690,7 @@ function overview(): HTMLElement[] {
         ]
       : []),
     sec(
-      heading("Jobs", shown.length),
+      heading("Jobs"),
       shown.length
         ? jobList
         : el(
