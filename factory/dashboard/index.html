@@ -37,8 +37,14 @@
         <div id="ask-opts">
           <div id="engines" role="radiogroup" aria-label="CLI that answers"></div>
           <span class="grow"></span>
-          <label class="sel" id="model-wrap" title="Model for this CLI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.200 1.800L12 17l-1.800-5.200L5 10l5.200-1.800z"/><path d="M19 16v4M17 18h4"/></svg><select class="pill flat" id="model"><option value="">model</option></select></label>
-          <label class="sel" title="Effort"><svg id="effort-icon" viewBox="0 0 24 24" aria-hidden="true"><rect class="b" x="3" y="15" width="3.500" height="6" rx="1"/><rect class="b" x="8.500" y="11" width="3.500" height="10" rx="1"/><rect class="b" x="14" y="7" width="3.500" height="14" rx="1"/><rect class="b" x="19.500" y="3" width="3.500" height="18" rx="1"/></svg><select class="pill flat" id="effort"><option value="">effort</option><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select></label>
+          <div class="menu" id="model-wrap">
+            <button class="pill flat" id="model-btn" type="button" aria-haspopup="listbox" aria-expanded="false" title="Model for this CLI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16v4M17 18h4"/></svg><span id="model-label">model</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="pop" id="model-pop" role="listbox" aria-label="Model" hidden></div>
+          </div>
+          <div class="menu" id="effort-wrap">
+            <button class="pill flat" id="effort-btn" type="button" aria-haspopup="listbox" aria-expanded="false" title="Effort"><svg id="effort-icon" viewBox="0 0 24 24" aria-hidden="true"><rect class="b" x="3" y="15" width="3.5" height="6" rx="1"/><rect class="b" x="8.5" y="11" width="3.5" height="10" rx="1"/><rect class="b" x="14" y="7" width="3.5" height="14" rx="1"/><rect class="b" x="19.5" y="3" width="3.5" height="18" rx="1"/></svg><span id="effort-label">effort</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="pop" id="effort-pop" role="listbox" aria-label="Effort" hidden></div>
+          </div>
           <button id="ask-send" type="submit" aria-label="Send">↑</button>
         </div>
       </form>

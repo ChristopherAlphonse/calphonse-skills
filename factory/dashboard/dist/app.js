@@ -661,7 +661,7 @@ $("ask-form").onsubmit = async (e) => {
   $("ask-q").textContent = `${v.def.label}: ${question}`;
   bubble("me", question);
   try {
-    const body = { board: v.def.id, id: v.openId ?? "", question, session: v.session, engine, model: ($("model")                     ).value, effort: ($("effort")                     ).value };
+    const body = { board: v.def.id, id: v.openId ?? "", question, session: v.session, engine, model: menus.model.value, effort: menus.effort.value };
     const res = await api("/api/ask", { method: "POST", body: JSON.stringify(body) });
     const out                                                        = await res.json();
     v.session = out.session ?? v.session;
@@ -691,26 +691,92 @@ function showEngine()       {
       return b;
     }),
   );
-  const model = $("model")                     ;
-  const keep = model.value;
-  model.replaceChildren(
-    ...["", ...(modelChoices[engine] ?? [])].map((m) => {
-      const o = el("option", "", m || "model");
-      o.value = m;
-      return o;
-    }),
-  );
-  model.value = (modelChoices[engine] ?? []).includes(keep) ? keep : "";
+  menus.model.options = (modelChoices[engine] ?? []).map((m) => ({ value: m, label: m }));
+  if (!menus.model.options.some((o) => o.value === menus.model.value)) menus.model.value = "";
+  menus.model.render();
   $("model-wrap").hidden = !modelChoices[engine]?.length;
 }
 
 const EFFORT_BARS                         = { "": 0, low: 1, medium: 2, high: 3, xhigh: 4, max: 4 };
+
+// A popup menu that opens above its button. Our own markup, so it never flickers the way a native select does.
+                
+                
+                                              
+                     
+ 
+const openMenus = new Set            ();
+
+function makeMenu(id        , placeholder        , options                                    , onPick            )       {
+  const btn = $(`${id}-btn`);
+  const pop = $(`${id}-pop`);
+  const label = $(`${id}-label`);
+  const menu       = { value: "", options, render };
+  const close = ()       => {
+    pop.hidden = true;
+    btn.setAttribute("aria-expanded", "false");
+    openMenus.delete(close);
+  };
+  function render()       {
+    const current = menu.options.find((o) => o.value === menu.value);
+    label.textContent = current && menu.value ? current.label : placeholder;
+    pop.replaceChildren(
+      ...[{ value: "", label: "Default" }, ...menu.options].map((o) => {
+        const item = el("button", `popitem${o.value === menu.value ? " on" : ""}`);
+        item.type = "button";
+        item.setAttribute("role", "option");
+        item.setAttribute("aria-selected", String(o.value === menu.value));
+        item.append(el("span", "", o.label), el("span", "tick", o.value === menu.value ? "✓" : ""));
+        item.onclick = () => {
+          menu.value = o.value;
+          render();
+          close();
+          onPick();
+        };
+        return item;
+      }),
+    );
+  }
+  btn.onclick = (e) => {
+    e.stopPropagation();
+    const wasOpen = !pop.hidden;
+    for (const c of [...openMenus]) c();
+    if (wasOpen) return;
+    render();
+    pop.hidden = false;
+    btn.setAttribute("aria-expanded", "true");
+    openMenus.add(close);
+  };
+  render();
+  return menu;
+}
+
 const showEffort = ()       => {
-  const level = EFFORT_BARS[($("effort")                     ).value] ?? 0;
+  const level = EFFORT_BARS[menus.effort.value] ?? 0;
   document.querySelectorAll("#effort-icon .b").forEach((bar, i) => bar.classList.toggle("on", i < level));
 };
-$("effort").onchange = showEffort;
+const menus = {
+  model: makeMenu("model", "model", [], () => undefined),
+  effort: makeMenu(
+    "effort",
+    "effort",
+    [
+      { value: "low", label: "Low" },
+      { value: "medium", label: "Medium" },
+      { value: "high", label: "High" },
+      { value: "xhigh", label: "Extra high" },
+      { value: "max", label: "Max" },
+    ],
+    () => showEffort(),
+  ),
+};
 showEffort();
+document.addEventListener("pointerdown", (e) => {
+  if (!(e.target               ).closest(".menu")) for (const c of [...openMenus]) c();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") for (const c of [...openMenus]) c();
+});
 
 // ---- chrome: zoom, panel, sidebar, drop zones
 $("zoom-in").onclick = () => {
