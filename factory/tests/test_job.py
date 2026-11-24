@@ -1114,6 +1114,49 @@ class TestServer(Factory):
         self.assertEqual(self.http("GET", "/api/build/file?job=../a&name=spec.md")[0], 404)
         self.assertEqual(self.http("GET", "/api/build/file?job=a&name=../../../../../../etc/hosts")[0], 404)
 
+    def base_of(self, name="spec.md", job="a"):
+        st, _, headers = self.http_full("GET", f"/api/build/file?job={job}&name={name}")
+        self.assertEqual(st, 200)
+        return headers["X-Base"]
+
+    def save(self, text, name="spec.md", job="a", base=None, **kw):
+        body = {"id": job, "name": name, "base": base or self.base_of(name, job), "text": text, **kw}
+        return self.http("POST", "/api/build/save", body=body)[0]
+
+    def test_save_replaces_a_whole_file_or_a_line_range(self):
+        self.new_spec("a")
+        self.wf("a", "spec.md", "# spec\n\none\ntwo\nthree\n")
+        self.assertEqual(self.save("ONE\nTWO", l1=3, l2=4), 200)
+        self.assertEqual((self.state / "jobs" / "a" / "spec.md").read_text(), "# spec\n\nONE\nTWO\nthree\n")
+        self.assertEqual(self.save("# all new\n"), 200)
+        self.assertEqual((self.state / "jobs" / "a" / "spec.md").read_text(), "# all new\n")
+
+    def test_save_refuses_an_edit_made_against_an_old_copy(self):
+        self.new_spec("a")
+        old = self.base_of()
+        self.wf("a", "spec.md", "# agent changed it\n")
+        self.assertEqual(self.save("# mine\n", base=old), 409)
+        self.assertEqual((self.state / "jobs" / "a" / "spec.md").read_text(), "# agent changed it\n")
+
+    def test_save_leaves_the_lines_that_steer_the_stage_machine_alone(self):
+        self.new_spec("a", spec=False)
+        self.wf("a", "spec.md", "STATUS: READY\n\nbody\n")
+        self.assertEqual(self.save("STATUS: DONE\n\nbody\n"), 422)
+        self.assertEqual(self.save("DONE", l1=1, l2=1), 422)
+        self.assertEqual(self.save("STATUS: READY\n\nnew body\n"), 200)
+
+    def test_save_is_confined_to_markdown_in_a_job_and_needs_the_session(self):
+        self.new_spec("a")
+        self.ok("create", "b", "T")
+        self.wf("b", "secret.md", "other\n")
+        self.wf("a", "notes.txt", "t\n")
+        base = self.base_of()
+        for name, job in (("../b/secret.md", "a"), ("job.json", "a"), ("notes.txt", "a"), ("spec.md", "zzz")):
+            self.assertEqual(self.save("x", name=name, job=job, base=base), 404, (name, job))
+        self.assertEqual(self.save("x", l1=5, l2=9), 400)
+        self.assertEqual(self.http("POST", "/api/build/save", cookie=False, body={"id": "a", "name": "spec.md", "base": base, "text": "x"})[0], 403)
+        self.assertEqual(self.http("POST", "/api/build/save", xfactory=False, body={"id": "a", "name": "spec.md", "base": base, "text": "x"})[0], 403)
+
     def test_approve_over_http(self):
         self.new_spec("a")
         self.assertEqual(self.http("POST", "/api/build/approve", body={"id": "a"})[0], 200)

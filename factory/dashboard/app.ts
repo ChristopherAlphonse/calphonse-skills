@@ -1,27 +1,72 @@
 import { el, chip } from "/static/dom.js";
 import { renderMarkdown } from "/static/markdown.js";
-import type { BoardDef, Filter, Job, Needs, Stage, View } from "/static/types.js";
+import { attachAnnotate } from "/static/annotate.js";
+import type {
+  BoardDef,
+  Filter,
+  Job,
+  Needs,
+  Stage,
+  View,
+} from "/static/types.js";
 
 const BUILD: Stage[] = [
   { id: "shape", label: "Shape", blurb: "Decide what to build, or reject it." },
   { id: "spec", label: "Spec", blurb: "Write the plan. You approve it here." },
-  { id: "build", label: "Build", blurb: "Write the code, then the checks run." },
-  { id: "review", label: "Review", blurb: "Independent reviewers read the change." },
+  {
+    id: "build",
+    label: "Build",
+    blurb: "Write the code, then the checks run.",
+  },
+  {
+    id: "review",
+    label: "Review",
+    blurb: "Independent reviewers read the change.",
+  },
   { id: "polish", label: "Polish", blurb: "Strip comments and workarounds." },
   { id: "prove", label: "Prove", blurb: "Run it for real and write the UAT." },
-  { id: "ship", label: "Ship", blurb: "PR body and commit message. You commit." },
+  {
+    id: "ship",
+    label: "Ship",
+    blurb: "PR body and commit message. You commit.",
+  },
   { id: "ready", label: "Ready", blurb: "Committed locally." },
 ];
 const REVIEW: Stage[] = [
-  { id: "scope", label: "Scope", blurb: "Find the diff and the repo's own checks." },
-  { id: "review", label: "Review", blurb: "Reviewers read the diff in parallel." },
-  { id: "reconcile", label: "Reconcile", blurb: "Merge the reviews into one ranked list." },
-  { id: "verify", label: "Verify", blurb: "Rerun the evidence, drop what fails." },
-  { id: "report", label: "Report", blurb: "Write the report and paste-ready comments." },
+  {
+    id: "scope",
+    label: "Scope",
+    blurb: "Find the diff and the repo's own checks.",
+  },
+  {
+    id: "review",
+    label: "Review",
+    blurb: "Reviewers read the diff in parallel.",
+  },
+  {
+    id: "reconcile",
+    label: "Reconcile",
+    blurb: "Merge the reviews into one ranked list.",
+  },
+  {
+    id: "verify",
+    label: "Verify",
+    blurb: "Rerun the evidence, drop what fails.",
+  },
+  {
+    id: "report",
+    label: "Report",
+    blurb: "Write the report and paste-ready comments.",
+  },
   { id: "ready", label: "Ready", blurb: "Report written. Nothing was posted." },
 ];
-const verdicts = (j: Job) => Object.entries(j.reviews).map(([name, v]) => ({ text: v ? `${name} ${v}` : `${name} ...`, cls: v ?? "" }));
-const stack = (j: Job) => (j.stack?.length ? [j.stack.map((k) => ({ text: k }))] : []);
+const verdicts = (j: Job) =>
+  Object.entries(j.reviews).map(([name, v]) => ({
+    text: v ? `${name} ${v}` : `${name} ...`,
+    cls: v ?? "",
+  }));
+const stack = (j: Job) =>
+  j.stack?.length ? [j.stack.map((k) => ({ text: k }))] : [];
 
 const DEFS: Record<string, Omit<BoardDef, "id" | "label">> = {
   build: {
@@ -32,13 +77,26 @@ const DEFS: Record<string, Omit<BoardDef, "id" | "label">> = {
     columns: 4,
     homeStage: "build",
     doneLabel: "Ready to land",
-    intro: "Local only. Nothing is pushed, and nothing is committed until you click.",
+    intro:
+      "Local only. Nothing is pushed, and nothing is committed until you click.",
     kind: "Build job",
-    stats: (j) => [[!j.round ? "-" : `${j.round}/${j.round_limit}`, "round"], [j.progress?.[1] ? `${j.progress[0]}/${j.progress[1]}` : "-", "tasks"], [j.files.length, "files"]],
+    stats: (j) => [
+      [!j.round ? "-" : `${j.round}/${j.round_limit}`, "round"],
+      [j.progress?.[1] ? `${j.progress[0]}/${j.progress[1]}` : "-", "tasks"],
+      [j.files.length, "files"],
+    ],
     place: (j) => j.branch ?? j.worktree,
-    needsPath: (j) => (j.can_approve ? "approve" : j.can_commit ? "commit" : "unblock"),
+    needsPath: (j) =>
+      j.can_approve ? "approve" : j.can_commit ? "commit" : "unblock",
     statusBits: (j) => [
-      [...(j.stage === "gate" || j.gate ? [{ text: `gate ${j.gate || "pending"}`, cls: j.gate || "" }] : []), ...(j.commit ? [{ text: `committed locally ${j.commit.slice(0, 7)}`, cls: "PASS" }] : [])],
+      [
+        ...(j.stage === "gate" || j.gate
+          ? [{ text: `gate ${j.gate || "pending"}`, cls: j.gate || "" }]
+          : []),
+        ...(j.commit
+          ? [{ text: `committed locally ${j.commit.slice(0, 7)}`, cls: "PASS" }]
+          : []),
+      ],
       ...stack(j),
       ...(j.stage === "review" ? [verdicts(j)] : []),
     ],
@@ -53,15 +111,36 @@ const DEFS: Record<string, Omit<BoardDef, "id" | "label">> = {
     doneLabel: "Reported",
     intro: "Read-only. Nothing is edited, committed, pushed or posted.",
     kind: "Review",
-    stats: (j) => [[j.report?.FINDINGS ?? "-", "findings"], [j.report?.BLOCKERS ?? "-", "blockers"], [j.files.length, "files"]],
-    place: (j) => (j.review ? `${j.review.base_ref} .. ${j.review.head_ref}` : (j.branch ?? j.worktree)),
+    stats: (j) => [
+      [j.report?.FINDINGS ?? "-", "findings"],
+      [j.report?.BLOCKERS ?? "-", "blockers"],
+      [j.files.length, "files"],
+    ],
+    place: (j) =>
+      j.review
+        ? `${j.review.base_ref} .. ${j.review.head_ref}`
+        : (j.branch ?? j.worktree),
     needsPath: () => "unblock",
     statusBits: (j) => [
       ...stack(j),
       ...(j.report?.FINDINGS !== undefined
-        ? [[{ text: `${j.report.FINDINGS} findings` }, ...(j.report.BLOCKERS !== undefined ? [{ text: `${j.report.BLOCKERS} blockers`, cls: Number(j.report.BLOCKERS) ? "FAIL" : "PASS" }] : [])]]
+        ? [
+            [
+              { text: `${j.report.FINDINGS} findings` },
+              ...(j.report.BLOCKERS !== undefined
+                ? [
+                    {
+                      text: `${j.report.BLOCKERS} blockers`,
+                      cls: Number(j.report.BLOCKERS) ? "FAIL" : "PASS",
+                    },
+                  ]
+                : []),
+            ],
+          ]
         : []),
-      ...(Object.values(j.reviews).some(Boolean) || j.stage === "review" ? [verdicts(j)] : []),
+      ...(Object.values(j.reviews).some(Boolean) || j.stage === "review"
+        ? [verdicts(j)]
+        : []),
     ],
   },
 };
@@ -84,6 +163,12 @@ let openTabs: string[] = [];
 let active = "";
 let scale = 1;
 let loadToken = 0;
+
+// The file shown in the panel, and an edit in progress on it. `base` is the hash the edit started from; the server refuses a save if the file has moved on.
+type Loaded = { job: string; name: string; text: string; base: string };
+type Edit = { job: string; name: string; l1?: number; l2?: number; text: string; base: string; error?: string };
+let loaded: Loaded | null = null;
+let edit: Edit | null = null;
 let sideCollapsed = false;
 
 const view = (): View => {
@@ -91,16 +176,25 @@ const view = (): View => {
   if (!v) throw new Error("no active board");
   return v;
 };
-const openJob = (): Job | undefined => view().jobs.find((j) => j.id === view().openId);
+const openJob = (): Job | undefined =>
+  view().jobs.find((j) => j.id === view().openId);
 
 function save(): void {
   try {
-    localStorage.setItem(STORE, JSON.stringify({ order, openTabs, active, sideCollapsed }));
+    localStorage.setItem(
+      STORE,
+      JSON.stringify({ order, openTabs, active, sideCollapsed }),
+    );
   } catch {
     // private window or blocked storage: the layout just is not remembered
   }
 }
-function restore(): { order: string[]; openTabs: string[]; active: string; sideCollapsed: boolean } | null {
+function restore(): {
+  order: string[];
+  openTabs: string[];
+  active: string;
+  sideCollapsed: boolean;
+} | null {
   try {
     return JSON.parse(localStorage.getItem(STORE) ?? "null");
   } catch {
@@ -109,11 +203,21 @@ function restore(): { order: string[]; openTabs: string[]; active: string; sideC
 }
 
 const api = (path: string, opts: { method?: string; body?: string } = {}) =>
-  fetch(path, { ...opts, credentials: "same-origin", headers: { "X-Factory": "1" } });
+  fetch(path, {
+    ...opts,
+    credentials: "same-origin",
+    headers: { "X-Factory": "1" },
+  });
 
-async function post(action: string, body: Record<string, unknown>): Promise<void> {
+async function post(
+  action: string,
+  body: Record<string, unknown>,
+): Promise<void> {
   try {
-    const res = await api(`/api/${active}/${action}`, { method: "POST", body: JSON.stringify(body) });
+    const res = await api(`/api/${active}/${action}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
     if (!res.ok) $("meta").textContent = `Refused: ${action} (${res.status})`;
   } catch {
     $("meta").textContent = "offline";
@@ -121,12 +225,29 @@ async function post(action: string, body: Record<string, unknown>): Promise<void
   await pollOne(active);
 }
 
-const stageOf = (v: View, j: Job): string => (j.stage === "needs-human" ? (j.parked_from ?? v.def.homeStage) : j.stage === "gate" ? "build" : j.stage === "rejected" ? "ready" : j.stage);
+const stageOf = (v: View, j: Job): string =>
+  j.stage === "needs-human"
+    ? (j.parked_from ?? v.def.homeStage)
+    : j.stage === "gate"
+      ? "build"
+      : j.stage === "rejected"
+        ? "ready"
+        : j.stage;
 const finished = (j: Job): boolean => ["ready", "rejected"].includes(j.stage);
-const visible = (v: View, j: Job): boolean => (v.filter === "needs" ? j.needs_human : v.filter === "done" ? finished(j) : true);
-const waitingCount = (v: View): number => v.jobs.filter((j) => j.needs_human).length;
+const visible = (v: View, j: Job): boolean =>
+  v.filter === "needs"
+    ? j.needs_human
+    : v.filter === "done"
+      ? finished(j)
+      : true;
+const waitingCount = (v: View): number =>
+  v.jobs.filter((j) => j.needs_human).length;
 
-function button(label: string, cls: string, onclick: () => void): HTMLButtonElement {
+function button(
+  label: string,
+  cls: string,
+  onclick: () => void,
+): HTMLButtonElement {
   const b = el("button", cls, label);
   b.type = "button";
   b.onclick = onclick;
@@ -151,7 +272,10 @@ function renderSidebar(): void {
     ...order.map((id) => {
       const v = views.get(id);
       if (!v) return el("span");
-      const r = el("button", `boardrow${id === active ? " on" : ""}${openTabs.includes(id) ? " open" : ""}`);
+      const r = el(
+        "button",
+        `boardrow${id === active ? " on" : ""}${openTabs.includes(id) ? " open" : ""}`,
+      );
       r.type = "button";
       r.draggable = true;
       r.dataset.board = id;
@@ -202,7 +326,9 @@ function dragEnd(e: DragEvent): void {
 }
 function dropIndex(x: number): number {
   const tabs = [...$("boardtabs").querySelectorAll<HTMLElement>(".btab")];
-  const i = tabs.findIndex((t) => x < t.getBoundingClientRect().left + t.offsetWidth / 2);
+  const i = tabs.findIndex(
+    (t) => x < t.getBoundingClientRect().left + t.offsetWidth / 2,
+  );
   return i < 0 ? tabs.length : i;
 }
 function dropOnTabs(e: DragEvent): void {
@@ -265,7 +391,11 @@ function renderTabs(): void {
   );
   const v = view();
   const done = v.jobs.filter(finished).length;
-  const defs: [Filter, string, number, string][] = [["all", "Pipeline", 0, ""], ["needs", "Needs you", waitingCount(v), ""], ["done", v.def.doneLabel, done, "ok"]];
+  const defs: [Filter, string, number, string][] = [
+    ["all", "Pipeline", 0, ""],
+    ["needs", "Needs you", waitingCount(v), ""],
+    ["done", v.def.doneLabel, done, "ok"],
+  ];
   $("filters").replaceChildren(
     ...defs.map(([id, label, n, cls]) => {
       const b = button(label, `tab${v.filter === id ? " on" : ""}`, () => {
@@ -276,7 +406,8 @@ function renderTabs(): void {
       return b;
     }),
   );
-  $("meta").textContent = `${v.jobs.length} jobs, updated ${new Date().toLocaleTimeString()}`;
+  $("meta").textContent =
+    `${v.jobs.length} jobs, updated ${new Date().toLocaleTimeString()}`;
   showIcon();
 }
 
@@ -285,21 +416,28 @@ function showIcon(): void {
   const waiting = [...views.values()].reduce((n, v) => n + waitingCount(v), 0);
   const href = `/favicon-${active || "factory"}.svg?dot=${waiting ? 1 : 0}`;
   const link = document.getElementById("favicon");
-  if (link && link.getAttribute("href") !== href) link.setAttribute("href", href);
+  if (link && link.getAttribute("href") !== href)
+    link.setAttribute("href", href);
   document.title = `${waiting ? `(${waiting}) ` : ""}Factory${active ? ` · ${view().def.label}` : ""}`;
 }
 
 // ---- canvas
 function node(v: View, s: Stage, jobs: Job[]): HTMLElement {
   const hold = jobs.some((j) => j.needs_human);
-  const n = el("section", `node${jobs.length ? " lit" : ""}${hold ? " hold" : ""}`);
+  const n = el(
+    "section",
+    `node${jobs.length ? " lit" : ""}${hold ? " hold" : ""}`,
+  );
   n.dataset.stage = s.id;
   const h = el("h3", "", s.label);
   h.append(el("span", "", jobs.length ? String(jobs.length) : ""));
   const list = el("div", "jobs");
   for (const j of jobs) {
     const bad = Number(j.report?.BLOCKERS) > 0 || j.gate === "FAIL";
-    const c = el("button", `jobchip${j.needs_human ? " hold" : ""}${bad ? " FAIL" : ""}${j.id === v.openId ? " on" : ""}`);
+    const c = el(
+      "button",
+      `jobchip${j.needs_human ? " hold" : ""}${bad ? " FAIL" : ""}${j.id === v.openId ? " on" : ""}`,
+    );
     c.type = "button";
     c.append(el("i"), el("span", "", j.title));
     c.onclick = () => openJobPanel(j.id);
@@ -313,7 +451,15 @@ function renderCanvas(): void {
   const v = view();
   const mine = v.jobs.filter((j) => visible(v, j));
   const nodes = el("div", `nodes cols${v.def.columns}`);
-  nodes.append(...v.def.stages.map((s) => node(v, s, mine.filter((j) => stageOf(v, j) === s.id))));
+  nodes.append(
+    ...v.def.stages.map((s) =>
+      node(
+        v,
+        s,
+        mine.filter((j) => stageOf(v, j) === s.id),
+      ),
+    ),
+  );
   const lane = el("div", "lane");
   lane.append(el("div", "rowlabel", v.def.lane), nodes);
   $("lanes").replaceChildren(lane);
@@ -337,7 +483,11 @@ function applyScale(): void {
   rowsEl.style.transform = "none";
   const w = lanes.offsetWidth;
   const h = lanes.offsetHeight;
-  const fit = Math.min(1, (canvas.clientWidth - 56) / w, (canvas.clientHeight - 200) / h);
+  const fit = Math.min(
+    1,
+    (canvas.clientWidth - 56) / w,
+    (canvas.clientHeight - 200) / h,
+  );
   scale = v.userZoom ?? Math.max(0.3, fit);
   rowsEl.style.transform = `scale(${scale})`;
   $("stage").style.width = `${w * scale}px`;
@@ -366,9 +516,18 @@ function drawWires(): void {
   const svg = $("wires");
   const base = $("lanes").getBoundingClientRect();
   const ns = "http://www.w3.org/2000/svg";
-  const at = (r: DOMRect) => ({ l: (r.left - base.left) / scale, r: (r.right - base.left) / scale, t: (r.top - base.top) / scale, b: (r.bottom - base.top) / scale });
+  const at = (r: DOMRect) => ({
+    l: (r.left - base.left) / scale,
+    r: (r.right - base.left) / scale,
+    t: (r.top - base.top) / scale,
+    b: (r.bottom - base.top) / scale,
+  });
   const shapes: SVGElement[] = [];
-  const mk = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string>, cls: string): SVGElementTagNameMap[K] => {
+  const mk = <K extends keyof SVGElementTagNameMap>(
+    tag: K,
+    attrs: Record<string, string>,
+    cls: string,
+  ): SVGElementTagNameMap[K] => {
     const e = document.createElementNS(ns, tag);
     for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
     e.setAttribute("class", cls);
@@ -384,10 +543,29 @@ function drawWires(): void {
       const y2 = (b.t + b.b) / 2;
       const wrap = b.t > a.b;
       const route: Pt[] = wrap
-        ? [[a.r, y1], [a.r + 28, y1], [a.r + 28, (a.b + b.t) / 2], [b.l - 28, (a.b + b.t) / 2], [b.l - 28, y2], [b.l, y2]]
-        : [[a.r, y1], [(a.r + b.l) / 2, y1], [(a.r + b.l) / 2, y2], [b.l, y2]];
+        ? [
+            [a.r, y1],
+            [a.r + 28, y1],
+            [a.r + 28, (a.b + b.t) / 2],
+            [b.l - 28, (a.b + b.t) / 2],
+            [b.l - 28, y2],
+            [b.l, y2],
+          ]
+        : [
+            [a.r, y1],
+            [(a.r + b.l) / 2, y1],
+            [(a.r + b.l) / 2, y2],
+            [b.l, y2],
+          ];
       shapes.push(mk("path", { d: routed(route) }, `wire${lit}`));
-      for (const [cx, cy] of [route[0], route[route.length - 1]]) shapes.push(mk("circle", { cx: String(cx), cy: String(cy), r: "4.5" }, `port${lit}`));
+      for (const [cx, cy] of [route[0], route[route.length - 1]])
+        shapes.push(
+          mk(
+            "circle",
+            { cx: String(cx), cy: String(cy), r: "4.5" },
+            `port${lit}`,
+          ),
+        );
     }
   }
   svg.setAttribute("width", String(base.width / scale));
@@ -415,14 +593,32 @@ const stats = (...pairs: [string | number, string][]): HTMLElement => {
   }
   return box;
 };
-const dotClass = (j: Job): string => (j.needs_human ? "warn" : j.gate === "FAIL" || Number(j.report?.BLOCKERS) > 0 ? "bad" : finished(j) ? "done" : "ok");
+const dotClass = (j: Job): string =>
+  j.needs_human
+    ? "warn"
+    : j.gate === "FAIL" || Number(j.report?.BLOCKERS) > 0
+      ? "bad"
+      : finished(j)
+        ? "done"
+        : "ok";
 
 function listRow(j: Job): HTMLButtonElement {
   const r = el("button", "lrow");
   r.type = "button";
   const t = el("div", "rt");
-  t.append(el("div", "rn", j.title), el("div", "rd", `${j.id} at ${j.stage}${j.needs_human ? ", waiting on you" : ""}`));
-  r.append(el("span", `dot ${dotClass(j)}`), t, el("span", "rc", `${j.files.length} files`));
+  t.append(
+    el("div", "rn", j.title),
+    el(
+      "div",
+      "rd",
+      `${j.id} at ${j.stage}${j.needs_human ? ", waiting on you" : ""}`,
+    ),
+  );
+  r.append(
+    el("span", `dot ${dotClass(j)}`),
+    t,
+    el("span", "rc", `${j.files.length} files`),
+  );
   r.onclick = () => openJobPanel(j.id);
   return r;
 }
@@ -436,7 +632,17 @@ function overview(): HTMLElement[] {
   const shown = v.jobs.filter((j) => visible(v, j));
   jobList.append(...shown.map(listRow));
   return [
-    sec(ph, el("h2", "pt", v.def.label), el("p", "pd", v.def.intro), el("div", "gap"), stats([v.jobs.length, "jobs"], [waiting.length, "need you"], [v.jobs.filter(finished).length, "done"])),
+    sec(
+      ph,
+      el("h2", "pt", v.def.label),
+      el("p", "pd", v.def.intro),
+      el("div", "gap"),
+      stats(
+        [v.jobs.length, "jobs"],
+        [waiting.length, "need you"],
+        [v.jobs.filter(finished).length, "done"],
+      ),
+    ),
     ...(waiting.length
       ? [
           sec(
@@ -444,21 +650,39 @@ function overview(): HTMLElement[] {
             ...waiting.map((j) => {
               const c = el("button", "callout");
               c.type = "button";
-              c.append(el("b", "", j.title), el("span", "", j.needs?.action ?? "Open"));
+              c.append(
+                el("b", "", j.title),
+                el("span", "", j.needs?.action ?? "Open"),
+              );
               c.onclick = () => openJobPanel(j.id);
               return c;
             }),
           ),
         ]
       : []),
-    sec(heading("Jobs", shown.length), shown.length ? jobList : el("p", "pd empty", "No jobs yet. Ask an agent to run it, or type below.")),
+    sec(
+      heading("Jobs", shown.length),
+      shown.length
+        ? jobList
+        : el(
+            "p",
+            "pd empty",
+            "No jobs yet. Ask an agent to run it, or type below.",
+          ),
+    ),
   ];
 }
 
 function needsBox(n: Needs, j: Job): HTMLElement {
   const box = el("div", "callout amber");
-  box.append(el("b", "", `Needs you: ${n.action}`), el("p", "", n.why), el("p", "", n.todo));
-  box.append(button(n.action, "btn", () => post(view().def.needsPath(j), { id: j.id })));
+  box.append(
+    el("b", "", `Needs you: ${n.action}`),
+    el("p", "", n.why),
+    el("p", "", n.todo),
+  );
+  box.append(
+    button(n.action, "btn", () => post(view().def.needsPath(j), { id: j.id })),
+  );
   return box;
 }
 
@@ -468,19 +692,28 @@ function skillsSection(j: Job): HTMLElement {
   const tag = (name: string) => {
     const t = el("button", `tag${off.has(name) ? " off" : ""}`, name);
     t.type = "button";
-    t.title = off.has(name) ? "Off for this job. Click to use it again." : "Click to stop using this skill on this job.";
+    t.title = off.has(name)
+      ? "Off for this job. Click to use it again."
+      : "Click to stop using this skill on this job.";
     t.onclick = () => post("skill", { id: j.id, name, off: !off.has(name) });
     return t;
   };
   const tagBox = el("div", "tags");
-  tagBox.append(...(v.skillsOpen ? j.skills : j.skills.filter((n) => off.has(n))).map(tag));
-  if (!v.skillsOpen && !off.size) tagBox.append(el("span", "pd empty", "All skills on"));
+  tagBox.append(
+    ...(v.skillsOpen ? j.skills : j.skills.filter((n) => off.has(n))).map(tag),
+  );
+  if (!v.skillsOpen && !off.size)
+    tagBox.append(el("span", "pd empty", "All skills on"));
   const actions = el("div", "actions");
   actions.append(
-    button(v.skillsOpen ? "Hide list" : "Choose skills", "btn ghost small", () => {
-      v.skillsOpen = !v.skillsOpen;
-      renderPanel();
-    }),
+    button(
+      v.skillsOpen ? "Hide list" : "Choose skills",
+      "btn ghost small",
+      () => {
+        v.skillsOpen = !v.skillsOpen;
+        renderPanel();
+      },
+    ),
   );
   return sec(heading("Skills", off.size), tagBox, actions);
 }
@@ -491,14 +724,21 @@ function noteSection(j: Job): HTMLElement {
   note.placeholder = `Note for the ${j.stage} stage. The next agent follows it.`;
   note.value = j.briefs?.[j.stage] ?? "";
   const actions = el("div", "actions");
-  actions.append(button("Save note", "btn ghost", () => post("brief", { id: j.id, stage: j.stage, text: note.value })));
+  actions.append(
+    button("Save note", "btn ghost", () =>
+      post("brief", { id: j.id, stage: j.stage, text: note.value }),
+    ),
+  );
   return sec(heading("Stage note"), note, actions);
 }
 
 function jobView(j: Job): HTMLElement[] {
   const v = view();
   const ph = el("div", "ph");
-  ph.append(button("←", "iconbtn", closeJob), el("span", "kindlabel", v.def.kind));
+  ph.append(
+    button("←", "iconbtn", closeJob),
+    el("span", "kindlabel", v.def.kind),
+  );
   const last = j.activity?.at(-1);
   const where = v.def.place(j);
   const bits = v.def.statusBits(j).filter((r) => r.length);
@@ -528,7 +768,14 @@ function jobView(j: Job): HTMLElement[] {
       stats(...v.def.stats(j)),
     ),
     ...(j.needs ? [sec(needsBox(j.needs, j))] : []),
-    ...(bits.length ? [sec(heading("Status"), ...bits.map((r) => row(...r.map((b) => chip(b.text, b.cls ?? "")))))] : []),
+    ...(bits.length
+      ? [
+          sec(
+            heading("Status"),
+            ...bits.map((r) => row(...r.map((b) => chip(b.text, b.cls ?? "")))),
+          ),
+        ]
+      : []),
     skillsSection(j),
     noteSection(j),
     sec(heading("Files", j.files.length), fileList, body),
@@ -556,20 +803,101 @@ async function loadFile(): Promise<void> {
   const name = v.openFile;
   if (!name) {
     const log = openJob()?.activity ?? [];
-    return showBody("raw", log.length ? log.toReversed().map((a) => `${a.ts.slice(11, 19)}  ${a.text}`).join("\n") : "No files or notes yet.");
+    return showBody(
+      "raw",
+      log.length
+        ? log
+            .toReversed()
+            .map((a) => `${a.ts.slice(11, 19)}  ${a.text}`)
+            .join("\n")
+        : "No files or notes yet.",
+    );
   }
   let ok = false;
   let text: string;
+  let base = "";
   try {
-    const res = await api(`/api/${v.def.id}/file?job=${encodeURIComponent(String(v.openId))}&name=${encodeURIComponent(name)}`);
+    const res = await api(
+      `/api/${v.def.id}/file?job=${encodeURIComponent(String(v.openId))}&name=${encodeURIComponent(name)}`,
+    );
     ok = res.ok;
     text = ok ? await res.text() : "not found";
+    base = res.headers.get("X-Base") ?? "";
   } catch {
     text = "offline, retrying";
   }
   if (token !== loadToken) return;
-  if (ok && /\.(md|markdown)$/i.test(name)) showBody("md", renderMarkdown(text));
-  else showBody("raw", text);
+  loaded = ok && base ? { job: String(v.openId), name, text, base } : null;
+  if (ok && /\.(md|markdown)$/i.test(name)) {
+    if (edit && edit.job === loaded?.job && edit.name === name)
+      return showBody("edit", editor(edit));
+    const page = document.createDocumentFragment();
+    const bar = el("div", "fbar");
+    if (loaded) bar.append(button("Edit file", "", () => startEdit()));
+    page.append(bar, renderMarkdown(text));
+    showBody("md", page);
+  } else showBody("raw", text);
+}
+
+function startEdit(l1?: number, l2?: number): void {
+  if (!loaded) return;
+  const lines = loaded.text.split("\n");
+  edit = {
+    job: loaded.job,
+    name: loaded.name,
+    l1,
+    l2,
+    base: loaded.base,
+    text: l1 && l2 ? lines.slice(l1 - 1, l2).join("\n") : loaded.text,
+  };
+  void loadFile();
+}
+
+const SAVE_ERRORS: Record<number, string> = {
+  409: "The file changed on disk after you opened it. Copy your text, cancel, and edit again.",
+  422: "Lines like STATUS: and VERDICT: steer the board. They cannot be edited here.",
+  400: "That edit was refused.",
+};
+
+async function saveEdit(e: Edit): Promise<void> {
+  const { job, name, base, text, l1, l2 } = e;
+  try {
+    const res = await api(`/api/${view().def.id}/save`, {
+      method: "POST",
+      body: JSON.stringify({ id: job, name, base, text, l1, l2 }),
+    });
+    e.error = res.ok ? undefined : (SAVE_ERRORS[res.status] ?? `Refused (${res.status}).`);
+    if (res.ok) edit = null;
+  } catch {
+    e.error = "offline";
+  }
+  await loadFile();
+}
+
+function editor(e: Edit): HTMLElement {
+  const box = el("div", "editor");
+  const where = e.l1 && e.l2 ? `${e.name}:${e.l1 === e.l2 ? e.l1 : `${e.l1}-${e.l2}`}` : e.name;
+  const area = el("textarea");
+  area.value = e.text;
+  area.spellcheck = false;
+  area.rows = Math.min(24, Math.max(6, e.text.split("\n").length + 1));
+  area.oninput = () => {
+    e.text = area.value;
+  };
+  area.onkeydown = (k) => {
+    if (k.key === "Enter" && (k.metaKey || k.ctrlKey)) void saveEdit(e);
+  };
+  const row = el("div", "row");
+  row.append(
+    button("Cancel", "", () => {
+      edit = null;
+      void loadFile();
+    }),
+    button("Save", "go", () => void saveEdit(e)),
+  );
+  box.append(el("div", "ref", where), area, el("div", "emsg", e.error ?? ""), row);
+  queueMicrotask(() => area.focus());
+  return box;
 }
 
 function openJobPanel(id: string): void {
@@ -600,7 +928,8 @@ async function fetchJobs(v: View): Promise<void> {
     const res = await api(`/api/${v.def.id}/jobs`);
     if (!res.ok) throw new Error(`status ${res.status}`);
     const text = await res.text();
-    if (text === v.sig) return v.def.id === active ? renderTabs() : renderSidebar();
+    if (text === v.sig)
+      return v.def.id === active ? renderTabs() : renderSidebar();
     v.sig = text;
     // shortcut: the payload is trusted, not validated, upgrade if the server stops being ours
     v.jobs = JSON.parse(text) as Job[];
@@ -622,12 +951,18 @@ async function pollLoop(): Promise<void> {
 let engineList: string[] = ["claude"];
 let modelChoices: Record<string, string[]> = {};
 let engine = "claude";
-const ENGINE_LABEL: Record<string, string> = { claude: "Claude Code", opencode: "OpenCode", kiro: "Kiro" };
+const ENGINE_LABEL: Record<string, string> = {
+  claude: "Claude Code",
+  opencode: "OpenCode",
+  kiro: "Kiro",
+};
 // Simple drawn marks, not the official logos: the page may not load outside images.
 const ENGINE_ICON: Record<string, string> = {
-  claude: '<svg viewBox="0 0 24 24" aria-hidden="true"><g stroke="#d97757" stroke-width="2.6" stroke-linecap="round"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/></g></svg>',
+  claude:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><g stroke="#d97757" stroke-width="2.6" stroke-linecap="round"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/></g></svg>',
   kiro: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#9046ff" d="M12 2.5c-4.4 0-7.5 3.3-7.5 7.9v8.6c0 1.2 1.3 1.8 2.2 1l1.5-1.3c.5-.4 1.2-.4 1.7 0l1.1 1c.6.5 1.4.5 2 0l1.1-1c.5-.4 1.2-.4 1.7 0l1.5 1.3c.9.8 2.2.2 2.2-1v-8.6c0-4.6-3.1-7.9-7.5-7.9z"/><circle cx="9.2" cy="10.5" r="1.3" fill="#fff"/><circle cx="14.8" cy="10.5" r="1.3" fill="#fff"/></svg>',
-  opencode: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M5 3h14v18H5V3zm4 4v10h6V7H9z"/></svg>',
+  opencode:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M5 3h14v18H5V3zm4 4v10h6V7H9z"/></svg>',
 };
 
 const bubble = (cls: string, text: string): void => {
@@ -650,26 +985,53 @@ composer.addEventListener("keydown", (e) => {
     ($("ask-form") as HTMLFormElement).requestSubmit();
   }
 });
-$("ask-form").onsubmit = async (e) => {
+$("ask-form").onsubmit = (e) => {
   e.preventDefault();
   const question = composer.value.trim();
   if (!question) return;
-  const v = view();
   composer.value = "";
   composer.style.height = "auto";
-  $("ask-q").textContent = `${v.def.label}: ${question}`;
+  return ask(question);
+};
+
+attachAnnotate(
+  () => {
+    const v = view();
+    return v.openId && v.openFile
+      ? { job: String(v.openId), file: v.openFile }
+      : null;
+  },
+  (text) => void ask(text),
+  (r) => startEdit(r.l1, r.l2),
+);
+
+async function ask(question: string): Promise<void> {
+  const v = view();
+  $("ask-q").textContent = `${v.def.label}: ${question.split("\n")[0]}`;
   bubble("me", question);
   try {
-    const body = { board: v.def.id, id: v.openId ?? "", question, session: v.session, engine, model: menus.model.value, effort: menus.effort.value };
-    const res = await api("/api/ask", { method: "POST", body: JSON.stringify(body) });
-    const out: { answer?: string; session?: string; error?: string } = await res.json();
+    const body = {
+      board: v.def.id,
+      id: v.openId ?? "",
+      question,
+      session: v.session,
+      engine,
+      model: menus.model.value,
+      effort: menus.effort.value,
+    };
+    const res = await api("/api/ask", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    const out: { answer?: string; session?: string; error?: string } =
+      await res.json();
     v.session = out.session ?? v.session;
     bubble(out.error ? "err" : "bot", out.error ?? out.answer ?? "");
   } catch {
     bubble("err", "offline");
   }
   await pollOne(v.def.id);
-};
+}
 
 function showEngine(): void {
   $("engines").replaceChildren(
@@ -681,7 +1043,12 @@ function showEngine(): void {
       b.setAttribute("aria-checked", String(name === engine));
       const icon = el("span");
       icon.innerHTML = ENGINE_ICON[name] ?? "";
-      b.append(icon, ...(name === engine ? [el("span", "", ENGINE_LABEL[name] ?? name)] : []));
+      b.append(
+        icon,
+        ...(name === engine
+          ? [el("span", "", ENGINE_LABEL[name] ?? name)]
+          : []),
+      );
       b.onclick = () => {
         engine = name;
         for (const v of views.values()) v.session = "";
@@ -690,13 +1057,24 @@ function showEngine(): void {
       return b;
     }),
   );
-  menus.model.options = (modelChoices[engine] ?? []).map((m) => ({ value: m, label: m }));
-  if (!menus.model.options.some((o) => o.value === menus.model.value)) menus.model.value = "";
+  menus.model.options = (modelChoices[engine] ?? []).map((m) => ({
+    value: m,
+    label: m,
+  }));
+  if (!menus.model.options.some((o) => o.value === menus.model.value))
+    menus.model.value = "";
   menus.model.render();
   $("model-wrap").hidden = !modelChoices[engine]?.length;
 }
 
-const EFFORT_BARS: Record<string, number> = { "": 0, low: 1, medium: 2, high: 3, xhigh: 4, max: 4 };
+const EFFORT_BARS: Record<string, number> = {
+  "": 0,
+  low: 1,
+  medium: 2,
+  high: 3,
+  xhigh: 4,
+  max: 4,
+};
 
 // A popup menu that opens above its button. Our own markup, so it never flickers the way a native select does.
 interface Menu {
@@ -706,7 +1084,12 @@ interface Menu {
 }
 const openMenus = new Set<() => void>();
 
-function makeMenu(id: string, placeholder: string, options: { value: string; label: string }[], onPick: () => void): Menu {
+function makeMenu(
+  id: string,
+  placeholder: string,
+  options: { value: string; label: string }[],
+  onPick: () => void,
+): Menu {
   const btn = $(`${id}-btn`);
   const pop = $(`${id}-pop`);
   const label = $(`${id}-label`);
@@ -721,11 +1104,17 @@ function makeMenu(id: string, placeholder: string, options: { value: string; lab
     label.textContent = current && menu.value ? current.label : placeholder;
     pop.replaceChildren(
       ...[{ value: "", label: "Default" }, ...menu.options].map((o) => {
-        const item = el("button", `popitem${o.value === menu.value ? " on" : ""}`);
+        const item = el(
+          "button",
+          `popitem${o.value === menu.value ? " on" : ""}`,
+        );
         item.type = "button";
         item.setAttribute("role", "option");
         item.setAttribute("aria-selected", String(o.value === menu.value));
-        item.append(el("span", "", o.label), el("span", "tick", o.value === menu.value ? "✓" : ""));
+        item.append(
+          el("span", "", o.label),
+          el("span", "tick", o.value === menu.value ? "✓" : ""),
+        );
         item.onclick = () => {
           menu.value = o.value;
           render();
@@ -752,7 +1141,9 @@ function makeMenu(id: string, placeholder: string, options: { value: string; lab
 
 const showEffort = (): void => {
   const level = EFFORT_BARS[menus.effort.value] ?? 0;
-  document.querySelectorAll("#effort-icon .b").forEach((bar, i) => bar.classList.toggle("on", i < level));
+  document
+    .querySelectorAll("#effort-icon .b")
+    .forEach((bar, i) => bar.classList.toggle("on", i < level));
 };
 const menus = {
   model: makeMenu("model", "model", [], () => undefined),
@@ -771,7 +1162,8 @@ const menus = {
 };
 showEffort();
 document.addEventListener("pointerdown", (e) => {
-  if (!(e.target as HTMLElement).closest(".menu")) for (const c of [...openMenus]) c();
+  if (!(e.target as HTMLElement).closest(".menu"))
+    for (const c of [...openMenus]) c();
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") for (const c of [...openMenus]) c();
@@ -819,19 +1211,37 @@ document.addEventListener("visibilitychange", async () => {
 // ---- start
 async function start(): Promise<void> {
   try {
-    const boards: { id: string; label: string }[] = await (await api("/api/boards")).json();
+    const boards: { id: string; label: string }[] = await (
+      await api("/api/boards")
+    ).json();
     for (const b of boards) {
       const def = DEFS[b.id];
-      if (def) views.set(b.id, { def: { ...def, id: b.id, label: b.label }, jobs: [], openId: null, openFile: null, filter: "all", userZoom: null, sig: "", session: "", skillsOpen: false });
+      if (def)
+        views.set(b.id, {
+          def: { ...def, id: b.id, label: b.label },
+          jobs: [],
+          openId: null,
+          openFile: null,
+          filter: "all",
+          userZoom: null,
+          sig: "",
+          session: "",
+          skillsOpen: false,
+        });
     }
   } catch {
     $("meta").textContent = "offline, retrying";
   }
   const saved = restore();
-  order = [...(saved?.order ?? []).filter((id) => views.has(id)), ...[...views.keys()].filter((id) => !saved?.order?.includes(id))];
+  order = [
+    ...(saved?.order ?? []).filter((id) => views.has(id)),
+    ...[...views.keys()].filter((id) => !saved?.order?.includes(id)),
+  ];
   openTabs = (saved?.openTabs ?? []).filter((id) => views.has(id));
   if (!openTabs.length && order.length) openTabs = [order[0]];
-  active = openTabs.includes(saved?.active ?? "") ? (saved?.active as string) : (openTabs[0] ?? "");
+  active = openTabs.includes(saved?.active ?? "")
+    ? (saved?.active as string)
+    : (openTabs[0] ?? "");
   document.body.classList.add("with-panel");
   setSide(saved?.sideCollapsed ?? false);
   try {

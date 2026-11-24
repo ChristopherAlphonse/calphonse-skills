@@ -71,12 +71,17 @@ function readCode(
   return [pre, i + 1];
 }
 
-function readQuote(lines          , i        )                             {
+function readQuote(
+  lines          ,
+  i        ,
+  offset        ,
+)                             {
+  const first = i;
   const buf           = [];
   while (i < lines.length && /^\s*>/.test(lines[i]))
     buf.push(lines[i++].replace(/^\s*>\s?/, ""));
   const q = el("blockquote");
-  q.append(renderMarkdown(buf.join("\n")));
+  q.append(renderMarkdown(buf.join("\n"), offset + first));
   return [q, i];
 }
 
@@ -105,10 +110,14 @@ function readTable(lines          , i        )                           {
 function readList(
   lines          ,
   i        ,
+  offset        ,
 )                                                {
   const list = el(/^\s*\d/.test(lines[i]) ? "ol" : "ul");
   while (i < lines.length && LIST_ITEM.test(lines[i])) {
-    wrap("li", lines[i++].replace(LIST_ITEM, ""), list);
+    const before = list.childElementCount;
+    wrap("li", lines[i].replace(LIST_ITEM, ""), list);
+    stamp(list.children[before], i, i + 1, offset);
+    i++;
   }
   return [list, i];
 }
@@ -131,13 +140,22 @@ function readParagraph(
   return [p, i];
 }
 
-export function renderMarkdown(src        )                   {
+// Marks a block with the 1-based, inclusive source lines it came from, so a selection can be traced back to the file.
+// `offset` is the index of the first line of `lines` in the whole file, for blocks nested in a quote.
+function stamp(node         , first        , end        , offset        )       {
+  if (!(node instanceof HTMLElement)) return;
+  node.dataset.l1 = String(offset + first + 1);
+  node.dataset.l2 = String(offset + Math.max(first + 1, end));
+}
+
+export function renderMarkdown(src        , offset = 0)                   {
   const root = document.createDocumentFragment();
   const lines = src.replace(/\r\n?/g, "\n").split("\n");
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
-    let node      ;
+    let node             ;
+    const first = i;
     if (!line.trim()) {
       i++;
       continue;
@@ -155,10 +173,11 @@ export function renderMarkdown(src        )                   {
     } else if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
       node = el("hr");
       i++;
-    } else if (/^\s*>/.test(line)) [node, i] = readQuote(lines, i);
+    } else if (/^\s*>/.test(line)) [node, i] = readQuote(lines, i, offset);
     else if (isTableStart(lines, i)) [node, i] = readTable(lines, i);
-    else if (LIST_ITEM.test(line)) [node, i] = readList(lines, i);
+    else if (LIST_ITEM.test(line)) [node, i] = readList(lines, i, offset);
     else [node, i] = readParagraph(lines, i);
+    stamp(node, first, Math.min(i, lines.length), offset);
     root.append(node);
   }
   return root;

@@ -18,7 +18,7 @@ SKILLS = HERE.parent.parent
 DASH_DIR = HERE.parent / "dashboard"
 DIST_DIR = DASH_DIR / "dist"
 STATE = ROOT / ".planning" / "factory-board"
-STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript", "markdown.js": "text/javascript"}
+STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript", "markdown.js": "text/javascript", "annotate.js": "text/javascript"}
 ENGINE_FILE = HERE / "job"
 # board id -> (label, which of the engine's jobs it shows)
 BOARD_SPECS = {"build": ("Build", lambda job: not job.get("review")), "review": ("Review", lambda job: bool(job.get("review")))}
@@ -137,6 +137,22 @@ def ask(board, jid, question, session, engine, model, effort):
     return {"answer": text}
 
 
+GUARDED_LINE = re.compile(r"^[A-Z]{3,}:.*$", re.M)
+
+
+def edit_file(old, text, l1=None, l2=None):
+    """The file after an edit, or (None, reason). Lines such as STATUS: READY steer the stage machine, so they may not change here."""
+    new = text
+    if l1 is not None:
+        lines = old.split("\n")
+        if not (isinstance(l1, int) and isinstance(l2, int) and 1 <= l1 <= l2 <= len(lines)):
+            return None, "range"
+        new = "\n".join(lines[:l1 - 1] + text.split("\n") + lines[l2:])
+    if GUARDED_LINE.findall(old) != GUARDED_LINE.findall(new):
+        return None, "guarded"
+    return new, None
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -187,18 +203,52 @@ class Handler(BaseHTTPRequestHandler):
         base = DIST_DIR if name.endswith(".js") else DASH_DIR
         return self.send(200, (base / name).read_bytes(), STATIC[name])
 
-    def get_file(self, board, jid, name):
+    def job_file(self, board, jid, name):
+        """The markdown file `name` inside job `jid` on this board, or None. Never leaves the job folder."""
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", jid):
-            return self.send(404, "{}")
+            return None
         try:
             if not any(j["id"] == jid and BOARD_SPECS[board][1](j) for j in ENGINE.all_jobs()):
-                return self.send(404, "{}")
+                return None
             p = (ENGINE.jobdir(jid) / name).resolve()
             if ENGINE.jobdir(jid).resolve() not in p.parents or p.suffix != ".md" or not p.is_file():
-                return self.send(404, "{}")
-            return self.send(200, p.read_text(), "text/plain; charset=utf-8")
+                return None
+            return p
         except (ValueError, OSError):
+            return None
+
+    def get_file(self, board, jid, name):
+        p = self.job_file(board, jid, name)
+        if not p:
             return self.send(404, "{}")
+        try:
+            data = p.read_bytes()
+            return self.send(200, data, "text/plain; charset=utf-8", {"X-Base": hashlib.sha256(data).hexdigest()})
+        except OSError:
+            return self.send(404, "{}")
+
+    def post_save(self, board, jid, body):
+        """Save an edit to a job file: the whole file, or lines l1..l2 replaced. `base` must still match the file on disk."""
+        p = self.job_file(board, jid, body.get("name") if isinstance(body.get("name"), str) else "")
+        text, base, l1, l2 = body.get("text"), body.get("base"), body.get("l1"), body.get("l2")
+        if not p:
+            return self.send(404, "{}")
+        if not isinstance(text, str) or not isinstance(base, str) or (l1 is None) != (l2 is None):
+            return self.send(400, "{}")
+        try:
+            old = p.read_bytes()
+            if not hmac.compare_digest(hashlib.sha256(old).hexdigest(), base):
+                return self.send(409, json.dumps({"error": "changed"}))
+            new, refused = edit_file(old.decode(), text, l1, l2)
+            if refused:
+                return self.send(422 if refused == "guarded" else 400, json.dumps({"error": refused}))
+            fd, tmp = tempfile.mkstemp(dir=p.parent, prefix=".edit-")
+            with os.fdopen(fd, "w") as f:
+                f.write(new)
+            os.replace(tmp, p)
+            return self.send(200, json.dumps({"base": hashlib.sha256(new.encode()).hexdigest()}))
+        except (OSError, UnicodeDecodeError):
+            return self.send(500, "{}")
 
     def do_GET(self):
         u = urlparse(self.path)
@@ -246,6 +296,9 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/ask":
             out = ask(text("board"), jid, text("question"), text("session"), text("engine"), text("model"), text("effort"))
             return self.send(200, json.dumps(out))
+        m = re.fullmatch(r"/api/([a-z]+)/save", self.path)
+        if m and m.group(1) in BOARD_SPECS:
+            return self.post_save(m.group(1), jid, body)
         m = re.fullmatch(r"/api/([a-z]+)/([a-z]+)", self.path)
         action = ENGINE.ACTIONS.get(m.group(2)) if m and m.group(1) in BOARD_SPECS else None
         if not action:
