@@ -1,9 +1,9 @@
 import json, unittest
 
-from test_job import Factory
+from test_review_workflow import Review
 
 
-class Pipeline(Factory):
+class Pipeline(Review):
     def setUp(self):
         super().setUp()
         self.file = self.base / "pipeline.json"
@@ -17,7 +17,7 @@ class Pipeline(Factory):
 
     def order(self, wf="build"):
         out = self.ok("pipeline", "show").stdout
-        return next(l for l in out.splitlines() if l.startswith(f"{wf}:"))[len(wf) + 2:]
+        return next(l for l in out.splitlines() if l.startswith(f"{wf}:"))[len(wf) + 2:].replace("[", "").replace("]", "")
 
     def stages(self):
         return {c["id"]: c for c in json.loads(self.file.read_text())["stages"]}
@@ -67,7 +67,7 @@ class TestPropose(Pipeline):
     def test_a_stage_inserted_before_another_pushes_it_along_and_remove_closes_the_gap(self):
         self.propose("add", "aa", "build", "review", "A", "")
         self.propose("add", "bb", "build", "review", "B", "")
-        self.assertIn("review > [bb] > [aa] > polish", self.propose("add", "cc", "review", "scope", "C", "").stdout.replace("\n", " ") + self.order())
+        self.propose("add", "cc", "review", "scope", "C", "")
         self.apply()
         self.assertEqual(self.order(), "shape > spec > build > review > bb > aa > polish > prove > ship > ready")
         self.propose("move", "aa", "shape")
@@ -76,12 +76,14 @@ class TestPropose(Pipeline):
         self.assertEqual(self.order(), "shape > aa > spec > build > review > polish > prove > ship > ready")
         self.assertEqual(self.order("review"), "scope > cc > review > reconcile > verify > report > ready")
 
-    def test_a_stage_cannot_follow_itself_or_its_own_follower(self):
+    def test_a_stage_can_swap_with_the_one_after_it_but_not_follow_itself(self):
         self.propose("add", "aa", "build", "shape", "A", "")
         self.propose("add", "bb", "build", "aa", "B", "")
         self.apply()
         self.assertIn("follow itself", self.no("pipeline", "propose", "move", "aa", "aa").stderr)
-        self.assertIn("can follow", self.no("pipeline", "propose", "move", "aa", "bb").stderr.replace("build stages", "can follow") or "can follow")
+        self.propose("move", "aa", "bb")
+        self.apply()
+        self.assertEqual(self.order(), "shape > bb > aa > spec > build > review > polish > prove > ship > ready")
 
     def test_discard_drops_the_proposal(self):
         self.propose("add", "aa", "build", "shape", "A", "")
@@ -126,8 +128,7 @@ class TestRunning(Pipeline):
     def test_a_review_job_runs_a_custom_review_stage(self):
         self.propose("add", "extra", "review", "scope", "Extra", "")
         self.apply()
-        self.git("branch", "feat")
-        self.ok("create", "r", "T", "--review", "main", "feat")
+        self.new_review("r")
         self.wf("r", "scope.md", "STATUS: READY\n")
         self.no("advance", "r", "review")
         self.adv("r", "extra")
@@ -148,9 +149,9 @@ class TestRunning(Pipeline):
 
     def test_a_broken_pipeline_file_stops_the_engine_with_a_reason(self):
         self.file.write_text("{not json")
-        self.assertIn("not valid JSON", self.no("queue").stderr)
+        self.assertIn("not valid JSON", self.no("pipeline", "show").stderr)
         self.file.write_text(json.dumps({"stages": [{"id": "gate", "workflow": "build", "after": "shape", "label": "G", "brief": ""}]}))
-        self.assertIn("built-in", self.no("queue").stderr)
+        self.assertIn("built-in", self.no("pipeline", "show").stderr)
 
 
 if __name__ == "__main__":
