@@ -1040,6 +1040,7 @@ async function ask(question: string): Promise<string> {
       engine,
       model: menus.model.value,
       effort: menus.effort.value,
+      mode,
     };
     const res = await api("/api/ask", {
       method: "POST",
@@ -1056,6 +1057,43 @@ async function ask(question: string): Promise<string> {
     bubble("err", "offline");
     return "offline";
   }
+}
+
+// Chat answers and proposes. Act also applies the pipeline change it prepared, because choosing Act is the click.
+type Mode = "chat" | "act";
+const MODE_KEY = "factory-ask-mode";
+let mode: Mode = ((): Mode => {
+  try {
+    return localStorage.getItem(MODE_KEY) === "act" ? "act" : "chat";
+  } catch {
+    return "chat";
+  }
+})();
+const MODE_HELP: Record<Mode, string> = {
+  chat: "Chat: answers questions. Changes it prepares wait for your Apply click.",
+  act: "Act: it changes the board for you, such as adding or moving a stage.",
+};
+
+function showMode(): void {
+  $("modes").replaceChildren(
+    ...(["chat", "act"] as Mode[]).map((m) => {
+      const b = button(m === "chat" ? "Chat" : "Act", `mode${m === mode ? " on" : ""}`, () => {
+        mode = m;
+        try {
+          localStorage.setItem(MODE_KEY, m);
+        } catch {
+          // the choice just is not remembered
+        }
+        showMode();
+      });
+      b.title = MODE_HELP[m];
+      b.setAttribute("role", "radio");
+      b.setAttribute("aria-checked", String(m === mode));
+      return b;
+    }),
+  );
+  ($("ask-input") as HTMLTextAreaElement).placeholder =
+    mode === "act" ? "Act: tell it what to change on the board" : "Ask anything. Say: skip qa-review, or turn off simplify";
 }
 
 function showEngine(): void {
@@ -1191,7 +1229,12 @@ document.addEventListener("pointerdown", (e) => {
     for (const c of [...openMenus]) c();
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") for (const c of [...openMenus]) c();
+  if (e.key !== "Escape") return;
+  if (openMenus.size) {
+    for (const c of [...openMenus]) c();
+    return;
+  }
+  if (!$("ask-sheet").hidden) $("ask-sheet").hidden = true;
 });
 
 // ---- chrome: zoom, panel, sidebar, drop zones
@@ -1280,6 +1323,7 @@ async function start(): Promise<void> {
     : (openTabs[0] ?? "");
   document.body.classList.add("with-panel");
   setSide(saved?.sideCollapsed ?? false);
+  showMode();
   void restoreChat();
   try {
     modelChoices = await (await api("/api/engines")).json();
