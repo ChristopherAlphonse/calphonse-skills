@@ -822,7 +822,8 @@ def place(order, sid, after):
 
 def op_add(state, wf, cid, after, label, brief, skill=""):
     need(wf in BASE_ORDER, "workflow must be build or review")
-    need(cid not in {c["id"] for c in state["stages"]} | BUILTIN_IDS, f"{cid} already exists")
+    need(cid not in BUILTIN_IDS, f"{cid} is a built-in stage name")
+    need(cid not in {c["id"] for c in state["stages"]}, f"{cid} already exists")
     new = copy_state(state)
     new["stages"].append({"id": cid, "workflow": wf, "label": label, "brief": brief, **({"skill": skill} if skill else {})})
     place(new["order"][wf], cid, after)

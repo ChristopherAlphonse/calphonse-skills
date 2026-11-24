@@ -68,10 +68,9 @@ class TestPropose(Pipeline):
         self.assertEqual(self.order("review"), "scope > review > verify > report > ready")
 
     def test_a_move_is_reported_as_one_move(self):
-        r = self.propose("move", "build", "polish", "spec")
-        self.assertIn("move polish after spec in build", r.stdout)
-        self.assertNotIn("move build", r.stdout)
-        self.assertNotIn("move review", r.stdout)
+        r = self.propose("move", "build", "polish", "prove")
+        self.assertIn("move polish after prove in build", r.stdout)
+        self.assertEqual(r.stdout.count("move "), 1)
 
     def test_orders_the_checks_cannot_work_with_are_refused_with_the_reason(self):
         for args, why in (
@@ -141,15 +140,15 @@ class TestBoard(Pipeline):
         self.assertEqual(first["order"], ["shape", "spec", "build", "review", "polish", "prove", "ship", "ready"])
         self.assertEqual((first["custom"], first["proposal"]), ({}, None))
         self.propose("add", "build", "qa-pass", "review", "QA pass", "Check by hand")
-        self.propose("move", "build", "prove", "spec")
+        self.propose("move", "build", "prove", "build")
         waiting = self.stages_payload()["proposal"]
         self.assertEqual(sorted(waiting["changed"]), ["prove", "qa-pass"])
-        self.assertEqual(waiting["order"]["build"], ["shape", "spec", "prove", "build", "review", "qa-pass", "polish", "ship", "ready"])
+        self.assertEqual(waiting["order"]["build"], ["shape", "spec", "build", "prove", "review", "qa-pass", "polish", "ship", "ready"])
         self.assertEqual(len(waiting["ops"]), 2)
         self.assertFalse(waiting["stale"])
         self.apply()
         done = self.stages_payload()
-        self.assertEqual(done["order"][2:4], ["prove", "build"])
+        self.assertEqual(done["order"][2:4], ["build", "prove"])
         self.assertEqual(done["custom"]["qa-pass"], {"label": "QA pass", "blurb": "Check by hand"})
         self.assertIsNone(done["proposal"])
         self.assertEqual(self.stages_payload("review")["order"], ["scope", "review", "reconcile", "verify", "report", "ready"])
@@ -219,6 +218,7 @@ class TestRunning(Pipeline):
 
     def test_a_failed_gate_still_sends_the_job_back_to_build_wherever_it_sits(self):
         self.change("remove", "build", "review")
+        self.set_config(checks="false")
         self.to_gate("j", change=False)
         self.assertIn("GATE: FAIL", self.run_gate("j"))
         self.no("advance", "j", "polish")
