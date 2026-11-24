@@ -181,7 +181,7 @@ State lives in the project, never in this repo.
 
 ## Editing files and diagrams on the board
 
-Open a job file and choose **Open editor** for a full-screen, line-numbered editor with a live preview and a comments sidebar. Comments go to the board's chat agent with the file, the line range and the quoted text. Saves use the file's hash, so an edit made against an old copy is refused, and lines such as `STATUS:` and `VERDICT:` cannot change from the editor because they steer the stages.
+Click a file in a job's panel to open it in an editor tab beside the board tabs: a line-numbered editor, the rendered file and a comments sidebar. The panel lists files only and never renders them. Switch back to the board with its tab or the Board button, and the editor stays open with its unsaved text. Comments go to the board's chat agent with the file, the line range and the quoted text. Saves use the file's hash, so an edit made against an old copy is refused, and lines such as `STATUS:` and `VERDICT:` cannot change from the editor because they steer the stages.
 
 Fenced `mermaid` blocks draw as diagrams once `FACTORY_MERMAID` names a `mermaid.min.js` on your machine. Nothing is bundled. Each diagram is drawn in a sandboxed frame that has no cookie and no access to the board, and without the variable the block stays plain code.
 
