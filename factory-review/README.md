@@ -128,7 +128,7 @@ Then it has a summary with a recommendation and the ranked findings. `comments.m
 
 ## Following along
 
-One board, started with `bin/job board` by you, an agent, or `create` and `queue` on their own. It has the Unblock button, a skill switch and note per review, and a chat bar. `watch` and `serve` are the same board. Its link works in several tabs until the process stops.
+One board for every factory skill, started with `bin/job board` by you, an agent, or `create` and `queue` on their own. It is the same board `factory` shows: open its Review tab from the left sidebar. The Review tab has the Unblock button, a skill switch and note per review, and a chat bar. `watch` and `serve` are the same board. Its link works in several tabs until the process stops.
 
 `unblock` is not a CLI command. It runs only from the board. The board binds to localhost and prints a code in its link. The code becomes a session cookie. Every action also needs a custom header and a loopback `Host`. The key lives only in the server's memory, and the git hooks check its hash.
 
@@ -226,4 +226,4 @@ The allow list is a set of command patterns. It cannot see what a command does i
 
 ## Board source
 
-The board is the same canvas UI as `factory`, written in TypeScript in `dashboard/*.ts`. The server reads the generated `dashboard/dist/*.js`, which is committed and never edited by hand. `serve` and `watch` rebuild `dist/` at start when Node 24 or later is on PATH and a `.ts` is newer. Otherwise they warn once, log it in `audit.log`, and serve the committed `dist/`. To build by hand, run `node factory-review/dashboard/build.mjs`. Add `--check` to fail on a stale `dist/`, as `tests/test_dashboard_build.py` does. A running board does not reload, so restart it after you edit a `.ts` file.
+The board is shared with `factory`: one server, `factory/bin/board`, with a left sidebar of boards and a tab per open board. Its UI is written in TypeScript in `dashboard/*.ts`. The server reads the generated `dashboard/dist/*.js`, which is committed and never edited by hand. `serve` and `watch` rebuild `dist/` at start when Node 24 or later is on PATH and a `.ts` is newer. Otherwise they warn once, log it in `audit.log`, and serve the committed `dist/`. To build by hand, run `node factory-review/dashboard/build.mjs`. Add `--check` to fail on a stale `dist/`, as `tests/test_dashboard_build.py` does. A running board does not reload, so restart it after you edit a `.ts` file.

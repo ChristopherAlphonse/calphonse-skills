@@ -1,18 +1,31 @@
 ---
 name: pr-body-style
 description: >
-  Draft or update pull request bodies in the user's preferred style, then push the
-  branch and open the PR (or update the existing PR's body) with it.
-  Use when an agent writes, rewrites, reviews, or updates a PR description/body,
-  especially when the user asks whether the PR body is accurate, too technical,
-  too long, business-focused, or ready for reviewers.
+  Draft, rewrite, or audit pull request bodies in the user's preferred style, then
+  push the branch and create or update the PR/MR on GitHub (gh) or GitLab (glab).
+  Covers Conventional Commits titles, a templated body, optional ticket links, local
+  verification, and a CI checks reference across ecosystems including Terraform.
+  Use when an agent writes, rewrites, reviews, or creates a PR/MR, especially when
+  the user asks whether the body is accurate, too technical, too long,
+  business-focused, or ready for reviewers.
 ---
 
 # PR Body Style
 
 ## Goal
 
-Write PR bodies that are short, business-focused, and accurate to the actual code change. Assume reviewers can read the diff; the PR body should explain the outcome, validation, and any non-obvious context.
+Write PR/MR bodies that are short, business-focused, and accurate to the actual code change. Assume reviewers can read the diff; the body should explain the outcome, validation, and any non-obvious context. When creating a PR/MR, also produce a Conventional Commits title, verify locally, link a ticket when the org uses one, and publish with the host's CLI (`gh` or `glab`) or API.
+
+## Detect the host
+
+Pick the tool before you write commands. Do not mix hosts.
+
+| Host | CLI | API wrapper | Object | ID flag |
+| --- | --- | --- | --- | --- |
+| GitHub | `gh` | `gh api` | PR | `<number>` |
+| GitLab | `glab` | `glab api` | MR | `<iid>` |
+
+Detect from the remote: `git remote get-url origin` (or the URL in the user's message). If a URL was given, use that host even if the local remote points elsewhere. If neither is clear, ask once and name the candidates. Everything below says "PR/MR" — use the host's vocabulary in titles, body headings, and replies.
 
 ## Finding the target
 
@@ -25,49 +38,129 @@ Never ask the user what to write the body for when the answer can be found. Work
 
 Ask only when two or more candidates remain after this (for example, several repos with unrelated changes), and then name the candidates in the question. Do not offer a menu of input types.
 
-## Publish the body
+## Understand the changes
 
-A request to write or update a body is the user's standing approval to publish it: do not stop at a draft and do not ask first. A question about an existing body (is it accurate, too long, ready) gets the answer and a corrected body, and publishes only if the user then says so. After writing the body:
+Run these in parallel, substituting the actual default branch:
 
-1. Push the branch if it has no upstream or is ahead of it: `git push -u origin <branch>`.
-2. If a PR for the branch exists, replace its body: `gh pr edit <n> --body-file <file>`. For GitLab use `glab mr update`.
-3. Otherwise open it against the default branch: `gh pr create --base <default> --head <branch> --title "<title>" --body-file <file>`. Use the latest commit's subject as the title when it is a good one.
-4. Write the body to a temp file and pass it with `--body-file`, so the shell doesn't mangle quotes or backticks.
-5. Reply with the PR links, one line each. Do not paste the bodies back unless asked.
+```bash
+git log origin/<base-branch>..HEAD --oneline
+git diff origin/<base-branch>..HEAD --stat
+```
 
-Factory branches live in `.worktrees/<id>/` and carry a pre-push hook that refuses any push without the board's key. When the user invoked this skill directly, that click already happened: push from the worktree with `git push --no-verify -u origin <branch>`, but only when `git rev-parse HEAD` equals the job's `commit`. If the tip differs, someone committed after the user's click: skip that branch and say why in one line. `--no-verify` also skips the repo's own pre-push hook, so run it first if `.git/hooks/pre-push` or the `core.hooksPath` of the main checkout has one.
+Determine:
 
-Never end by handing the user commands to push or open the PR. Do it. Skip publishing only when the user says "draft only" or similar, when the target is a PR in someone else's repo, or when this skill runs as a `factory` stage (factory forbids push and `gh`). If the push or `gh` fails for another reason, show the error and the body.
+- **What changed**: which modules, packages, services, or directories were modified.
+- **Change type**: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `ci`, `build`, `revert`.
+- **Scope**: the primary module/package/service/directory, or `monorepo` / `repo` for cross-cutting changes. Use `terraform` / `infra` for infrastructure-only changes.
+- **Is this a code change?**: if the PR modifies source (not only docs, markdown, or config), local verification applies when creating the PR/MR. If the request is only to write a body, follow the Style Rules instead and read CI status.
 
-## Guardrails
+## Format the title (Conventional Commits)
+
+Use `type(scope): description` — lowercase, imperative description, no trailing period.
+
+- `type`: one of the change types above.
+- `scope`: affected module/package/service/directory, or `monorepo` / `repo`. Multiple scopes may be comma-separated.
+- Prefer the latest commit's subject when it is already a good Conventional Commits title; otherwise derive one from the diff.
+
+Examples:
+
+```
+feat(web): add dark mode toggle
+fix(cli, daemon): load shell env at entrypoint
+fix(api): handle nil response from upstream
+feat(terraform): add private endpoint for the database subnet
+fix(infra): pin provider versions in the shared module
+chore(repo): bump dependencies
+```
+
+## Link a ticket (optional)
+
+If the org uses an issue tracker, ask the user whether to:
+
+- **Create a new ticket** with the appropriate tool (Linear, Jira, GitHub/GitLab issues, etc.).
+- **Link an existing ticket** — ask for the identifier (`TEAM-1234`, `JIRA-567`, `#42`).
+- **Skip** — only if the user explicitly says no ticket is needed.
+
+Put the identifier in the body's issue/related section. Many CI setups require it in the body (often waived for `chore:` and `revert:`). If there is no ticket, write `N/A` only when the repo template explicitly allows it; otherwise omit the line rather than inventing one.
+
+## Local verification (full PR/MR creation only)
+
+Skip this section when the request is only to draft, rewrite, or audit a body — see [Style Rules](#style-rules) for the quick path. Run it when creating a PR/MR or when the user explicitly asks for checks. Prefer filtered/target flags so you only verify what changed (faster than the whole repo).
+
+Discover commands from the repo root: `Makefile`, `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `build.gradle`, `mix.exs`, `Gemfile`, `composer.json`, `justfile`, `Taskfile.yml`, `README.md`, or CI workflow config. Use the repo's own targets when present (`make verify`, `pnpm check`, `just ci`).
+
+### Typecheck / compile
+
+- TypeScript: `npm run typecheck`, `pnpm -r typecheck`, `tsc --noEmit`
+- Python (typed): `mypy .`, `pyright`, `ty check`
+- Rust: `cargo check`
+- Go: `go build ./...`, `go vet ./...`
+- Java/Kotlin: `./gradlew compileJava`, `./mvnw compile`
+- Terraform / OpenTofu: `terraform -chdir=<dir> init -backend=false && terraform -chdir=<dir> validate` (run per changed root/module; `tofu` accepts the same flags)
+
+### Lint / format
+
+- JS/TS: `npm run fix`, `npm run lint`, `eslint .`, `prettier --check .`
+- Python: `ruff check --fix .`, `ruff format .`, `black .`, `flake8`
+- Rust: `cargo clippy --all-targets`, `cargo fmt --check`
+- Go: `golangci-lint run`, `gofmt -l .`
+- Shell: `shellcheck`, `shfmt -d .`
+- Terraform / OpenTofu: `terraform fmt -check -recursive` (autofix: `terraform fmt -recursive`), `tflint --recursive`, `tofu fmt -check -recursive`
+
+### Tests
+
+- JS/TS: `npm run test -- --filter=<workspace>`, `pnpm -r test`, `vitest run <path>`, `jest <path>`
+- Python: `pytest <path>`, `tox -e <env>`, `python -m unittest`
+- Rust: `cargo test -p <crate>`
+- Go: `go test ./<pkg>/...`
+- Java/Kotlin: `./gradlew test`, `./mvnw test`
+- Ruby: `bundle exec rspec <path>`, `rake test`
+- Terraform / OpenTofu: `terraform -chdir=<dir> plan -input=false -lock=false` for a changed root/module, plus `terratest` / `go test ./test/...` when the repo has infrastructure tests
+
+### Additional checks (run when relevant)
+
+- **Unused exports / dead code**: `knip`, `ts-prune`, `vulture` (Python), `unused` (Go), `cargo udeps` (Rust), `tflint` with unused-declaration rules (Terraform).
+- **Dependency hygiene**: `depcheck`, `pip check`, `cargo audit`, `bundle audit`; for Terraform, `tfsec`/`checkov` and provider source pinning checks.
+- **Lockfile / generated state in sync**: after changing a manifest (`package.json`, `requirements.txt`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `Gemfile`, or Terraform provider/backend config), run the install/init command and commit the result. For Terraform, run `terraform -chdir=<dir> init` and commit the updated `.terraform.lock.hcl`; CI commonly fails on provider drift.
+- **Generated code / codegen**: regenerate and commit OpenAPI/protobuf/GraphQL/SQL migration artifacts. For Terraform, regenerate `terraform-docs` README/module docs if the repo enforces them.
+- **Style / asset linters**: `stylelint` and asset linters when those files changed.
+- **Security scans**: repo-configured scanners such as `trivy`, `semgrep`, `gitleaks`, `tfsec`, or `checkov -d <dir>`.
+
+Record which commands you ran and their outcome; that feeds the validation section of the body.
+
+## Write the body
+
+### Guardrails
 
 - Do not mention speculative benefits, future work, or unrelated cleanup.
 - Keep validation concrete: commands, CI status, screenshots, or manual checks.
 
-## Style Rules
+### Style Rules
 
-- Preserve the repository's PR template headings unless the user asks to change the template.
+- Preserve the repository's PR/MR template headings unless the user asks to change the template.
 - Lead with the user/business outcome, reliability impact, or operational reason for the change.
 - Keep the description to 1 short paragraph plus 2-4 bullets when bullets help scanning.
 - Mention technical details only when they clarify behavior, reviewer risk, compatibility, CI impact, or deployment impact.
 - Avoid method-by-method or file-by-file narration unless the user explicitly asks for implementation detail.
 - Check the wording against the [simplify](../simplify/SKILL.md) skill.
 - Keep wording plain and direct. Prefer "Moves retry handling into the shared HTTP client" over deep root-cause prose.
-- Make every claim match the actual diff and current check status. Read the git host's CI status when a PR exists. Never run a test suite or build to write the body: it takes minutes and costs credits. If CI status is unavailable, list the steps a reviewer would follow under How to Test. Do not write "Not run" and do not flag unverified checks in the reply.
-- Writing a body is a quick task (only the publish step writes anything): read `git diff --stat` and the diff of the changed source files, then write. Do not run long commands. Finish in one or two tool calls after reading.
+- Make every claim match the actual diff and current check status. Read the host's CI status when a PR/MR exists. Writing a body is a quick task: read `git diff --stat` and the diff of the changed source files, then write — do not run a test suite or build just to write the body, and do not run long commands. If CI status is unavailable, list the steps a reviewer would follow under How to Test. Do not write "Not run" and do not flag unverified checks in the reply.
+- Finish body-only requests in one or two tool calls after reading. Local verification above applies only when creating a PR/MR.
 - Keep "How to Test" concrete and minimal: commands run, user-visible checks, or CI status.
 - Use "Additional Information" only for high-signal context, risks, retained compatibility shims, or follow-up notes. Keep it empty or one sentence when possible.
 
-## Accuracy Checks
+### Accuracy Checks
 
-Before finalizing a PR body:
+Before finalizing a PR/MR body:
 
 1. Compare it to the current diff, not memory of the plan.
 2. Remove stale claims about files, methods, dependencies, or CI failures that no longer matter.
 3. Keep compatibility/stub notes only when a reviewer could otherwise mistake the code for dead code.
 4. Use business-language framing for technical fixtures, such as "retained timeout constant for tests" instead of listing fixture paths.
 
-## Preferred Shape
+### Preferred Shape
+
+Keep the repo's template when one exists. Otherwise use this shape (the four-section fallback maps as: Description, Related Issue, Potential Risk & Impact, How Has This Been Tested?):
 
 ```markdown
 # Pull Request
@@ -82,6 +175,15 @@ One sentence explaining the outcome or operational reason.
 - CI/local/deployment behavior change
 - Retained compatibility or test support, if relevant
 
+## Related Issue
+
+Closes TEAM-1234
+<!-- or: Part of TEAM-1234, or: N/A when the template allows it -->
+
+## Potential Risk & Impact
+
+- Risk, performance implication, or technical debt — use "N/A" only if truly none
+
 ## How to Test
 
 1. `command`
@@ -92,7 +194,7 @@ One sentence explaining the outcome or operational reason.
 One sentence only if useful.
 ```
 
-## Example Tone
+### Example Tone
 
 Prefer:
 
@@ -109,3 +211,99 @@ Avoid:
 ```markdown
 Root cause: `retryLoop()` in `jobs/report.ts` was deleted, `sleep()` in `jobs/export.ts` now calls `client.backoff()`, and the `RETRY_MS` constant is re-exported from `lib/http/index.ts`...
 ```
+
+## Create or update the PR/MR
+
+A request to write or update a body is the user's standing approval to publish it: do not stop at a draft and do not ask first. A question about an existing body (is it accurate, too long, ready) gets the answer and a corrected body, and publishes only if the user then says so.
+
+1. Push the branch if it has no upstream or is ahead of it: `git push -u origin <branch>`.
+2. Write the body to a temp file and pass it as a file so the shell does not mangle quotes or backticks (e.g. `/tmp/pr-body.md`).
+3. If a PR/MR for the branch exists, replace its body. Otherwise create it against the default branch with the Conventional Commits title.
+4. Reply with the PR/MR links, one line each. Do not paste the bodies back unless asked.
+
+### GitHub (`gh`)
+
+```bash
+# create
+gh pr create --base <base> --head <branch> --title "<type>(<scope>): <description>" --body-file <file>
+
+# update an existing PR's body
+gh pr edit <number> --body-file <file>
+
+# API form (automation; --field body=@<file> reads the file)
+gh api --method POST repos/{owner}/{repo}/pulls \
+  --field title="<type>(<scope>): <description>" \
+  --field head="<branch>" --field base="<base>" \
+  --field body=@<file>
+gh api --method PATCH repos/{owner}/{repo}/pulls/<number> --field body=@<file>
+```
+
+### GitLab (`glab`)
+
+Use "merge request" / MR wording in the title context and body headings.
+
+```bash
+# create
+glab mr create --source-branch <branch> --target-branch <base> \
+  --title "<type>(<scope>): <description>" \
+  --description "$(cat <file>)" --yes
+
+# update an existing MR's body
+glab mr update <iid> --description "$(cat <file>)"
+
+# API form (automation)
+glab api --method POST projects/:id/merge_requests \
+  --field source_branch="<branch>" --field target_branch="<base>" \
+  --field title="<type>(<scope>): <description>" \
+  --field description=@<file>
+glab api --method PUT projects/:id/merge_requests/<iid> --field description=@<file>
+```
+
+Prefer the CLI (`gh pr create`, `glab mr create`) over raw API calls; reach for the API only for automation or fields the CLI does not expose. Resolve `:id` as the URL-encoded project path when needed.
+
+### Factory branches
+
+Factory branches live in `.worktrees/<id>/` and carry a pre-push hook that refuses any push without the board's key. When the user invoked this skill directly, that click already happened: push from the worktree with `git push --no-verify -u origin <branch>`, but only when `git rev-parse HEAD` equals the job's `commit`. If the tip differs, someone committed after the user's click: skip that branch and say why in one line. `--no-verify` also skips the repo's own pre-push hook, so run it first if `.git/hooks/pre-push` or the `core.hooksPath` of the main checkout has one.
+
+Never end by handing the user commands to push or open the PR/MR. Do it. Skip publishing only when the user says "draft only" or similar, when the target is a PR/MR in someone else's repo, or when this skill runs as a `factory` stage (factory forbids push and `gh`/`glab`). If the push or CLI/API call fails for another reason, show the error and the body.
+
+## CI Checks Reference
+
+These are typical check categories. Map them to the repo's actual commands when adapting this skill.
+
+### Always-run checks
+
+| Category | What it does | How to find the local command |
+|---|---|---|
+| **Typecheck / compile** | Verifies the project compiles or passes static types | Check `package.json`, `Makefile`, `pyproject.toml`, `Cargo.toml`, `go.mod`, CI config; for Terraform, `terraform init -backend=false && terraform validate` |
+| **Lint** | Enforces code style / correctness rules | Check for `lint`, `check`, or equivalent scripts; for Terraform, `tflint --recursive` |
+| **Format** | Enforces consistent formatting | Check for `format`, `fmt`, `prettier`, `black`, `gofmt`, `rustfmt`, `terraform fmt -check -recursive` |
+| **Tests** | Runs unit and integration tests | Check for `test` script / target; for Terraform, `terraform plan` and `terratest` |
+| **Dead code / unused exports** | Flags unused code | `knip`, `ts-prune`, `vulture`, `cargo udeps`, `tflint` unused rules |
+| **Dependency check** | Flags unused / vulnerable dependencies | `depcheck`, `audit`, `cargo audit`, `tfsec`, `checkov` |
+| **Lockfile in sync** | Fails if lockfile is stale relative to the manifest | Run the package manager's install command and commit the lockfile; for Terraform commit `.terraform.lock.hcl` |
+| **PR Conventions** | Validates branch name, semantic title, ticket presence | Follow the formatting rules above |
+
+### Conditional checks (run only when affected files change)
+
+- **API / schema validation**: triggered by API or schema changes. Regenerate locally.
+- **Platform-specific builds**: triggered when desktop/mobile/embedded targets are affected.
+- **E2E tests**: triggered when the consumer app or top-level binary is affected.
+- **Infrastructure plans**: triggered by Terraform/OpenTofu changes. Run `terraform fmt -check`, `validate`, `plan`, and security scans for the changed root/module; commit regenerated module docs and `.terraform.lock.hcl`.
+
+### Typical conventions CI enforces
+
+- **Branch name**: max length, allowed characters (e.g. `[A-Za-z0-9/-]`).
+- **Title**: Conventional Commits format with a valid scope.
+- **Ticket reference**: body must contain a ticket identifier (often skipped for `chore:` / `revert:`).
+
+## Common Mistakes to Avoid
+
+- **Wrong base branch**: use the branch the org takes PRs/MRs into (`main`, `dev`, `develop`, `trunk`).
+- **Wrong host tool**: `gh` creates PRs on GitHub and `glab` creates MRs on GitLab; do not cross them.
+- **Missing scope**: title CI checks often require a valid scope.
+- **Missing ticket reference**: the body must reference the ticket ID for CI to pass (except `chore:` / `revert:`).
+- **Forgetting to push**: the branch must be on the remote before `gh pr create` / `glab mr create`.
+- **Lockfile drift**: run the install/init command and commit lockfile changes after dependency changes, including Terraform's `.terraform.lock.hcl`.
+- **Skipping local checks on code PRs**: typecheck/compile, lint, and tests should run locally before sending code changes, to avoid CI round-trips.
+- **Uncommitted generated artifacts**: after API/schema changes, or Terraform module/doc regeneration, commit the output.

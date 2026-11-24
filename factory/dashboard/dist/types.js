@@ -1,5 +1,5 @@
 // Generated from types.ts by build.mjs. Do not edit.
-// The /api/jobs payload: the job.json fields from cmd_create and the later stages, plus what snapshot() adds.
+// The /api/<board>/jobs payload: the job.json fields of either engine, plus what its snapshot() adds.
                         
                  
                 
@@ -23,53 +23,67 @@
              
                 
                 
-                
+                 
+                       
                       
-                      
-                    
-                                    
-                             
                   
                         
                                   
                    
                         
                           
-                        
-                     
-                  
-                       
+                         
                
                        
                         
                        
-                    
-                      
-                     
-                       
-                           
+                              
                                              
-                      
+                       
                                          
                   
                        
                       
+                        
                        
-                      
- 
-
-                         
-                
-                   
                         
-                
-                   
  
 
                         
+             
+                
+                
+ 
+
+                                              
+
+// One engine's board: its stages and how its jobs read in the panel.
+                           
+             
+                
+                
+               
+                  
+               
+                  
+                    
+                    
+                
+               
+                                                 
+                                   
+                                
+                                                             
+ 
+
+                       
+                
               
                         
                           
+                 
+                          
+              
                   
-                    
+                      
  

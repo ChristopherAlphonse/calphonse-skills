@@ -174,9 +174,9 @@ A pass finds nothing to run, or only `hold` rows, and ends. To repeat passes, sc
 
 ## Board
 
-`JOB board` starts the board if needed and prints its link (see First action); `JOB watch [port]` (default 8766) runs it in the foreground, and `JOB serve` is the same. It needs no terminal. Its link stays valid until the process stops and can open in several tabs. The board reads `.planning/factory-review/jobs/*/job.json` every 2 seconds.
+`JOB board` starts the board if needed and prints its link (see First action); `JOB watch [port]` (default 8766) runs it in the foreground, and `JOB serve` is the same. The board is shared with `factory`: both skills print the same link, and the server is `factory/bin/board`. It needs no terminal. Its link stays valid until the process stops and can open in several tabs. The board reads `.planning/factory-review/jobs/*/job.json` every 2 seconds.
 
-The page is a canvas of connected stage nodes (Scope, Review, Reconcile, Verify, Report, Ready), a top bar with Pipeline, Needs you and Reported tabs, a side panel, and an ask bar at the bottom. Each review is a chip on its stage. A parked review sits on its stage, outlined, and its panel has Unblock. The panel also shows the compared refs, the stack skills, one chip per reviewer, the findings and blockers counts once the report exists, a skill switch, a stage note, and every file in the job folder. The ask bar answers questions about the review and makes the same skill and note changes. It never edits code.
+In the board, open the **Review** tab (the left sidebar lists every board; click one or drag it onto the tab strip). It is a canvas of connected stage nodes (Scope, Review, Reconcile, Verify, Report, Ready), with Pipeline, Needs you and Reported filters, a side panel, and an ask bar at the bottom. Each review is a chip on its stage. A parked review sits on its stage, outlined, and its panel has Unblock. The panel also shows the compared refs, the stack skills, one chip per reviewer, the findings and blockers counts once the report exists, a skill switch, a stage note, and every file in the job folder. The ask bar answers questions about the review and makes the same skill and note changes. It never edits code.
 
 ## Out of scope
 

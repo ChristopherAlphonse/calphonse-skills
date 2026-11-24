@@ -169,9 +169,9 @@ class Review(unittest.TestCase):
         conn.putrequest(method, path, skip_host=True)
         conn.putheader("Host", host or f"127.0.0.1:{self.port}")
         if cookie is True:
-            conn.putheader("Cookie", f"factory-review-{self.port}={self.cookie}")
+            conn.putheader("Cookie", f"factory-board-{self.port}={self.cookie}")
         elif cookie:
-            conn.putheader("Cookie", f"factory-review-{self.port}={cookie}")
+            conn.putheader("Cookie", f"factory-board-{self.port}={cookie}")
         if xfactory:
             conn.putheader("X-Factory", "1")
         data = raw if raw is not None else (json.dumps(body).encode() if body is not None else b"")
@@ -195,5 +195,5 @@ class Review(unittest.TestCase):
 
     def unblock(self, jid):
         self.board()
-        st, _ = self.http("POST", "/api/unblock", body={"id": jid})
+        st, _ = self.http("POST", "/api/review/unblock", body={"id": jid})
         self.assertEqual(st, 200, f"board refused unblock {jid}")

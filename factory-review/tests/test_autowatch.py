@@ -52,8 +52,8 @@ class TestAutoStart(AutoWatch):
     def test_create_starts_a_board_and_prints_its_link(self):
         r = self.create("j")
         self.redeem(self.link(r))
-        self.assertEqual([j["id"] for j in json.loads(self.http("GET", "/api/jobs")[1])], ["j"])
-        self.assertEqual(self.http("POST", "/api/unblock", body={"id": "j"})[0], 409)
+        self.assertEqual([j["id"] for j in json.loads(self.http("GET", "/api/review/jobs")[1])], ["j"])
+        self.assertEqual(self.http("POST", "/api/review/unblock", body={"id": "j"})[0], 409)
 
     def test_queue_reuses_the_running_board(self):
         first = self.link(self.create("j"))
@@ -81,7 +81,7 @@ class TestAutoStart(AutoWatch):
         url = self.link(self.ok("queue"))
         self.assertNotEqual(self.watch_info()["pid"], old["pid"])
         self.redeem(url)
-        self.assertEqual(self.http("GET", "/api/jobs")[0], 200)
+        self.assertEqual(self.http("GET", "/api/review/jobs")[0], 200)
 
     def test_board_prints_the_same_link_on_stdout(self):
         url = self.link(self.create("j"))
@@ -97,7 +97,7 @@ class TestAutoStart(AutoWatch):
         self.park("s")
         self.ok("queue")
         self.redeem(self.watch_info()["url"])
-        job = json.loads(self.http("GET", "/api/jobs")[1])[0]
+        job = json.loads(self.http("GET", "/api/review/jobs")[1])[0]
         self.assertTrue(job["needs_human"])
         self.assertTrue(job["can_unblock"])
         self.assertTrue((self.state / "human.sha256").exists())
@@ -134,7 +134,7 @@ class TestPorts(AutoWatch):
         self.assertNotEqual(self.watch_info()["port"], 8766)
         self.assertGreaterEqual(self.watch_info()["port"], 8767)
         self.redeem(self.watch_info()["url"])
-        self.assertEqual(self.http("GET", "/api/jobs")[0], 200)
+        self.assertEqual(self.http("GET", "/api/review/jobs")[0], 200)
 
     def test_two_projects_get_two_boards(self):
         self.create("j")

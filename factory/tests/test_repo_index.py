@@ -79,9 +79,9 @@ class RepoIndex(unittest.TestCase):
             with self.subTest(rel=rel):
                 self.assertTrue((REPO / "factory" / rel).exists())
                 self.assertTrue((REPO / "factory-review" / rel).exists())
-        for rel in ("index.html", "app.ts", "dist/app.js", "dashboard.css"):
+        for rel in ("index.html", "app.ts", "dist/app.js", "dashboard.css", "../bin/board"):
             with self.subTest(rel=rel):
-                self.assertTrue((REPO / "factory-review" / "dashboard" / rel).exists())
+                self.assertTrue((REPO / "factory" / "dashboard" / rel).exists())
 
     def test_both_skills_carry_the_same_baseline_policy(self):
         a, b = (REPO / s / "policy.yaml" for s in ("factory", "factory-review"))

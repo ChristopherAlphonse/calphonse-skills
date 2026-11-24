@@ -254,7 +254,7 @@ class TestBoardView(Review):
         self.wf("r", "report.md", "STATUS: READY\nFINDINGS: 1\nBLOCKERS: 1\n\nreport\n")
         self.ok("create", "b", "T")
         self.board()
-        status, out = self.http("GET", "/api/jobs")
+        status, out = self.http("GET", "/api/build/jobs")
         self.assertEqual(status, 200)
         jobs = {j["id"]: j for j in json.loads(out)}
         self.assertEqual(jobs["r"]["kind"], "review")

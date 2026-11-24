@@ -205,9 +205,9 @@ class Factory(unittest.TestCase):
         conn.putrequest(method, path, skip_host=True)
         conn.putheader("Host", host or f"127.0.0.1:{self.port}")
         if cookie is True:
-            conn.putheader("Cookie", f"factory-{self.port}={self.cookie}")
+            conn.putheader("Cookie", f"factory-board-{self.port}={self.cookie}")
         elif cookie:
-            conn.putheader("Cookie", f"factory-{self.port}={cookie}")
+            conn.putheader("Cookie", f"factory-board-{self.port}={cookie}")
         if xfactory:
             conn.putheader("X-Factory", "1")
         data = raw if raw is not None else (json.dumps(body).encode() if body is not None else b"")
@@ -232,12 +232,12 @@ class Factory(unittest.TestCase):
     def human(self, action, jid):
         """Run a human action the only way it can run: a click on the board."""
         self.board()
-        st, _ = self.http("POST", f"/api/{action}", body={"id": jid})
+        st, _ = self.http("POST", f"/api/build/{action}", body={"id": jid})
         self.assertEqual(st, 200, f"board refused {action} {jid}")
 
     def human_refused(self, action, jid):
         self.board()
-        st, out = self.http("POST", f"/api/{action}", body={"id": jid})
+        st, out = self.http("POST", f"/api/build/{action}", body={"id": jid})
         self.assertEqual(st, 409, f"board unexpectedly accepted {action} {jid}")
         return out
 
@@ -966,7 +966,7 @@ class TestServer(Factory):
         self.start_server()
 
     def get_jobs(self):
-        st, body = self.http("GET", "/api/jobs")
+        st, body = self.http("GET", "/api/build/jobs")
         self.assertEqual(st, 200)
         return {j["id"]: j for j in json.loads(body)}
 
@@ -1030,19 +1030,19 @@ class TestServer(Factory):
     def test_api_needs_cookie_and_custom_header(self):
         self.ok("create", "j", "T")
         self.assertIn("j", self.get_jobs())
-        self.assertEqual(self.http("GET", "/api/jobs", cookie=False)[0], 403)
-        self.assertEqual(self.http("GET", "/api/jobs", cookie="wrong")[0], 403)
-        self.assertEqual(self.http("GET", "/api/jobs", xfactory=False)[0], 403)
-        self.assertEqual(self.http("GET", f"/api/jobs?c={self.code}&t={self.cookie}", cookie=False, xfactory=False)[0], 403)
+        self.assertEqual(self.http("GET", "/api/build/jobs", cookie=False)[0], 403)
+        self.assertEqual(self.http("GET", "/api/build/jobs", cookie="wrong")[0], 403)
+        self.assertEqual(self.http("GET", "/api/build/jobs", xfactory=False)[0], 403)
+        self.assertEqual(self.http("GET", f"/api/build/jobs?c={self.code}&t={self.cookie}", cookie=False, xfactory=False)[0], 403)
 
     def test_wrong_host_rejected_even_with_session(self):
         self.assertEqual(self.http("GET", "/", host="evil.example")[0], 403)
-        self.assertEqual(self.http("GET", "/api/jobs", host="evil.example")[0], 403)
-        self.assertEqual(self.http("GET", "/api/jobs")[0], 200)
+        self.assertEqual(self.http("GET", "/api/build/jobs", host="evil.example")[0], 403)
+        self.assertEqual(self.http("GET", "/api/build/jobs")[0], 200)
 
     def test_oversized_and_bad_content_length_refused(self):
         self.new_spec("a")
-        self.assertEqual(self.http("POST", "/api/approve", raw=b"x" * (64 * 1024 + 1))[0], 413)
+        self.assertEqual(self.http("POST", "/api/build/approve", raw=b"x" * (64 * 1024 + 1))[0], 413)
         self.assertFalse(self.js("a")["approvals"].get("spec"))
 
     def test_snapshot_fields(self):
@@ -1102,21 +1102,21 @@ class TestServer(Factory):
         self.ok("create", "b", "T")
         self.wf("b", "secret.md", "other job\n")
         self.wf("a", "notes.txt", "t\n")
-        st, body = self.http("GET", "/api/file?job=a&name=spec.md")
+        st, body = self.http("GET", "/api/build/file?job=a&name=spec.md")
         self.assertEqual((st, body), (200, b"# spec\n"))
-        self.assertEqual(self.http("GET", "/api/file?job=a&name=spec.md", cookie=False)[0], 403)
-        self.assertEqual(self.http("GET", "/api/file?job=b&name=secret.md")[0], 200)
-        self.assertEqual(self.http("GET", "/api/file?job=a&name=../b/secret.md")[0], 404)
-        self.assertEqual(self.http("GET", "/api/file?job=a&name=..%2Fb%2Fsecret.md")[0], 404)
-        self.assertEqual(self.http("GET", "/api/file?job=a&name=job.json")[0], 404)
-        self.assertEqual(self.http("GET", "/api/file?job=a&name=notes.txt")[0], 404)
-        self.assertEqual(self.http("GET", "/api/file?job=zzz&name=spec.md")[0], 404)
-        self.assertEqual(self.http("GET", "/api/file?job=../a&name=spec.md")[0], 404)
-        self.assertEqual(self.http("GET", "/api/file?job=a&name=../../../../../../etc/hosts")[0], 404)
+        self.assertEqual(self.http("GET", "/api/build/file?job=a&name=spec.md", cookie=False)[0], 403)
+        self.assertEqual(self.http("GET", "/api/build/file?job=b&name=secret.md")[0], 200)
+        self.assertEqual(self.http("GET", "/api/build/file?job=a&name=../b/secret.md")[0], 404)
+        self.assertEqual(self.http("GET", "/api/build/file?job=a&name=..%2Fb%2Fsecret.md")[0], 404)
+        self.assertEqual(self.http("GET", "/api/build/file?job=a&name=job.json")[0], 404)
+        self.assertEqual(self.http("GET", "/api/build/file?job=a&name=notes.txt")[0], 404)
+        self.assertEqual(self.http("GET", "/api/build/file?job=zzz&name=spec.md")[0], 404)
+        self.assertEqual(self.http("GET", "/api/build/file?job=../a&name=spec.md")[0], 404)
+        self.assertEqual(self.http("GET", "/api/build/file?job=a&name=../../../../../../etc/hosts")[0], 404)
 
     def test_approve_over_http(self):
         self.new_spec("a")
-        self.assertEqual(self.http("POST", "/api/approve", body={"id": "a"})[0], 200)
+        self.assertEqual(self.http("POST", "/api/build/approve", body={"id": "a"})[0], 200)
         self.assertTrue(self.js("a")["approvals"].get("spec"))
         self.adv("a", "build")
         ap = [l for l in self.audit_lines() if l["action"] == "approve"]
@@ -1124,10 +1124,10 @@ class TestServer(Factory):
 
     def test_approve_without_session_or_bad_host_changes_nothing(self):
         self.new_spec("a")
-        self.assertEqual(self.http("POST", "/api/approve", cookie=False, body={"id": "a"})[0], 403)
-        self.assertEqual(self.http("POST", "/api/approve", cookie="bad", body={"id": "a"})[0], 403)
-        self.assertEqual(self.http("POST", "/api/approve", host="evil.example", body={"id": "a"})[0], 403)
-        self.assertEqual(self.http("POST", "/api/approve", xfactory=False, body={"id": "a"})[0], 403)
+        self.assertEqual(self.http("POST", "/api/build/approve", cookie=False, body={"id": "a"})[0], 403)
+        self.assertEqual(self.http("POST", "/api/build/approve", cookie="bad", body={"id": "a"})[0], 403)
+        self.assertEqual(self.http("POST", "/api/build/approve", host="evil.example", body={"id": "a"})[0], 403)
+        self.assertEqual(self.http("POST", "/api/build/approve", xfactory=False, body={"id": "a"})[0], 403)
         self.assertFalse(self.js("a")["approvals"].get("spec"))
         self.no("advance", "a", "build")
 
@@ -1136,41 +1136,41 @@ class TestServer(Factory):
         self.new_spec("b")
         self.no("approve", "a", "spec")
         self.assertFalse(self.js("a")["approvals"].get("spec"))
-        self.assertEqual(self.http("POST", "/api/approve", body={"id": "b"})[0], 200)
+        self.assertEqual(self.http("POST", "/api/build/approve", body={"id": "b"})[0], 200)
         self.no("approve", "a", "spec")
         self.assertFalse(self.js("a")["approvals"].get("spec"))
 
     def test_post_with_a_non_string_id_gets_a_400(self):
         for bad in (5, None, ["a"], {"a": 1}):
             with self.subTest(bad=bad):
-                self.assertEqual(self.http("POST", "/api/approve", body={"id": bad})[0], 400)
+                self.assertEqual(self.http("POST", "/api/build/approve", body={"id": bad})[0], 400)
 
     def test_post_status_codes(self):
         self.new_spec("a")
-        self.assertEqual(self.http("POST", "/api/approve", raw=b"not json")[0], 400)
-        self.assertEqual(self.http("POST", "/api/approve", body={"nope": 1})[0], 400)
-        self.assertEqual(self.http("POST", "/api/approve", body={"id": "missing"})[0], 409)
-        self.assertEqual(self.http("POST", "/api/commit", body={"id": "a"})[0], 409)
-        self.assertEqual(self.http("POST", "/api/unblock", body={"id": "a"})[0], 409)
-        self.assertEqual(self.http("POST", "/api/approve", body={"id": "a"})[0], 200)
+        self.assertEqual(self.http("POST", "/api/build/approve", raw=b"not json")[0], 400)
+        self.assertEqual(self.http("POST", "/api/build/approve", body={"nope": 1})[0], 400)
+        self.assertEqual(self.http("POST", "/api/build/approve", body={"id": "missing"})[0], 409)
+        self.assertEqual(self.http("POST", "/api/build/commit", body={"id": "a"})[0], 409)
+        self.assertEqual(self.http("POST", "/api/build/unblock", body={"id": "a"})[0], 409)
+        self.assertEqual(self.http("POST", "/api/build/approve", body={"id": "a"})[0], 200)
         self.adv("a", "build")
-        self.assertEqual(self.http("POST", "/api/approve", body={"id": "a"})[0], 409)
+        self.assertEqual(self.http("POST", "/api/build/approve", body={"id": "a"})[0], 409)
 
     def test_commit_over_http(self):
         self.to_ship("a")
-        self.assertEqual(self.http("POST", "/api/commit", cookie=False, body={"id": "a"})[0], 403)
+        self.assertEqual(self.http("POST", "/api/build/commit", cookie=False, body={"id": "a"})[0], 403)
         self.assertIsNone(self.js("a")["commit"])
-        self.assertEqual(self.http("POST", "/api/commit", body={"id": "a"})[0], 200)
+        self.assertEqual(self.http("POST", "/api/build/commit", body={"id": "a"})[0], 200)
         self.assertTrue(self.js("a")["commit"])
-        self.assertEqual(self.http("POST", "/api/commit", body={"id": "a"})[0], 409)
+        self.assertEqual(self.http("POST", "/api/build/commit", body={"id": "a"})[0], 409)
 
     def test_unblock_over_http(self):
         self.to_build("a")
         self.wf("a", "build.md", "STATUS: BLOCKED\n")
         self.adv("a", "needs-human")
-        self.assertEqual(self.http("POST", "/api/unblock", host="evil.example", body={"id": "a"})[0], 403)
+        self.assertEqual(self.http("POST", "/api/build/unblock", host="evil.example", body={"id": "a"})[0], 403)
         self.assertEqual(self.stage("a"), "needs-human")
-        self.assertEqual(self.http("POST", "/api/unblock", body={"id": "a"})[0], 200)
+        self.assertEqual(self.http("POST", "/api/build/unblock", body={"id": "a"})[0], 200)
         self.assertEqual(self.stage("a"), "build")
 
 

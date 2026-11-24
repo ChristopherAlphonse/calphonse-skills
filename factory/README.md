@@ -113,7 +113,7 @@ sequenceDiagram
 
 ## Following along
 
-One board, started with `bin/job board` by you or an agent. It has the Approve spec, Commit locally and Unblock buttons, holds the approval key in memory, and its link works in several tabs until the process stops.
+One board for every factory skill, started with `bin/job board` by you or an agent, served by `bin/board`. `factory` and `factory-review` print the same link. A left sidebar lists the boards (Build, Review); open one as a tab by clicking it or dragging it onto the tab strip, and drag tabs to reorder them. Each board keeps its own state, so you can switch between two at once. The Build board has the Approve spec, Commit locally and Unblock buttons. The server holds the approval key in memory, and its link works in several tabs until the process stops.
 
 `watch` and `serve` are the same board: buttons, a skill switch and note per job, and a chat bar.
 

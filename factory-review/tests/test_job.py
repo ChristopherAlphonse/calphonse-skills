@@ -166,7 +166,7 @@ class TestStages(Review):
     def test_unblock_only_works_on_a_parked_job(self):
         self.new_review()
         self.board()
-        self.assertEqual(self.http("POST", "/api/unblock", body={"id": "r"})[0], 409)
+        self.assertEqual(self.http("POST", "/api/review/unblock", body={"id": "r"})[0], 409)
 
 
 class TestQueue(Review):
@@ -278,7 +278,7 @@ class TestServer(Review):
         self.start_server()
 
     def jobs(self):
-        st, body = self.http("GET", "/api/jobs")
+        st, body = self.http("GET", "/api/review/jobs")
         self.assertEqual(st, 200)
         return {j["id"]: j for j in json.loads(body)}
 
@@ -308,10 +308,10 @@ class TestServer(Review):
     def test_the_api_needs_the_cookie_the_header_and_a_loopback_host(self):
         self.new_review()
         self.assertIn("r", self.jobs())
-        self.assertEqual(self.http("GET", "/api/jobs", cookie=False)[0], 403)
-        self.assertEqual(self.http("GET", "/api/jobs", cookie="wrong")[0], 403)
-        self.assertEqual(self.http("GET", "/api/jobs", xfactory=False)[0], 403)
-        self.assertEqual(self.http("GET", "/api/jobs", host="evil.example")[0], 403)
+        self.assertEqual(self.http("GET", "/api/review/jobs", cookie=False)[0], 403)
+        self.assertEqual(self.http("GET", "/api/review/jobs", cookie="wrong")[0], 403)
+        self.assertEqual(self.http("GET", "/api/review/jobs", xfactory=False)[0], 403)
+        self.assertEqual(self.http("GET", "/api/review/jobs", host="evil.example")[0], 403)
 
     def test_snapshot_carries_the_review_fields(self):
         self.new_review()
@@ -332,34 +332,34 @@ class TestServer(Review):
         self.wf("b", "secret.md", "other job\n")
         self.wf("a", "notes.txt", "t\n")
         self.wf("a", "scope.md", "STATUS: READY\n")
-        self.assertEqual(self.http("GET", "/api/file?job=a&name=scope.md"), (200, b"STATUS: READY\n"))
-        self.assertEqual(self.http("GET", "/api/file?job=a&name=scope.md", cookie=False)[0], 403)
+        self.assertEqual(self.http("GET", "/api/review/file?job=a&name=scope.md"), (200, b"STATUS: READY\n"))
+        self.assertEqual(self.http("GET", "/api/review/file?job=a&name=scope.md", cookie=False)[0], 403)
         for name in ("../b/secret.md", "..%2Fb%2Fsecret.md", "job.json", "notes.txt", "../../../../../../etc/hosts"):
-            self.assertEqual(self.http("GET", f"/api/file?job=a&name={name}")[0], 404, name)
-        self.assertEqual(self.http("GET", "/api/file?job=zzz&name=scope.md")[0], 404)
-        self.assertEqual(self.http("GET", "/api/file?job=../a&name=scope.md")[0], 404)
+            self.assertEqual(self.http("GET", f"/api/review/file?job=a&name={name}")[0], 404, name)
+        self.assertEqual(self.http("GET", "/api/review/file?job=zzz&name=scope.md")[0], 404)
+        self.assertEqual(self.http("GET", "/api/review/file?job=../a&name=scope.md")[0], 404)
 
     def test_unblock_over_http_needs_session_header_and_host(self):
         self.new_review()
         self.park("r")
         for kw in ({"cookie": False}, {"cookie": "bad"}, {"host": "evil.example"}, {"xfactory": False}):
-            self.assertEqual(self.http("POST", "/api/unblock", body={"id": "r"}, **kw)[0], 403)
+            self.assertEqual(self.http("POST", "/api/review/unblock", body={"id": "r"}, **kw)[0], 403)
         self.assertEqual(self.stage("r"), "needs-human")
         self.assertTrue(self.jobs()["r"]["can_unblock"])
         n = self.jobs()["r"]["needs"]
         self.assertEqual(n["action"], "Unblock")
         self.assertNotIn("command", n)
-        self.assertEqual(self.http("POST", "/api/unblock", body={"id": "r"})[0], 200)
+        self.assertEqual(self.http("POST", "/api/review/unblock", body={"id": "r"})[0], 200)
         self.assertEqual(self.stage("r"), "scope")
 
     def test_post_status_codes(self):
         self.new_review()
-        self.assertEqual(self.http("POST", "/api/unblock", raw=b"not json")[0], 400)
-        self.assertEqual(self.http("POST", "/api/unblock", body={"nope": 1})[0], 400)
-        self.assertEqual(self.http("POST", "/api/unblock", raw=b"x" * (64 * 1024 + 1))[0], 413)
-        self.assertEqual(self.http("POST", "/api/unblock", body={"id": "missing"})[0], 409)
+        self.assertEqual(self.http("POST", "/api/review/unblock", raw=b"not json")[0], 400)
+        self.assertEqual(self.http("POST", "/api/review/unblock", body={"nope": 1})[0], 400)
+        self.assertEqual(self.http("POST", "/api/review/unblock", raw=b"x" * (64 * 1024 + 1))[0], 413)
+        self.assertEqual(self.http("POST", "/api/review/unblock", body={"id": "missing"})[0], 409)
         for gone in ("approve", "commit"):
-            self.assertEqual(self.http("POST", f"/api/{gone}", body={"id": "r"})[0], 404)
+            self.assertEqual(self.http("POST", f"/api/review/{gone}", body={"id": "r"})[0], 404)
 
     def test_serve_is_audited(self):
         self.assertTrue(any(e["action"] == "watch" for e in self.audit_lines()))

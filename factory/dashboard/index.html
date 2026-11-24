@@ -8,10 +8,19 @@
   </head>
   <body>
     <nav id="top">
+      <button id="side-toggle" type="button" aria-label="Show or hide the boards list" aria-expanded="true" title="Boards">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M9.5 4.5v15"/></svg>
+      </button>
       <div class="brand"><b>Factory</b><span id="meta">connecting</span></div>
-      <div id="tabs" role="tablist"></div>
+      <div id="boardtabs" role="tablist" aria-label="Open boards"></div>
+      <div id="filters" role="tablist"></div>
       <button id="panel-toggle" type="button" title="Show or hide the side panel">Panel</button>
     </nav>
+    <aside id="side" aria-label="Boards">
+      <div class="sidehead">Boards</div>
+      <div id="boardlist"></div>
+      <p class="sidehint">Drag a board onto the tabs to open it, or onto another board to reorder.</p>
+    </aside>
     <main id="canvas">
       <div id="stage"><div id="rows"><svg id="wires" aria-hidden="true"></svg><div id="lanes"></div></div></div>
       <div id="zoom"><button id="zoom-out" type="button" aria-label="Zoom out">−</button><button id="zoom-fit" type="button" aria-label="Fit to window">⤢</button><button id="zoom-in" type="button" aria-label="Zoom in">+</button></div>

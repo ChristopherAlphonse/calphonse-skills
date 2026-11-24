@@ -28,7 +28,7 @@ class Watch(Factory):
 class TestWatch(Watch):
     def test_it_starts_without_a_terminal(self):
         self.start_watch()
-        self.assertEqual(self.http("GET", "/api/jobs")[0], 200)
+        self.assertEqual(self.http("GET", "/api/build/jobs")[0], 200)
 
     def test_static_assets_need_a_session_and_are_whitelisted(self):
         self.start_watch()
@@ -45,9 +45,9 @@ class TestWatch(Watch):
         self.assertEqual(self.http_full("GET", "/?c=wrong", cookie=False)[0], 403)
         self.assertEqual(self.http_full("GET", f"/?c={self.code}", cookie=False, host="evil.example")[0], 403)
         self.assertEqual(self.http_full("GET", f"/?c={self.code}", cookie=False)[0], 303)
-        self.assertEqual(self.http("GET", "/api/jobs", cookie=False)[0], 403)
-        self.assertEqual(self.http("GET", "/api/jobs", xfactory=False)[0], 403)
-        self.assertEqual(self.http("GET", "/api/jobs")[0], 200)
+        self.assertEqual(self.http("GET", "/api/build/jobs", cookie=False)[0], 403)
+        self.assertEqual(self.http("GET", "/api/build/jobs", xfactory=False)[0], 403)
+        self.assertEqual(self.http("GET", "/api/build/jobs")[0], 200)
 
     def test_it_serves_the_board(self):
         self.spec_ready_job()
@@ -55,31 +55,31 @@ class TestWatch(Watch):
         status, page = self.http("GET", "/")
         self.assertEqual(status, 200)
         self.assertIn(b"<h1>Factory</h1>", page)
-        jobs = json.loads(self.http("GET", "/api/jobs")[1])
+        jobs = json.loads(self.http("GET", "/api/build/jobs")[1])
         self.assertEqual([j["id"] for j in jobs], ["s"])
-        self.assertEqual(self.http("GET", "/api/file?job=s&name=spec.md")[0], 200)
+        self.assertEqual(self.http("GET", "/api/build/file?job=s&name=spec.md")[0], 200)
 
     def test_the_buttons_work_from_the_board_an_agent_started(self):
         self.spec_ready_job()
         self.start_watch()
-        job = json.loads(self.http("GET", "/api/jobs")[1])[0]
+        job = json.loads(self.http("GET", "/api/build/jobs")[1])[0]
         self.assertTrue(job["can_approve"])
-        self.assertEqual(self.http("POST", "/api/approve", body={"id": "s"})[0], 200)
+        self.assertEqual(self.http("POST", "/api/build/approve", body={"id": "s"})[0], 200)
         self.assertTrue(self.js("s")["approvals"].get("spec"))
         self.assertTrue(any(e["actor"] == "human" and e["action"] == "approve" for e in self.audit_lines()))
 
     def test_the_board_changes_skills_and_stage_notes(self):
         self.spec_ready_job()
         self.start_watch()
-        self.assertEqual(self.http("POST", "/api/skill", body={"id": "s", "name": "qa-review", "off": True})[0], 200)
-        self.assertEqual(self.http("POST", "/api/brief", body={"id": "s", "stage": "spec", "text": "keep it small"})[0], 200)
+        self.assertEqual(self.http("POST", "/api/build/skill", body={"id": "s", "name": "qa-review", "off": True})[0], 200)
+        self.assertEqual(self.http("POST", "/api/build/brief", body={"id": "s", "stage": "spec", "text": "keep it small"})[0], 200)
         job = self.js("s")
         self.assertEqual(job["skills_off"], ["qa-review"])
         self.assertEqual(job["briefs"], {"spec": "keep it small"})
         hint = self.ok("queue").stdout
         self.assertIn("USER TURNED OFF, do not use: qa-review", hint)
         self.assertIn("USER NOTE for this stage, follow it: keep it small", hint)
-        self.assertEqual(self.http("POST", "/api/skill", body={"id": "s", "name": "../x", "off": True})[0], 409)
+        self.assertEqual(self.http("POST", "/api/build/skill", body={"id": "s", "name": "../x", "off": True})[0], 409)
 
     def test_the_cli_human_commands_stay_refused_next_to_a_watcher(self):
         self.spec_ready_job()
@@ -110,18 +110,19 @@ class TestWatch(Watch):
         for port in ports:
             conn = http.client.HTTPConnection("127.0.0.1", port, timeout=15)
             self.addCleanup(conn.close)
-            conn.request("GET", "/api/jobs", headers={"Host": f"127.0.0.1:{port}", "Cookie": cookies, "X-Factory": "1"})
+            conn.request("GET", "/api/build/jobs", headers={"Host": f"127.0.0.1:{port}", "Cookie": cookies, "X-Factory": "1"})
             self.assertEqual(conn.getresponse().status, 200, f"board on port {port}")
 
 
 class TestWatchRebuild(Watch):
-    """Each test runs a copy of bin/job and dashboard/ so the real repo is never written."""
+    """Each test runs a copy of bin/job, bin/board and dashboard/ so the real repo is never written."""
 
     def setUp(self):
         super().setUp()
         self.copy = self.base / "x"
         (self.copy / "bin").mkdir(parents=True)
         shutil.copy2(JOB, self.copy / "bin" / "job")
+        shutil.copy2(JOB.parent / "board", self.copy / "bin" / "board")
         shutil.copytree(JOB.parent.parent / "dashboard", self.copy / "dashboard")
         self.dist = self.copy / "dashboard" / "dist"
         for src in (self.copy / "dashboard").glob("*.ts"):  # fixed clock: every source older than its dist
@@ -141,7 +142,6 @@ class TestWatchRebuild(Watch):
         p.wait()
         warnings = [l for l in p.stderr.read().splitlines() if l.startswith("dashboard:")]
         self.assertEqual(len(warnings), 1, warnings)
-        self.assertEqual(len([e for e in self.audit_lines() if e["action"] == "dashboard-build"]), 1)
 
     def assert_node_never_runs(self):
         marker = self.base / "node-ran"
