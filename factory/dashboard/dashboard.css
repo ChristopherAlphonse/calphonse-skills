@@ -302,3 +302,4 @@ body.dragging #canvas { box-shadow: inset 0 0 0 2px var(--acc); }
 #modes { display: inline-flex; gap: 2px; padding: 2px; border-radius: 999px; background: var(--raise); margin-right: 6px; }
 #modes .mode { border: 0; border-radius: 999px; padding: 4px 10px; background: transparent; color: var(--text-3); font-size: 12px; }
 #modes .mode.on { background: var(--on); color: var(--on-text); }
+#ask-log .botname { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--acc); margin-bottom: 3px; }

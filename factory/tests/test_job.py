@@ -1190,6 +1190,9 @@ class TestServer(Factory):
         for stage in list(mod.TRANSITIONS) + list(mod.REVIEW_TRANSITIONS):
             self.assertIn(stage, guide, f"board-agent.md never mentions the {stage} stage")
         self.assertIn("not possible from chat", guide)
+        self.assertIn("Factory Bot", mod.ask_system("a", "build", True))
+        self.assertIn("only handle the factory board", mod.ask_system("a", "build", True))
+        self.assertNotIn("Factory Bot", mod.ask_system("a", "build", False).split("# Factory board assistant")[0])
 
     def test_approve_over_http(self):
         self.new_spec("a")

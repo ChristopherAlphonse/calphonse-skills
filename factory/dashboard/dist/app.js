@@ -979,9 +979,10 @@ const ENGINE_ICON                         = {
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M5 3h14v18H5V3zm4 4v10h6V7H9z"/></svg>',
 };
 
-const bubble = (cls        , text        , open = true)       => {
+const bubble = (cls        , text        , open = true, who = "")       => {
   if (open) $("ask-sheet").hidden = false;
   const line = el("div", cls);
+  if (who) line.append(el("div", "botname", who));
   // The agent writes markdown. What you typed, and errors, stay as text.
   if (cls === "bot") line.append(renderMarkdown(text));
   else line.textContent = text;
@@ -991,10 +992,10 @@ const bubble = (cls        , text        , open = true)       => {
 // Bring back the saved chat after a reload. The log stays closed until you open it.
 async function restoreChat()                {
   try {
-    const turns                                                                                    = await (await api("/api/chat")).json();
+    const turns                                                                                                   = await (await api("/api/chat")).json();
     for (const t of turns) {
       bubble("me", t.question, false);
-      if (t.answer || t.error) bubble(t.error ? "err" : "bot", t.error || t.answer, false);
+      if (t.answer || t.error) bubble(t.error ? "err" : "bot", t.error || t.answer, false, t.mode === "act" && !t.error ? BOT_NAME : "");
     }
   } catch {
     // the log is a convenience; the board works without it
@@ -1051,7 +1052,7 @@ async function ask(question        )                  {
       await res.json();
     v.session = out.session ?? v.session;
     const reply = out.error ?? out.answer ?? "";
-    bubble(out.error ? "err" : "bot", reply);
+    bubble(out.error ? "err" : "bot", reply, true, mode === "act" && !out.error ? BOT_NAME : "");
     await pollOne(v.def.id);
     return reply;
   } catch {
@@ -1062,6 +1063,7 @@ async function ask(question        )                  {
 
 // Chat answers and proposes. Act also applies the pipeline change it prepared, because choosing Act is the click.
                            
+const BOT_NAME = "Factory Bot";
 const MODE_KEY = "factory-ask-mode";
 let mode       = (()       => {
   try {
@@ -1072,7 +1074,7 @@ let mode       = (()       => {
 })();
 const MODE_HELP                       = {
   chat: "Chat: answers questions. Changes it prepares wait for your Apply click.",
-  act: "Act: it changes the board for you, such as adding or moving a stage.",
+  act: "Act: Factory Bot changes the board for you, such as adding or moving a stage.",
 };
 
 function showMode()       {
@@ -1094,7 +1096,7 @@ function showMode()       {
     }),
   );
   ($("ask-input")                       ).placeholder =
-    mode === "act" ? "Act: tell it what to change on the board" : "Ask anything. Say: skip qa-review, or turn off simplify";
+    mode === "act" ? "Tell Factory Bot what to change on the board" : "Ask anything. Say: skip qa-review, or turn off simplify";
 }
 
 function showEngine()       {
