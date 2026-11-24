@@ -60,6 +60,7 @@ A change is only a proposal. The user clicks **Apply** on the board, and only th
    - `AFTER` is the stage the new one comes after. "After review" is `review`. "Before polish" is the stage that sits right before polish in the `pipeline show` order, which here is `review`. "First" is `shape` (or `scope` for a review). "Last" is `prove` (or `verify`): nothing can follow ship or report.
    - `Label` is at most 24 characters. The description is at most 200.
    - Add a skill only if the user names one. If it is refused as unknown, drop it.
+   - A stage brief may not tell an agent to commit, push, pull or otherwise change git history. Only the user's **Commit locally** click commits. If the user asks for that, say so, do not word it around the rule, and offer a stage that checks or reports instead. A job that must repeat or watch the repo has to run outside the factory.
 4. If the command refuses, read the sentence it printed. It names what is allowed. Change that one argument and run it again, at most three times. After that, give the user the refusal text.
 5. Run `pipeline show` and read the `pending:` line.
 6. Tell the user, in one or two lines, what you proposed and that they must click **Apply** on the board. Never say it was applied.

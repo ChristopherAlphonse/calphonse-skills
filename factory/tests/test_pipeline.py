@@ -64,6 +64,13 @@ class TestPropose(Pipeline):
             self.assertIn(why, self.no("pipeline", "propose", *args).stderr, args)
         self.assertIn("pending: nothing", self.ok("pipeline", "show").stdout)
 
+    def test_a_stage_may_not_tell_an_agent_to_commit_push_or_pull(self):
+        for brief in ("commit everything and git pull", "Run git push when done", "pull from origin", "commits all the changes", "git add -A"):
+            r = self.no("pipeline", "propose", "add", "sync", "build", "prove", "Sync", brief)
+            self.assertIn("Commit locally", r.stderr, brief)
+        self.ok("pipeline", "propose", "add", "sync", "build", "prove", "Sync", "Check the pull request text and the commit message wording")
+        self.assertFalse(self.file.exists())
+
     def test_a_stage_inserted_before_another_pushes_it_along_and_remove_closes_the_gap(self):
         self.propose("add", "aa", "build", "review", "A", "")
         self.propose("add", "bb", "build", "review", "B", "")

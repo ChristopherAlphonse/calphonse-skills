@@ -658,6 +658,8 @@ BUILTIN_IDS = set(TRANSITIONS) | set(REVIEW_TRANSITIONS) | {"ready", "rejected",
 STAGE_ID = re.compile(r"[a-z][a-z0-9-]{1,23}")
 MAX_CUSTOM = 12
 MAX_LABEL, MAX_BRIEF = 24, 200
+# Only the user's Commit locally click commits, and no agent pushes or pulls, so a stage brief may not tell one to.
+FORBIDDEN_BRIEF = re.compile(r"\bgit\s+(add|commit|push|pull|fetch|merge|rebase|reset|checkout|clean)\b|\bcommit(s|ting)?\s+(all|everything|the\s+(changes|code|diff|branch))\b|\b(push|pull)(es|ing)?\s+(to|from)\s+(the\s+)?(remote|origin|upstream)\b", re.I)
 _PIPE_CACHE = [None, None]
 
 
@@ -687,6 +689,8 @@ def check_custom(stages):
             errs.append(f"{i}: label must be 1 to {MAX_LABEL} characters")
         if len(c["brief"]) > MAX_BRIEF:
             errs.append(f"{i}: brief must be at most {MAX_BRIEF} characters")
+        if FORBIDDEN_BRIEF.search(c["brief"]) or FORBIDDEN_BRIEF.search(c["label"]):
+            errs.append(f"{i}: a stage cannot tell an agent to commit, push or pull. Only the user's Commit locally click commits")
         skill = c.get("skill", "")
         if skill and not (SKILL_NAME.fullmatch(skill) and (SELF.parent.parent.parent / skill / "SKILL.md").is_file()):
             errs.append(f"{i}: no skill named {skill!r}")
