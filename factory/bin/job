@@ -993,6 +993,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.get_static(u.path[len("/static/"):])
         if not self.trusted():
             return self.send(403, "{}")
+        if u.path == "/api/engines":
+            return self.send(200, json.dumps(model_choices()))
         if u.path == "/api/jobs":
             return self.send(200, json.dumps([snapshot(j) for j in all_jobs()]))
         if u.path == "/api/file":
@@ -1017,7 +1019,7 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(jid, str):
             return self.send(400, "{}")
         if self.path == "/api/ask":
-            return self.send(200, json.dumps(ask_claude(jid, text("question"), text("session"))))
+            return self.send(200, json.dumps(ask_engine(jid, text("question"), text("session"), text("engine"), text("model"), text("effort"))))
         routes = {"/api/approve": lambda: cmd_approve(jid, "spec"),
                   "/api/commit": lambda: cmd_commit(jid),
                   "/api/unblock": lambda: cmd_unblock(jid),
@@ -1041,30 +1043,79 @@ class Handler(BaseHTTPRequestHandler):
 ASK_TIMEOUT = 300
 
 
-def ask_claude(jid, question, session):
-    """One chat turn: `claude -p` may read the job files and change the board only through skill, brief, and note."""
-    claude = shutil.which("claude")
-    if not claude:
-        return {"error": "claude was not found on PATH"}
+ENGINES = {"claude": "claude", "opencode": "opencode", "kiro": "kiro-cli"}
+
+
+def engines():
+    return [name for name, exe in ENGINES.items() if shutil.which(exe)]
+
+
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
+MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@#-]{0,99}")
+CLAUDE_MODELS = ["opus", "sonnet", "haiku", "claude-fable-5-2", "claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]
+
+
+def model_choices():
+    """Model names to suggest per installed CLI. The box also takes any name the CLI accepts."""
+    out = {name: [] for name in engines()}
+    if "claude" in out:
+        out["claude"] = CLAUDE_MODELS
+    if "opencode" in out:
+        try:
+            r = subprocess.run([ENGINES["opencode"], "models"], capture_output=True, text=True, timeout=8)
+            out["opencode"] = r.stdout.split()[:200]
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return out
+
+
+def ask_args(engine, exe, system, question, session, model="", effort=""):
+    """The command line for one chat turn. Only claude can limit the shell commands; the others run with the user's own tools."""
+    me = str(Path(__file__).resolve())
+    if engine == "claude":
+        args = [exe, "-p", "--output-format", "json", "--append-system-prompt", system,
+                "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--tools", "Read,Grep,Glob,Bash",
+                "--allowedTools", f"Bash({me} skill:*)", f"Bash({me} brief:*)", f"Bash({me} note:*)", "Read", "Grep", "Glob"]
+        args += (["--model", model] if model else []) + (["--effort", effort] if effort else [])
+        return args + (["--resume", session] if session else []), question[:4000]
+    prompt = f"{system}\n\nUser: {question[:4000]}"
+    if engine == "opencode":
+        pick = f"{model}#{effort}" if model and effort and "#" not in model else model
+        return [exe, "run", "--auto"] + (["--model", pick] if pick else []) + (["--session", session] if session else []) + [prompt], None
+    return [exe, "chat", "--v3", "--no-interactive", "--trust-tools=execute_bash,fs_read"] + (["--model", model] if model else []) + (["--effort", effort] if effort else []) + [prompt], None
+
+
+def ask_engine(jid, question, session, engine, model="", effort=""):
+    """One chat turn through the chosen CLI. It may read the job files and change the board with skill, brief, and note."""
+    engine = engine if engine in ENGINES else "claude"
+    exe = shutil.which(ENGINES[engine])
+    if not exe:
+        return {"error": f"{ENGINES[engine]} was not found on PATH"}
     me = str(Path(__file__).resolve())
     system = (f"You are the factory board's assistant, working in {ROOT}. Job state is under .planning/factory/jobs/. "
               f"The user is looking at job {jid or '(none)'}. To change the board run only: {me} skill <id> <name> on|off, "
               f"{me} brief <id> <stage> <text> (empty text clears), {me} note <id> <text>. "
               "Approve spec, Commit locally and Unblock are buttons the user clicks: say which one. Answer in a few plain lines.")
-    args = [claude, "-p", "--output-format", "json", "--append-system-prompt", system,
-            "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--tools", "Read,Grep,Glob,Bash",
-            "--allowedTools", f"Bash({me} skill:*)", f"Bash({me} brief:*)", f"Bash({me} note:*)", "Read", "Grep", "Glob"]
-    if session:
-        args += ["--resume", session]
+    if model and not MODEL_NAME.fullmatch(model):
+        return {"error": f"bad model name {model!r}"}
+    args, stdin = ask_args(engine, exe, system, question, session, model, effort if effort in EFFORTS else "")
     try:
-        r = subprocess.run(args, input=question[:4000], capture_output=True, text=True, timeout=ASK_TIMEOUT,
+        r = subprocess.run(args, input=stdin, capture_output=True, text=True, timeout=ASK_TIMEOUT,
                            cwd=str(ROOT), env={**os.environ, "FACTORY_ROOT": str(ROOT)})
-        out = json.loads(r.stdout)
-    except (OSError, ValueError, subprocess.SubprocessError) as e:
+    except (OSError, subprocess.SubprocessError) as e:
         return {"error": f"chat failed: {e}"}
-    if out.get("is_error"):
-        return {"error": str(out.get("result", "claude reported an error"))[:500]}
-    return {"answer": out.get("result", ""), "session": out.get("session_id", "")}
+    if engine == "claude":
+        try:
+            out = json.loads(r.stdout)
+        except ValueError:
+            return {"error": (r.stderr or r.stdout).strip()[-500:] or "claude returned nothing"}
+        if out.get("is_error"):
+            return {"error": str(out.get("result", "claude reported an error"))[:500]}
+        return {"answer": out.get("result", ""), "session": out.get("session_id", "")}
+    text = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", r.stdout).strip()
+    if r.returncode or not text:
+        return {"error": (re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", r.stderr).strip() or text or f"{engine} exited {r.returncode}")[-500:]}
+    return {"answer": text}
 
 
 def rebuild_dashboard():

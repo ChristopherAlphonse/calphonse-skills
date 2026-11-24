@@ -23,9 +23,15 @@
         <div id="ask-log"></div>
       </div>
       <form id="ask-form" autocomplete="off">
-        <input id="ask-input" placeholder="Ask the factory, or say: skip qa-review on this job" spellcheck="false" />
-        <span class="engine"><i></i>Claude Code</span>
-        <button id="ask-send" type="submit" aria-label="Send">↑</button>
+        <textarea id="ask-input" rows="1" placeholder="Ask anything. Say: skip qa-review, or turn off simplify" spellcheck="false"></textarea>
+        <div id="ask-opts">
+          <button class="pill flat" id="engine" type="button" title="Switch the CLI that answers"><i></i><span id="engine-name">Claude Code</span></button>
+          <span class="grow"></span>
+          <input class="pill flat" id="model" list="models" placeholder="model" spellcheck="false" title="Model for this CLI. Empty uses its default." />
+          <datalist id="models"></datalist>
+          <select class="pill flat" id="effort" title="Effort"><option value="">effort</option><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select>
+          <button id="ask-send" type="submit" aria-label="Send">↑</button>
+        </div>
       </form>
     </div>
     <script type="module" src="/static/app.js"></script>

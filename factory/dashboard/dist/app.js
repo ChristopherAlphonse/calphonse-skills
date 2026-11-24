@@ -37,6 +37,10 @@ const $ = (id        )              => {
 const state        = { jobs: [], openId: null, openFile: null, lastSig: "", loadToken: 0 };
 let tab      = "all";
 let session = "";
+let engineList           = ["claude"];
+let modelChoices                           = {};
+let engine = "claude";
+const ENGINE_LABEL                         = { claude: "Claude Code", opencode: "OpenCode", kiro: "Kiro" };
 
 const api = (path        , opts                                     = {}) =>
   fetch(path, { ...opts, credentials: "same-origin", headers: { "X-Factory": "1" } });
@@ -336,16 +340,28 @@ const bubble = (cls        , text        )       => {
 $("ask-close").onclick = () => {
   $("ask-sheet").hidden = true;
 };
+const composer = $("ask-input")                       ;
+composer.addEventListener("input", () => {
+  composer.style.height = "auto";
+  composer.style.height = `${composer.scrollHeight}px`;
+});
+composer.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    ($("ask-form")                   ).requestSubmit();
+  }
+});
 $("ask-form").onsubmit = async (e) => {
   e.preventDefault();
-  const input = $("ask-input")                    ;
+  const input = $("ask-input")                       ;
   const question = input.value.trim();
   if (!question) return;
   input.value = "";
+  input.style.height = "auto";
   $("ask-q").textContent = question;
   bubble("me", question);
   try {
-    const res = await api("/api/ask", { method: "POST", body: JSON.stringify({ id: state.openId ?? "", question, session }) });
+    const res = await api("/api/ask", { method: "POST", body: JSON.stringify({ id: state.openId ?? "", question, session, engine, model: ($("model")                    ).value.trim(), effort: ($("effort")                     ).value }) });
     const out                                                        = await res.json();
     session = out.session ?? session;
     bubble(out.error ? "err" : "bot", out.error ?? out.answer ?? "");
@@ -354,6 +370,32 @@ $("ask-form").onsubmit = async (e) => {
   }
   await poll();
 };
+
+$("engine").onclick = () => {
+  engine = engineList[(engineList.indexOf(engine) + 1) % engineList.length];
+  session = "";
+  showEngine();
+};
+function showEngine()       {
+  $("engine-name").textContent = ENGINE_LABEL[engine] ?? engine;
+  ($("model")                    ).value = "";
+  $("models").replaceChildren(...(modelChoices[engine] ?? []).map((m) => {
+    const o = el("option");
+    o.value = m;
+    return o;
+  }));
+}
+try {
+  modelChoices = await (await api("/api/engines")).json();
+  const found = Object.keys(modelChoices);
+  if (found.length) {
+    engineList = found;
+    engine = found[0];
+    showEngine();
+  }
+} catch {
+  // keep the claude default
+}
 
 $("panel-toggle").onclick = () => {
   document.body.classList.toggle("with-panel");

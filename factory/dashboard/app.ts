@@ -36,6 +36,10 @@ const $ = (id: string): HTMLElement => {
 const state: State = { jobs: [], openId: null, openFile: null, lastSig: "", loadToken: 0 };
 let tab: Tab = "all";
 let session = "";
+let engineList: string[] = ["claude"];
+let modelChoices: Record<string, string[]> = {};
+let engine = "claude";
+const ENGINE_LABEL: Record<string, string> = { claude: "Claude Code", opencode: "OpenCode", kiro: "Kiro" };
 
 const api = (path: string, opts: { method?: string; body?: string } = {}) =>
   fetch(path, { ...opts, credentials: "same-origin", headers: { "X-Factory": "1" } });
@@ -335,16 +339,28 @@ const bubble = (cls: string, text: string): void => {
 $("ask-close").onclick = () => {
   $("ask-sheet").hidden = true;
 };
+const composer = $("ask-input") as HTMLTextAreaElement;
+composer.addEventListener("input", () => {
+  composer.style.height = "auto";
+  composer.style.height = `${composer.scrollHeight}px`;
+});
+composer.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    ($("ask-form") as HTMLFormElement).requestSubmit();
+  }
+});
 $("ask-form").onsubmit = async (e) => {
   e.preventDefault();
-  const input = $("ask-input") as HTMLInputElement;
+  const input = $("ask-input") as HTMLTextAreaElement;
   const question = input.value.trim();
   if (!question) return;
   input.value = "";
+  input.style.height = "auto";
   $("ask-q").textContent = question;
   bubble("me", question);
   try {
-    const res = await api("/api/ask", { method: "POST", body: JSON.stringify({ id: state.openId ?? "", question, session }) });
+    const res = await api("/api/ask", { method: "POST", body: JSON.stringify({ id: state.openId ?? "", question, session, engine, model: ($("model") as HTMLInputElement).value.trim(), effort: ($("effort") as HTMLSelectElement).value }) });
     const out: { answer?: string; session?: string; error?: string } = await res.json();
     session = out.session ?? session;
     bubble(out.error ? "err" : "bot", out.error ?? out.answer ?? "");
@@ -353,6 +369,32 @@ $("ask-form").onsubmit = async (e) => {
   }
   await poll();
 };
+
+$("engine").onclick = () => {
+  engine = engineList[(engineList.indexOf(engine) + 1) % engineList.length];
+  session = "";
+  showEngine();
+};
+function showEngine(): void {
+  $("engine-name").textContent = ENGINE_LABEL[engine] ?? engine;
+  ($("model") as HTMLInputElement).value = "";
+  $("models").replaceChildren(...(modelChoices[engine] ?? []).map((m) => {
+    const o = el("option");
+    o.value = m;
+    return o;
+  }));
+}
+try {
+  modelChoices = await (await api("/api/engines")).json();
+  const found = Object.keys(modelChoices);
+  if (found.length) {
+    engineList = found;
+    engine = found[0];
+    showEngine();
+  }
+} catch {
+  // keep the claude default
+}
 
 $("panel-toggle").onclick = () => {
   document.body.classList.toggle("with-panel");

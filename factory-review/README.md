@@ -206,11 +206,25 @@ Measure a harness before trusting it with `tests/probe_harness.py <harness>`. It
 
 ## Tests
 
+Quick subset (guard, policy, and the board build check), in parallel:
+
+```
+python3 factory-review/tests/run.py
+```
+
+Every test, in parallel:
+
+```
+python3 factory-review/tests/run.py all
+```
+
+`--workers N` overrides the worker count; the default is up to 8. The unit is a test class, and the fixed-port `test_autowatch` classes share one worker. The serial command stays authoritative:
+
 ```
 python3 -m unittest discover -s factory-review/tests
 ```
 
-93 tests, about a minute. `test_job.py` covers creating a review, the stage rules, stack detection, the read-only guarantees, the audit log, and the board. `test_integrity.py` replays the bypasses a red-team agent found against `factory`. `test_watch.py` and `test_autowatch.py` cover the read-only board, and `test_tick.py` covers the deny rules.
+136 tests. The quick subset covers the logic that does not need a git repo or an HTTP server, so it runs in seconds. The full run takes minutes because most tests start `git` or `python3 -I bin/job` as a subprocess. `test_job.py` covers creating a review, the stage rules, stack detection, the read-only guarantees, the audit log, and the board. `test_integrity.py` replays the bypasses a red-team agent found against `factory`. `test_watch.py` and `test_autowatch.py` cover the read-only board, and `test_tick.py` covers the deny rules.
 
 ## Notes on the allow list
 

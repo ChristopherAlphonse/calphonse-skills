@@ -73,8 +73,9 @@ class RepoIndex(unittest.TestCase):
         self.assertIn("`factory`", (REPO / "factory-review" / "SKILL.md").read_text())
 
     def test_factory_review_has_the_same_skeleton_as_factory(self):
-        for rel in ("SKILL.md", "README.md", "bin/job", "bin/tick", "tests/probe_harness.py", "tests/test_job.py",
-                    "tests/test_tick.py", "tests/test_watch.py", "tests/test_autowatch.py", "tests/test_integrity.py"):
+        for rel in ("SKILL.md", "README.md", "bin/job", "bin/tick", "tests/probe_harness.py", "tests/run.py",
+                    "tests/test_job.py", "tests/test_tick.py", "tests/test_watch.py", "tests/test_autowatch.py",
+                    "tests/test_integrity.py"):
             with self.subTest(rel=rel):
                 self.assertTrue((REPO / "factory" / rel).exists())
                 self.assertTrue((REPO / "factory-review" / rel).exists())
