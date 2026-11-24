@@ -1187,7 +1187,7 @@ class TestServer(Factory):
         with mock.patch.dict(os.environ, {"FACTORY_ROOT": str(self.root)}):
             spec.loader.exec_module(mod)
         self.assertIn(guide.strip(), mod.ask_system("a"))
-        for stage in list(mod.TRANSITIONS) + list(mod.REVIEW_TRANSITIONS):
+        for stage in mod.BASE_ORDER["build"] + mod.BASE_ORDER["review"] + ["gate"]:
             self.assertIn(stage, guide, f"board-agent.md never mentions the {stage} stage")
         self.assertIn("not possible from chat", guide)
         self.assertIn("Factory Bot", mod.ask_system("a", "build", True))

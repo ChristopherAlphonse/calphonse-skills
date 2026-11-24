@@ -57,7 +57,7 @@ class RepoIndex(unittest.TestCase):
         job = engine()
         text = (REPO / "factory" / "SKILL.md").read_text()
         rows = set(re.findall(r"^\| (\w+) \|", text, re.M))
-        for stage in job.REVIEW_TRANSITIONS:
+        for stage in job.BASE_ORDER["review"]:
             with self.subTest(stage=stage):
                 self.assertIn(stage, rows, f"{stage} is not a row in the stages table")
         for skill in ("code-review-frontend", "qa-review", "test-review",

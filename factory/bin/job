@@ -624,48 +624,55 @@ def justify_review(job, cur, to):
     return to
 
 
-# ---- pipeline: custom stages
-# Built-in stages and their order are locked. A custom stage is an extra node that runs one skill and writes <id>.md with
-# STATUS: READY (go on) or STATUS: BLOCKED (park on the user). It is saved in pipeline.json beside SKILL.md and applies to every project.
+# ---- pipeline: the order of stages, and custom stages
+# pipeline.json beside SKILL.md holds the order of each workflow's stages and any custom stages. It applies to every project.
+# The order is free, within the rules the checks need: see order_problems. The gate is not in the order: it runs by itself after
+# any stage that changes code (build, polish) and passes the job to the stage after that one.
 PIPELINE_FILE = Path(os.environ.get("FACTORY_PIPELINE") or SELF.parent.parent / "pipeline.json")
 PROPOSAL_FILE = STATE / "pipeline-proposal.json"
-# The built-in stages a custom stage may follow, each with the stage it moves to when all goes well.
-ATTACH = {
-    "build": {"shape": "spec", "spec": "build", "build": "gate", "review": "polish", "polish": "gate", "prove": "ship"},
-    "review": {"scope": "review", "review": "reconcile", "reconcile": "verify", "verify": "report"},
-}
 BASE_ORDER = {
-    "build": ["shape", "spec", "build", "review", "polish", "prove", "ship", "ready"],
-    "review": ["scope", "review", "reconcile", "verify", "report", "ready"],
+    "build": ["shape", "spec", "build", "review", "polish", "prove", "ship"],
+    "review": ["scope", "review", "reconcile", "verify", "report"],
 }
-BUILTIN_IDS = set(TRANSITIONS) | set(REVIEW_TRANSITIONS) | {"ready", "rejected", "needs-human"}
+WHY_REQUIRED = {
+    "spec": "nothing is built until you approve the spec",
+    "build": "it is where the code gets written",
+    "ship": "it is where you click Commit locally",
+    "scope": "reviewers need it",
+    "review": "it is the review",
+    "report": "it is the result",
+}
+BUILTIN_IDS = set(BASE_ORDER["build"]) | set(BASE_ORDER["review"]) | {"gate", "ready", "rejected", "needs-human"}
 STAGE_ID = re.compile(r"[a-z][a-z0-9-]{1,23}")
 MAX_CUSTOM = 12
 MAX_LABEL, MAX_BRIEF = 24, 200
 _PIPE_CACHE = [None, None]
 
 
+def default_state():
+    return {"order": {wf: list(seq) for wf, seq in BASE_ORDER.items()}, "stages": []}
+
+
 def check_custom(stages):
-    """Every problem with a list of custom stages, as plain sentences. Empty when it is sound."""
-    errs, by_id, after_seen = [], {}, set()
+    """Every problem with the custom stage definitions, as plain sentences."""
+    errs, seen = [], set()
     if not isinstance(stages, list):
         return ["stages must be a list"]
     if len(stages) > MAX_CUSTOM:
         errs.append(f"at most {MAX_CUSTOM} custom stages")
     for c in stages:
-        if not isinstance(c, dict) or not all(isinstance(c.get(k), str) for k in ("id", "workflow", "after", "label", "brief")):
-            errs.append("each stage needs text fields id, workflow, after, label and brief")
+        if not isinstance(c, dict) or not all(isinstance(c.get(k), str) for k in ("id", "workflow", "label", "brief")):
+            errs.append("each stage needs text fields id, workflow, label and brief")
             continue
         i = c["id"]
         if not STAGE_ID.fullmatch(i):
             errs.append(f"{i!r} is not a stage id: use 2 to 24 lowercase letters, digits or dashes, starting with a letter")
         elif i in BUILTIN_IDS:
             errs.append(f"{i} is a built-in stage name")
-        elif i in by_id:
+        elif i in seen:
             errs.append(f"{i} is used twice")
-        else:
-            by_id[i] = c
-        if c["workflow"] not in ATTACH:
+        seen.add(i)
+        if c["workflow"] not in BASE_ORDER:
             errs.append(f"{i}: workflow must be build or review")
         if not 1 <= len(c["label"]) <= MAX_LABEL:
             errs.append(f"{i}: label must be 1 to {MAX_LABEL} characters")
@@ -674,67 +681,97 @@ def check_custom(stages):
         skill = c.get("skill", "")
         if skill and not (SKILL_NAME.fullmatch(skill) and (SELF.parent.parent.parent / skill / "SKILL.md").is_file()):
             errs.append(f"{i}: no skill named {skill!r}")
-    for c in by_id.values():
-        key = (c["workflow"], c["after"])
-        if key in after_seen:
-            errs.append(f"two stages follow {c['after']} in {c['workflow']}")
-        after_seen.add(key)
-        p, hops = c, 0
-        while p["workflow"] in ATTACH and p["after"] in by_id and by_id[p["after"]]["workflow"] == p["workflow"] and hops <= len(by_id):
-            p, hops = by_id[p["after"]], hops + 1
-        if hops > len(by_id):
-            errs.append(f"{c['id']}: stages follow each other in a loop")
-        elif c["workflow"] in ATTACH and p["after"] not in ATTACH[c["workflow"]]:
-            errs.append(f"{c['id']}: a stage cannot follow {p['after']}; it can follow {', '.join(ATTACH[c['workflow']])} or another custom stage")
     return errs
 
 
-def custom_hint(c, nxt):
+def order_problems(wf, order, custom_ids):
+    """Why an order cannot work. The checks each stage runs need some stages to come before others."""
+    errs, known = [], set(BASE_ORDER[wf]) | custom_ids
+    if not isinstance(order, list) or not all(isinstance(x, str) for x in order):
+        return [f"the {wf} order must be a list of stage ids"]
+    if len(set(order)) != len(order):
+        errs.append(f"a {wf} stage appears twice")
+    errs += [f"{x} is not a {wf} stage" for x in order if x not in known]
+    errs += [f"{x} is defined but not placed in the {wf} order" for x in sorted(custom_ids) if x not in order]
+    errs += [f"{x} cannot be removed: {WHY_REQUIRED[x]}" for x in BASE_ORDER[wf] if x in WHY_REQUIRED and x not in order]
+    pos = {x: i for i, x in enumerate(order)}
+
+    def before(a, b, why):
+        if a in pos and b in pos and pos[a] > pos[b]:
+            errs.append(why)
+
+    if wf == "build":
+        before("spec", "build", "build has to come after spec: nothing is built until you approve the spec")
+        for x in ("review", "polish", "prove"):
+            before("build", x, f"{x} has to come after build: it works on the code build writes")
+        if "ship" in pos and order[-1] != "ship":
+            errs.append("ship has to be the last stage: it waits for your Commit locally click")
+    else:
+        before("scope", "review", "review has to come after scope")
+        before("review", "reconcile", "reconcile has to come after review")
+        before("reconcile", "verify", "verify has to come after reconcile")
+        before("review", "verify", "verify has to come after review")
+        if "report" in pos and order[-1] != "report":
+            errs.append("report has to be the last stage")
+    return errs
+
+
+def check_state(state):
+    errs = check_custom(state["stages"])
+    ids = {c["id"] for c in state["stages"] if isinstance(c, dict) and isinstance(c.get("id"), str)}
+    for wf in BASE_ORDER:
+        mine = {c["id"] for c in state["stages"] if isinstance(c, dict) and c.get("workflow") == wf and isinstance(c.get("id"), str)}
+        errs += order_problems(wf, state["order"].get(wf), mine)
+    for wf in BASE_ORDER:
+        errs += [f"{x} is in the {wf} order but belongs to another workflow" for x in state["order"].get(wf, []) if x in ids and x not in {c["id"] for c in state["stages"] if c.get("workflow") == wf}]
+    return errs
+
+
+def custom_hint(c):
     skill = f"{c['skill']} -> " if c.get("skill") else ""
-    ending = f"{c['id']}.md (STATUS: READY, or STATUS: BLOCKED if you cannot go on), then advance {nxt}"
-    return f"{c['brief'] + ': ' if c['brief'] else ''}{skill}{ending}"
+    return f"{c['brief'] + ': ' if c['brief'] else ''}{skill}{c['id']}.md (STATUS: READY, or STATUS: BLOCKED if you cannot go on)"
 
 
-def compile_pipeline(stages):
-    """Transitions, hints, display order and the evidence map for each workflow, with the custom stages wired in."""
-    children = {(c["workflow"], c["after"]): c for c in stages}
+def compile_state(state):
+    """Each workflow's transitions, hints, display order and next-stage map, from the order list."""
+    customs = {c["id"]: c for c in state["stages"]}
     out = {}
-    for wf, base in (("build", (TRANSITIONS, HINT)), ("review", (REVIEW_TRANSITIONS, HINT_REVIEW))):
-        trans = {k: set(v) for k, v in base[0].items()}
-        hints, evidence, order, custom = dict(base[1]), {}, [], {}
-        for x in BASE_ORDER[wf]:
-            order.append(x)
-            chain, at = [], x
-            while (wf, at) in children:
-                chain.append(children[(wf, at)])
-                at = chain[-1]["id"]
-            if not chain:
+    for wf, hints_base in (("build", HINT), ("review", HINT_REVIEW)):
+        seq = state["order"][wf]
+        nxt = {x: (seq[i + 1] if i + 1 < len(seq) else "ready") for i, x in enumerate(seq)}
+        trans, hints, mine = {}, {}, {}
+        for x in seq:
+            n = nxt[x]
+            if x in customs:
+                trans[x], hints[x], mine[x] = {n, "needs-human"}, custom_hint(customs[x]), customs[x]
                 continue
-            target = ATTACH[wf][x]
-            path = [x] + [c["id"] for c in chain] + [target]
-            trans[x].discard(target)
-            trans[x].add(path[1])
-            evidence[(x, path[1])] = target
-            for c, nxt in zip(chain, path[2:]):
-                trans[c["id"]] = {nxt, "needs-human"}
-                hints[c["id"]] = custom_hint(c, nxt)
-                custom[c["id"]] = c
-                order.append(c["id"])
-        out[wf] = {"transitions": trans, "hints": hints, "evidence": evidence, "order": order, "custom": custom}
+            hints[x] = hints_base.get(x, "")
+            if wf == "review":
+                trans[x] = {n, "needs-human"} | ({"rejected"} if x == "scope" else set())
+            else:
+                trans[x] = {"shape": {n, "rejected"}, "spec": {n}, "build": {"gate", "needs-human"}, "polish": {"gate", "build", "needs-human"}}.get(x, {n, "build", "needs-human"})
+        if wf == "build":
+            hints["gate"] = hints_base["gate"]
+        out[wf] = {"transitions": trans, "hints": hints, "custom": mine, "order": seq + ["ready"], "next": nxt}
     return out
 
 
-def read_custom():
+def read_state():
     try:
         data = json.loads(PIPELINE_FILE.read_text())
     except OSError:
-        return []
+        return default_state()
     except ValueError:
         die(f"{PIPELINE_FILE} is not valid JSON")
-    stages = data.get("stages") if isinstance(data, dict) else None
-    errs = check_custom(stages)
+    need(isinstance(data, dict), f"{PIPELINE_FILE} must hold an object")
+    state = default_state()
+    state["stages"] = data.get("stages", [])
+    if data.get("order") is not None:
+        need(isinstance(data["order"], dict), f"{PIPELINE_FILE}: order must be an object")
+        state["order"] = {wf: data["order"].get(wf) for wf in BASE_ORDER}
+    errs = check_state(state)
     need(not errs, f"{PIPELINE_FILE} is not valid: {'; '.join(errs)}")
-    return stages
+    return state
 
 
 def pipeline():
@@ -745,7 +782,7 @@ def pipeline():
     except OSError:
         stamp = (0, 0)
     if _PIPE_CACHE[0] != stamp:
-        _PIPE_CACHE[:] = [stamp, compile_pipeline(read_custom())]
+        _PIPE_CACHE[:] = [stamp, compile_state(read_state())]
     return _PIPE_CACHE[1]
 
 
@@ -766,57 +803,104 @@ def pipeline_custom():
     return [dict(c) for wf in ("build", "review") for c in pipeline()[wf]["custom"].values()]
 
 
-def after_choices(stages, wf):
-    return list(ATTACH[wf]) + [c["id"] for c in stages if c["workflow"] == wf]
+def state_key(state):
+    return json.dumps(state, sort_keys=True)
 
 
-def op_add(stages, cid, wf, after, label, brief, skill=""):
-    need(wf in ATTACH, "workflow must be build or review")
-    new = {"id": cid, "workflow": wf, "after": after, "label": label, "brief": brief, **({"skill": skill} if skill else {})}
-    need(cid not in {c["id"] for c in stages}, f"{cid} already exists")
-    return splice(stages, new)
+def copy_state(state):
+    return json.loads(json.dumps(state))
 
 
-def splice(stages, new):
-    """Put `new` right after new['after']. A stage that already followed it now follows `new`."""
-    out = [dict(c) for c in stages]
-    for c in out:
-        if (c["workflow"], c["after"]) == (new["workflow"], new["after"]):
-            c["after"] = new["id"]
-    return out + [new]
+def place(order, sid, after):
+    if after == "start":
+        order.insert(0, sid)
+        return
+    need(after in order, f"{after} is not a stage here: choose start or one of {', '.join(order)}")
+    order.insert(order.index(after) + 1, sid)
 
 
-def op_remove(stages, cid):
-    gone = next((c for c in stages if c["id"] == cid), None)
-    need(gone, f"no custom stage {cid}")
-    out = [dict(c) for c in stages if c["id"] != cid]
-    for c in out:
-        if (c["workflow"], c["after"]) == (gone["workflow"], cid):
-            c["after"] = gone["after"]
+def op_add(state, wf, cid, after, label, brief, skill=""):
+    need(wf in BASE_ORDER, "workflow must be build or review")
+    need(cid not in {c["id"] for c in state["stages"]} | BUILTIN_IDS, f"{cid} already exists")
+    new = copy_state(state)
+    new["stages"].append({"id": cid, "workflow": wf, "label": label, "brief": brief, **({"skill": skill} if skill else {})})
+    place(new["order"][wf], cid, after)
+    return new
+
+
+def op_remove(state, wf, sid):
+    need(wf in BASE_ORDER and sid in state["order"][wf], f"{sid} is not a {wf} stage")
+    new = copy_state(state)
+    new["order"][wf].remove(sid)
+    new["stages"] = [c for c in new["stages"] if c["id"] != sid]
+    return new
+
+
+def op_move(state, wf, sid, after):
+    need(wf in BASE_ORDER and sid in state["order"][wf], f"{sid} is not a {wf} stage")
+    need(after != sid, "a stage cannot follow itself")
+    new = copy_state(state)
+    new["order"][wf].remove(sid)
+    place(new["order"][wf], sid, after)
+    return new
+
+
+def valid_places(state, wf):
+    """Every `after` value where a new stage would keep the order sound."""
+    out = []
+    for after in ["start"] + state["order"][wf]:
+        try:
+            trial = op_add(state, wf, "zz-trial", after, "Trial", "")
+        except SystemExit:
+            continue
+        if not check_state(trial):
+            out.append(after)
     return out
 
 
-def op_move(stages, cid, after):
-    moved = next((c for c in stages if c["id"] == cid), None)
-    need(moved, f"no custom stage {cid}")
-    need(after != cid, "a stage cannot follow itself")
-    rest = op_remove(stages, cid)
-    need(after in after_choices(rest, moved["workflow"]), f"{moved['workflow']} stages can follow: {', '.join(after_choices(rest, moved['workflow']))}")
-    return splice(rest, {**moved, "after": after})
+def order_text(state):
+    ids = {c["id"] for c in state["stages"]}
+    comp = compile_state(state)
+    return "\n".join(f"{wf}: " + " > ".join(f"[{x}]" if x in ids else x for x in comp[wf]["order"]) for wf in ("build", "review"))
 
 
-def order_text(stages):
-    comp = compile_pipeline(stages)
-    ids = {c["id"] for c in stages}
-    return "\n".join(f"{wf}: " + " > ".join(f"[{s}]" if s in ids else s for s in comp[wf]["order"]) for wf in ("build", "review"))
+def stay_put(old, new):
+    """The longest run of stages that kept their relative order, so a move is reported as one move."""
+    best = []
+    for i, x in enumerate(old):
+        run = [x]
+        for y in old[i + 1:]:
+            if new.index(y) > new.index(run[-1]):
+                run.append(y)
+        best = max(best, run, key=len)
+    return set(best)
 
 
 def stage_ops(old, new):
     """Plain sentences for what turns `old` into `new`."""
-    before, after = {c["id"]: c for c in old}, {c["id"]: c for c in new}
-    out = [f"add {i} ({c['label']}) after {c['after']} in {c['workflow']}" for i, c in after.items() if i not in before]
-    out += [f"remove {i}" for i in before if i not in after]
-    out += [f"move {i} after {after[i]['after']}" for i in after if i in before and after[i]["after"] != before[i]["after"]]
+    ops = []
+    for wf in BASE_ORDER:
+        a, b = old["order"][wf], new["order"][wf]
+        labels = {c["id"]: c["label"] for c in new["stages"]}
+        common_a = [x for x in a if x in b]
+        common_b = [x for x in b if x in a]
+        keep = stay_put(common_a, common_b) if common_a else set()
+        for x in b:
+            before = b[b.index(x) - 1] if b.index(x) else "start"
+            if x not in a:
+                ops.append(f"add {x} ({labels.get(x, x)}) after {before} in {wf}")
+            elif x not in keep:
+                ops.append(f"move {x} after {before} in {wf}")
+        ops += [f"remove {x} from {wf}" for x in a if x not in b]
+    return ops
+
+
+def changed_ids(old, new):
+    out = []
+    for wf in BASE_ORDER:
+        a, b = old["order"][wf], new["order"][wf]
+        keep = stay_put([x for x in a if x in b], [x for x in b if x in a])
+        out += [x for x in b if x not in a or x not in keep]
     return out
 
 
@@ -829,15 +913,15 @@ def read_proposal():
 
 def proposal_state():
     """The pending change for the board: what it does, and the pipeline it would give. None when nothing waits."""
-    prop, now_stages = read_proposal(), pipeline_custom()
-    if not prop or check_custom(prop.get("stages")):
+    prop, now_state = read_proposal(), read_state()
+    if not prop or not isinstance(prop.get("state"), dict) or check_state(prop["state"]):
         return None
-    ops = stage_ops(now_stages, prop["stages"])
+    ops = stage_ops(now_state, prop["state"])
     if not ops:
         return None
-    comp = compile_pipeline(prop["stages"])
-    return {"ops": ops, "order": {wf: comp[wf]["order"] for wf in comp}, "new": [c["id"] for c in prop["stages"] if c["id"] not in {x["id"] for x in now_stages}],
-            "stale": prop.get("base") != json.dumps(now_stages, sort_keys=True)}
+    comp = compile_state(prop["state"])
+    return {"ops": ops, "order": {wf: comp[wf]["order"] for wf in comp}, "changed": changed_ids(now_state, prop["state"]),
+            "stale": prop.get("base") != state_key(now_state)}
 
 
 @serialized
@@ -851,40 +935,44 @@ def cmd_pipeline(*args):
         if sub != "clear":
             human_only()
         return {"apply": pipeline_apply, "discard": pipeline_clear, "clear": pipeline_clear}[sub]()
-    need(sub == "propose" and rest, "usage: pipeline propose add <id> <build|review> <after> <label> <brief> [skill] | remove <id> | move <id> <after>")
+    need(sub == "propose" and rest, PROPOSE_USAGE)
     return pipeline_propose(rest[0], rest[1:])
 
 
+PROPOSE_USAGE = ("usage: pipeline propose add WORKFLOW ID AFTER \"Label\" \"What the stage does\" [skill] | remove WORKFLOW ID | move WORKFLOW ID AFTER "
+                 "(WORKFLOW is build or review, AFTER is a stage id or start)")
+
+
 def pipeline_show():
-    now_stages = pipeline_custom()
-    print(order_text(now_stages))
-    print("a new stage can follow: " + "; ".join(f"{wf}: {', '.join(after_choices(now_stages, wf))}" for wf in ATTACH))
+    state = read_state()
+    print(order_text(state))
+    print("the gate runs by itself after build and polish. These stay true: build after spec; review, polish and prove after build; ship last. For reviews: scope, review, report stay; report last.")
+    print("a stage can go after: " + "; ".join(f"{wf}: {', '.join(valid_places(state, wf))}" for wf in BASE_ORDER))
     prop = proposal_state()
     print("pending: " + ("; ".join(prop["ops"]) + " (waits for the user to click Apply on the board)" if prop else "nothing"))
 
 
 def pipeline_propose(op, a):
-    prop = read_proposal()
-    now_stages = pipeline_custom()
-    base = json.dumps(now_stages, sort_keys=True)
-    stages = prop["stages"] if prop and prop.get("base") == base and not check_custom(prop.get("stages")) else now_stages
-    arity = {"add": (5, 6), "remove": (1, 1), "move": (2, 2)}
-    need(op in arity and arity[op][0] <= len(a) <= arity[op][1], "usage: pipeline propose add <id> <build|review> <after> <label> <brief> [skill] | remove <id> | move <id> <after>")
-    new = {"add": op_add, "remove": op_remove, "move": op_move}[op](stages, *a)
-    errs = check_custom(new)
+    prop, now_state = read_proposal(), read_state()
+    base = state_key(now_state)
+    state = prop["state"] if prop and prop.get("base") == base and isinstance(prop.get("state"), dict) and not check_state(prop["state"]) else now_state
+    arity = {"add": (5, 6), "remove": (2, 2), "move": (3, 3)}
+    need(op in arity and arity[op][0] <= len(a) <= arity[op][1], PROPOSE_USAGE)
+    new = {"add": op_add, "remove": op_remove, "move": op_move}[op](state, *a)
+    errs = check_state(new)
     need(not errs, "; ".join(errs))
-    write_private_text(PROPOSAL_FILE, json.dumps({"base": base, "stages": new}, indent=2, sort_keys=True) + "\n")
+    write_private_text(PROPOSAL_FILE, json.dumps({"base": base, "state": new}, indent=2, sort_keys=True) + "\n")
     audit("pipeline-propose", "", " ".join(a)[:200])
     print(order_text(new))
-    print("proposed: " + "; ".join(stage_ops(now_stages, new)) + ". Nothing changes until the user clicks Apply on the board.")
+    print("proposed: " + "; ".join(stage_ops(now_state, new)) + ". Nothing changes until the user clicks Apply on the board.")
 
 
-def write_private_text(path, text):
+def write_private_text(path, text, mode=0o600):
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent)
     with os.fdopen(fd, "w") as f:
         f.write(text)
-    os.chmod(tmp, 0o600)
+    os.chmod(tmp, mode)
     os.replace(tmp, path)
 
 
@@ -894,22 +982,18 @@ def pipeline_clear():
 
 
 def pipeline_apply():
-    prop = read_proposal()
-    need(prop and not check_custom(prop.get("stages")), "no pending pipeline change")
-    now_stages = pipeline_custom()
-    need(prop.get("base") == json.dumps(now_stages, sort_keys=True), "the pipeline changed since this was proposed: discard it and propose again")
-    gone = {c["id"] for c in now_stages} - {c["id"] for c in prop["stages"]}
-    stuck = [j["id"] for j in all_jobs() if j["stage"] in gone]
+    prop, now_state = read_proposal(), read_state()
+    need(prop and isinstance(prop.get("state"), dict) and not check_state(prop["state"]), "no pending pipeline change")
+    need(prop.get("base") == state_key(now_state), "the pipeline changed since this was proposed: discard it and propose again")
+    comp = compile_state(prop["state"])
+    stuck = [j["id"] for j in all_jobs()
+             if (j["stage"] not in comp[workflow_of(j)]["next"] and j["stage"] not in {"gate", "ready", "rejected", "needs-human"})
+             or (j["stage"] == "needs-human" and j.get("parked_from") not in (None, "gate") and j.get("parked_from") not in comp[workflow_of(j)]["next"])]
     need(not stuck, f"jobs are at a stage this removes ({', '.join(stuck)}): finish or move them first")
-    text = json.dumps({"stages": prop["stages"]}, indent=2, sort_keys=True) + "\n"
-    PIPELINE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=PIPELINE_FILE.parent, prefix=".pipeline-")
-    with os.fdopen(fd, "w") as f:
-        f.write(text)
-    os.replace(tmp, PIPELINE_FILE)
+    write_private_text(PIPELINE_FILE, json.dumps(prop["state"], indent=2, sort_keys=True) + "\n", 0o644)
     PROPOSAL_FILE.unlink(missing_ok=True)
-    audit("pipeline-apply", "", "; ".join(stage_ops(now_stages, prop["stages"]))[:300])
-    print(order_text(prop["stages"]))
+    audit("pipeline-apply", "", "; ".join(stage_ops(now_state, prop["state"]))[:300])
+    print(order_text(prop["state"]))
 
 
 @serialized
