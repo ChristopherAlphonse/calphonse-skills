@@ -1,6 +1,6 @@
 # Factory
 
-The factory takes a feature from idea to a reviewed, committed change on a local branch. It does this by chaining the other skills in this repo as stages. A script moves each job from stage to stage and checks the evidence before every move. You follow the work on a kanban board.
+The factory takes a feature from idea to a reviewed, committed change on a local branch. It does this by chaining the other skills in this repo as stages. A script moves each job from stage to stage and checks the evidence before every move. You follow the work, approve, and chat on a board of connected stages.
 
 It never pushes and never opens a PR or MR. The only commit is the one you make by clicking a button on the board.
 

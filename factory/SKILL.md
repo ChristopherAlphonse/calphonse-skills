@@ -1,6 +1,6 @@
 ---
 name: factory
-description: Take a feature from idea to a reviewed local commit by chaining this repo's skills as stages (shape, spec, build, review, polish, prove, ship) on a kanban board. Use when the user wants a whole feature driven end to end, a software factory, a pipeline, or the board. Never commits without the user's click; never pushes or opens a PR/MR. To review a branch, use factory-review.
+description: Take a feature from idea to a reviewed local commit by chaining this repo's skills as stages (shape, spec, build, review, polish, prove, ship) on a board of connected stages. Use when the user wants a whole feature driven end to end, a software factory, a pipeline, or the board. Never commits without the user's click; never pushes or opens a PR/MR. To review a branch, use factory-review.
 ---
 
 # Factory
@@ -105,7 +105,7 @@ A pass finds nothing to run, or only `hold` rows, and ends. To continue automati
 
 ## Board
 
-`JOB board` starts the board if needed and prints its link (see First action); `JOB watch [port]` (default 8766) runs it in the foreground, and `JOB serve` is the same. It needs no terminal. Its link stays valid until the process stops and can open in several tabs. The board reads `.planning/factory/jobs/*/job.json` every 2 seconds. Columns: Shape, Spec, Build (build and gate), Review, Polish, Prove, Ship, Needs you, Ready to land. Cards show round, gate, one chip per reviewer, task progress, and the local commit. A card waiting on the user is outlined. Approve spec, Commit locally, and Unblock are buttons, and the only way those moves happen. The drawer has a skill switch and a stage note per job, and the chat bar answers questions and makes the same changes. Click a card to read every file in its folder. The board looks and behaves the same whichever harness ran the pass.
+`JOB board` starts the board if needed and prints its link (see First action); `JOB watch [port]` (default 8766) runs it in the foreground, and `JOB serve` is the same. It needs no terminal. Its link stays valid until the process stops and can open in several tabs. The board reads `.planning/factory/jobs/*/job.json` every 2 seconds. The page is a canvas of connected stage nodes (Shape to Ready, with a second lane for review jobs), a top bar with Pipeline, Needs you and Ready to land tabs, a side panel, and an ask bar at the bottom. Each job is a chip on its stage. A node holding a job that waits on the user is outlined. Click a chip to open the panel: status, the Approve spec, Commit locally or Unblock button, the skill switch, a stage note, and every file in the job folder. Those buttons are the only way those moves happen. The ask bar answers questions and makes the same skill and note changes. The board looks and behaves the same whichever harness ran the pass.
 
 ## Out of scope
 

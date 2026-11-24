@@ -78,7 +78,7 @@ class RepoIndex(unittest.TestCase):
             with self.subTest(rel=rel):
                 self.assertTrue((REPO / "factory" / rel).exists())
                 self.assertTrue((REPO / "factory-review" / rel).exists())
-        for rel in ("index.html", "map.html", "app.ts", "map.ts", "dist/app.js", "dist/map.js", "dashboard.css"):
+        for rel in ("index.html", "app.ts", "dist/app.js", "dashboard.css"):
             with self.subTest(rel=rel):
                 self.assertTrue((REPO / "factory-review" / "dashboard" / rel).exists())
 

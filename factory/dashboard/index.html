@@ -7,32 +7,27 @@
     <link rel="stylesheet" href="/static/dashboard.css" />
   </head>
   <body>
-    <header>
-      <div class="title">
-        <h1>Factory</h1>
-        <a href="/map">Map</a>
-        <span id="meta">connecting</span>
-      </div>
-      <p class="policy">Local only. The factory never pushes or opens a PR/MR, and it commits only when you click.</p>
-    </header>
-    <main id="board"></main>
-    <aside id="drawer">
-      <button class="x" id="close">Close</button>
-      <button class="x" id="reset" title="Reset drawer width">Reset width</button>
-      <div id="dhead"></div>
-      <div id="dneeds"></div>
-      <div id="dtools"></div>
-      <div class="files" id="dfiles"></div>
-      <div id="dbody" class="raw"></div>
-    </aside>
+    <nav id="top">
+      <div class="brand"><b>Factory</b><span id="meta">connecting</span></div>
+      <div id="tabs" role="tablist"></div>
+      <button id="panel-toggle" type="button" title="Show or hide the side panel">Panel</button>
+    </nav>
+    <main id="canvas">
+      <svg id="wires" aria-hidden="true"></svg>
+      <div id="rows"></div>
+    </main>
+    <aside id="panel"></aside>
     <div id="ask">
-      <div id="ask-log" hidden></div>
+      <div id="ask-sheet" hidden>
+        <div id="ask-head"><span id="ask-q"></span><button id="ask-close" type="button" aria-label="Close">×</button></div>
+        <div id="ask-log"></div>
+      </div>
       <form id="ask-form" autocomplete="off">
         <input id="ask-input" placeholder="Ask the factory, or say: skip qa-review on this job" spellcheck="false" />
-        <button id="ask-send" type="submit">Send</button>
+        <span class="engine"><i></i>Claude Code</span>
+        <button id="ask-send" type="submit" aria-label="Send">↑</button>
       </form>
     </div>
-    <button id="grip" type="button" aria-label="Resize drawer"></button>
     <script type="module" src="/static/app.js"></script>
   </body>
 </html>

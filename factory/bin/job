@@ -13,7 +13,7 @@ JOBS = STATE / "jobs"
 DASH_DIR = Path(__file__).resolve().parent.parent / "dashboard"
 DIST_DIR = DASH_DIR / "dist"
 STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript",
-          "markdown.js": "text/javascript", "map.js": "text/javascript", "map.css": "text/css", "drawer.js": "text/javascript"}
+          "markdown.js": "text/javascript"}
 DEFAULTS = {
     "concurrency": 1, "max_rounds": 3, "checks": "", "base_branch": "main", "checks_timeout": 1800,
 }
@@ -989,10 +989,6 @@ class Handler(BaseHTTPRequestHandler):
         q = parse_qs(u.query)
         if u.path == "/":
             return self.get_root(q)
-        if u.path == "/map":
-            if not (self.host_ok() and self.session_ok()):
-                return self.send(403, "{}")
-            return self.send(200, (DASH_DIR / "map.html").read_bytes(), "text/html; charset=utf-8")
         if u.path.startswith("/static/"):
             return self.get_static(u.path[len("/static/"):])
         if not self.trusted():

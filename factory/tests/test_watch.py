@@ -39,15 +39,6 @@ class TestWatch(Watch):
         self.assertEqual(status, 200)
         self.assertEqual(headers["Content-Type"], "text/javascript")
 
-    def test_the_map_page_and_its_assets_need_a_session(self):
-        self.start_watch()
-        self.assertEqual(self.http_full("GET", "/map", cookie=False)[0], 403)
-        self.assertEqual(self.http_full("GET", "/static/map.js", cookie=False)[0], 403)
-        for path, ctype in (("/map", "text/html; charset=utf-8"), ("/static/map.js", "text/javascript"), ("/static/map.css", "text/css")):
-            status, _, headers = self.http_full("GET", path)
-            self.assertEqual(status, 200, path)
-            self.assertEqual(headers["Content-Type"], ctype)
-
     def test_login_rules(self):
         self.start_watch()
         self.assertEqual(self.http_full("GET", "/", cookie=False)[0], 403)
