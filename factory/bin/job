@@ -863,11 +863,11 @@ def needs_you(job):
     if s == "spec":
         action, files = "Approve spec", "spec.md"
         why = "Nothing is built until you approve spec.md, and editing it later cancels the approval."
-        todo = "Read it in this drawer, then click Approve spec."
+        todo = "Read spec.md under Files, then click Approve spec."
     elif s == "ship":
         action, files = "Commit locally", "pr-body.md and commit.md"
         why = "The gate passed and the PR body and commit message are written. Nothing is committed until you click."
-        todo = "Read pr-body.md and commit.md in this drawer, then click Commit locally."
+        todo = "Read pr-body.md and commit.md under Files, then click Commit locally."
     else:
         action, files = "Unblock", "blocked.md"
         why = job.get("note") or "The job stopped and cannot continue on its own."

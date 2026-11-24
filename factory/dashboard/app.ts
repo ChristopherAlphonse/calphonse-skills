@@ -35,6 +35,8 @@ const $ = (id: string): HTMLElement => {
 };
 const state: State = { jobs: [], openId: null, openFile: null, lastSig: "", loadToken: 0 };
 let tab: Tab = "all";
+let userZoom: number | null = null;
+let scale = 1;
 let session = "";
 let engineList: string[] = ["claude"];
 let modelChoices: Record<string, string[]> = {};
@@ -128,94 +130,160 @@ function render(): void {
     wrap.append(el("div", "rowlabel", label), nodes);
     rows.push(wrap);
   }
-  $("rows").replaceChildren(...rows);
-  drawWires();
+  $("lanes").replaceChildren(...rows);
+  applyScale();
   renderPanel();
+}
+
+function applyScale(): void {
+  const lanes = $("lanes");
+  const canvas = $("canvas");
+  const rowsEl = $("rows");
+  rowsEl.style.transform = "none";
+  rowsEl.style.margin = "0";
+  const w = lanes.offsetWidth;
+  const h = lanes.offsetHeight;
+  const fit = Math.min(1, (canvas.clientWidth - 56) / w, (canvas.clientHeight - 200) / h);
+  scale = userZoom ?? Math.max(0.3, fit);
+  rowsEl.style.transform = `scale(${scale})`;
+  rowsEl.style.marginRight = `${w * (scale - 1)}px`;
+  rowsEl.style.marginBottom = `${h * (scale - 1)}px`;
+  drawWires();
 }
 
 function drawWires(): void {
   const svg = $("wires");
-  const base = $("rows").getBoundingClientRect();
+  const base = $("lanes").getBoundingClientRect();
   const ns = "http://www.w3.org/2000/svg";
+  const at = (r: DOMRect) => ({ l: (r.left - base.left) / scale, r: (r.right - base.left) / scale, t: (r.top - base.top) / scale, b: (r.bottom - base.top) / scale });
   const paths: SVGPathElement[] = [];
   for (const nodes of document.querySelectorAll<HTMLElement>(".nodes")) {
     const cards = [...nodes.children] as HTMLElement[];
     for (let i = 0; i + 1 < cards.length; i++) {
-      const a = cards[i].getBoundingClientRect();
-      const b = cards[i + 1].getBoundingClientRect();
-      const x1 = a.right - base.left;
-      const y1 = a.top + 28 - base.top;
-      const x2 = b.left - base.left;
-      const y2 = b.top + 28 - base.top;
-      const mid = (x1 + x2) / 2;
+      const a = at(cards[i].getBoundingClientRect());
+      const b = at(cards[i + 1].getBoundingClientRect());
+      const wrap = b.t > a.b;
+      const x1 = wrap ? (a.l + a.r) / 2 : a.r;
+      const y1 = wrap ? a.b : a.t + 28;
+      const x2 = wrap ? (b.l + b.r) / 2 : b.l;
+      const y2 = wrap ? b.t : b.t + 28;
       const p = document.createElementNS(ns, "path");
-      p.setAttribute("d", `M${x1},${y1} C${mid},${y1} ${mid},${y2} ${x2},${y2}`);
+      p.setAttribute("d", wrap ? `M${x1},${y1} C${x1},${y1 + 30} ${x2},${y2 - 30} ${x2},${y2}` : `M${x1},${y1} C${(x1 + x2) / 2},${y1} ${(x1 + x2) / 2},${y2} ${x2},${y2}`);
       if (cards[i].classList.contains("lit")) p.classList.add("lit");
       paths.push(p);
     }
   }
-  svg.setAttribute("width", String(base.width));
-  svg.setAttribute("height", String(base.height));
-  svg.style.left = `${$("rows").offsetLeft}px`;
-  svg.style.top = `${$("rows").offsetTop}px`;
+  svg.setAttribute("width", String(base.width / scale));
+  svg.setAttribute("height", String(base.height / scale));
   svg.replaceChildren(...paths);
 }
 
-// ---- side panel
-function overview(): HTMLElement[] {
-  const waiting = state.jobs.filter((j) => j.needs_human).length;
-  const done = state.jobs.filter((j) => ["ready", "rejected"].includes(j.stage)).length;
-  const stat = (n: number, label: string) => {
+// ---- side panel (Floorplan's structure: header, title, description, stats, titled sections)
+const sec = (...kids: (HTMLElement | null)[]): HTMLElement => {
+  const s = el("div", "sec");
+  s.append(...kids.filter((k): k is HTMLElement => k !== null));
+  return s;
+};
+const heading = (text: string, count?: number): HTMLElement => {
+  const h = el("h3", "", text);
+  if (count !== undefined) h.append(el("span", "c", String(count)));
+  return h;
+};
+const stats = (...pairs: [string | number, string][]): HTMLElement => {
+  const box = el("div", "stats");
+  for (const [n, label] of pairs) {
     const d = el("div");
     d.append(el("b", "", String(n)), el("span", "", label));
-    return d;
-  };
-  const stats = el("div", "stats");
-  stats.append(stat(state.jobs.length, "jobs"), stat(waiting, "need you"), stat(done, "ready"));
-  const list = state.jobs.filter(visible).map((j) => {
-    const r = el("button", "listrow", j.title);
-    r.type = "button";
-    r.append(el("small", "", `${j.id} at ${j.stage}${j.needs_human ? ", waiting on you" : ""}`));
-    r.onclick = () => openJobPanel(j.id);
-    return r;
-  });
-  const empty = state.jobs.length ? [] : [el("p", "sub", "No jobs yet. Ask an agent to run the factory, or type below.")];
-  return [el("h2", "", "Factory"), el("p", "sub", "Local only. Nothing is pushed, and nothing is committed until you click."), stats, el("h4", "", "Jobs"), ...list, ...empty];
+    box.append(d);
+  }
+  return box;
+};
+const finished = (j: Job): boolean => ["ready", "rejected"].includes(j.stage);
+const dotClass = (j: Job): string => (j.needs_human ? "warn" : j.gate === "FAIL" ? "bad" : finished(j) ? "done" : "ok");
+
+function listRow(j: Job): HTMLButtonElement {
+  const r = el("button", "lrow");
+  r.type = "button";
+  const t = el("div", "rt");
+  t.append(el("div", "rn", j.title), el("div", "rd", `${j.id} at ${j.stage}${j.needs_human ? ", waiting on you" : ""}`));
+  r.append(el("span", `dot ${dotClass(j)}`), t, el("span", "rc", `${j.files.length} files`));
+  r.onclick = () => openJobPanel(j.id);
+  return r;
+}
+
+function overview(): HTMLElement[] {
+  const waiting = state.jobs.filter((j) => j.needs_human);
+  const ph = el("div", "ph");
+  ph.append(el("span", "ico", "▦"), el("span", "kindlabel", "Pipeline"));
+  const list = state.jobs.filter(visible).map(listRow);
+  const jobList = el("div", "list");
+  jobList.append(...list);
+  return [
+    sec(
+      ph,
+      el("h2", "pt", "Factory"),
+      el("p", "pd", "Local only. Nothing is pushed, and nothing is committed until you click."),
+      el("div", "gap"),
+      stats([state.jobs.length, "jobs"], [waiting.length, "need you"], [state.jobs.filter(finished).length, "ready"]),
+    ),
+    ...(waiting.length
+      ? [sec(heading("Needs you", waiting.length), ...waiting.map((j) => {
+          const c = el("button", "callout");
+          c.type = "button";
+          c.append(el("b", "", j.title), el("span", "", j.needs?.action ?? "Open"));
+          c.onclick = () => openJobPanel(j.id);
+          return c;
+        }))]
+      : []),
+    sec(heading("Jobs", list.length), list.length ? jobList : el("p", "pd empty", "No jobs yet. Ask an agent to run the factory, or type below.")),
+  ];
 }
 
 function needsBox(n: Needs, j: Job): HTMLElement {
-  const box = el("div", "needs");
-  box.append(el("h4", "", `Needs you: ${n.action}`), el("p", "", n.why), el("p", "", n.todo));
+  const box = el("div", "callout amber");
+  box.append(el("b", "", `Needs you: ${n.action}`), el("p", "", n.why), el("p", "", n.todo));
   const path = j.can_approve ? "/api/approve" : j.can_commit ? "/api/commit" : "/api/unblock";
   box.append(button(n.action, "btn", () => post(path, { id: j.id })));
   return box;
 }
 
-function toolsBox(j: Job): HTMLElement {
-  const box = el("div", "tools");
+let skillsOpen = false;
+function skillsSection(j: Job): HTMLElement {
   const off = new Set(j.skills_off ?? []);
-  const chips = j.skills.map((name) => {
-    const c = chip(off.has(name) ? `${name} (off)` : name, off.has(name) ? "FAIL" : "");
-    c.title = off.has(name) ? "Click to use this skill again" : "Click to stop using this skill on this job";
-    c.onclick = () => post("/api/skill", { id: j.id, name, off: !off.has(name) });
-    return c;
+  const tag = (name: string) => {
+    const t = el("button", `tag${off.has(name) ? " off" : ""}`, name);
+    t.type = "button";
+    t.title = off.has(name) ? "Off for this job. Click to use it again." : "Click to stop using this skill on this job.";
+    t.onclick = () => post("/api/skill", { id: j.id, name, off: !off.has(name) });
+    return t;
+  };
+  const tagBox = el("div", "tags");
+  tagBox.append(...(skillsOpen ? j.skills : j.skills.filter((n) => off.has(n))).map(tag));
+  if (!skillsOpen && !off.size) tagBox.append(el("span", "pd empty", "All skills on"));
+  const toggle = button(skillsOpen ? "Hide list" : "Choose skills", "btn ghost small", () => {
+    skillsOpen = !skillsOpen;
+    renderPanel();
   });
+  return sec(heading("Skills", off.size), tagBox, el("div", "actions").appendChild(toggle).parentElement as HTMLElement);
+}
+
+function noteSection(j: Job): HTMLElement {
   const note = el("textarea");
   note.rows = 2;
   note.placeholder = `Note for the ${j.stage} stage. The next agent follows it.`;
   note.value = j.briefs?.[j.stage] ?? "";
-  box.append(el("h4", "", "Skills on this job"), row(...chips), note, button("Save note", "btn ghost", () => post("/api/brief", { id: j.id, stage: j.stage, text: note.value })));
-  return box;
+  const actions = el("div", "actions");
+  actions.append(button("Save note", "btn ghost", () => post("/api/brief", { id: j.id, stage: j.stage, text: note.value })));
+  return sec(heading("Stage note"), note, actions);
 }
 
-function statusRows(j: Job): HTMLElement[] {
+function statusChips(j: Job): HTMLElement[] {
   const rows: HTMLElement[] = [];
-  const chips = [chip(j.kind === "review" ? `review job: ${j.stage}` : j.stage)];
-  if (j.round && j.kind !== "review") chips.push(chip(`round ${j.round}/${j.round_limit}`));
+  const chips: HTMLElement[] = [];
   if (j.stage === "gate" || j.gate) chips.push(chip(`gate ${j.gate || "pending"}`, j.gate || ""));
   if (j.commit) chips.push(chip(`committed locally ${j.commit.slice(0, 7)}`, "PASS"));
-  rows.push(row(...chips));
-  if (j.kind === "review" && j.review) rows.push(el("div", "sub", `${j.review.base_ref} .. ${j.review.head_ref}`));
+  if (j.kind === "review" && j.review) chips.push(chip(`${j.review.base_ref} .. ${j.review.head_ref}`));
+  if (chips.length) rows.push(row(...chips));
   if (j.stack?.length) rows.push(row(...j.stack.map((k) => chip(k))));
   if (j.report?.FINDINGS !== undefined) {
     const c = [chip(`${j.report.FINDINGS} findings`)];
@@ -223,39 +291,46 @@ function statusRows(j: Job): HTMLElement[] {
     rows.push(row(...c));
   }
   if (j.stage === "review") rows.push(row(...Object.entries(j.reviews).map(([name, v]) => chip(v ? `${name} ${v}` : `${name} ...`, v ?? ""))));
-  const [done, total] = j.progress;
-  if (total) {
-    const bar = el("div", "bar");
-    const fill = el("i");
-    fill.style.width = `${Math.round((100 * done) / total)}%`;
-    bar.append(fill);
-    rows.push(bar, el("div", "sub", `tasks ${done}/${total}`));
-  }
   return rows;
 }
 
 function jobView(j: Job): HTMLElement[] {
+  const ph = el("div", "ph");
+  ph.append(button("←", "iconbtn", closeJob), el("span", "kindlabel", j.kind === "review" ? "Review job" : "Build job"));
+  const [done, total] = j.progress;
+  const last = j.activity?.at(-1);
+  const where = j.branch ?? j.worktree;
+  const pp = where ? el("div", "pp", where) : null;
   const files = j.files.map((f) => {
-    const c = chip(f, f === state.openFile ? "on" : "");
-    c.onclick = async () => {
+    const r = el("button", `lrow${f === state.openFile ? " on" : ""}`);
+    r.type = "button";
+    const t = el("div", "rt");
+    t.append(el("div", "rn", f));
+    r.append(el("span", "dot file"), t);
+    r.onclick = () => {
       state.openFile = f;
       renderPanel();
-      await loadFile();
     };
-    return c;
+    return r;
   });
+  const fileList = el("div", "list");
+  fileList.append(...files);
   const body = el("div");
   body.id = "dbody";
   return [
-    button("← All jobs", "btn ghost", closeJob),
-    el("h2", "", j.title),
-    el("div", "sub", `${j.id}${j.branch ? `, ${j.branch}` : ""}`),
-    ...statusRows(j),
-    ...(j.needs ? [needsBox(j.needs, j)] : []),
-    toolsBox(j),
-    el("h4", "", "Files"),
-    row(...files),
-    body,
+    sec(
+      ph,
+      el("h2", "pt", j.title),
+      el("p", `pd${last ? "" : " empty"}`, last ? `now: ${last.text}` : j.id),
+      pp,
+      el("div", "gap"),
+      stats([j.kind === "review" || !j.round ? "-" : `${j.round}/${j.round_limit}`, "round"], [total ? `${done}/${total}` : "-", "tasks"], [j.files.length, "files"]),
+    ),
+    ...(j.needs ? [sec(needsBox(j.needs, j))] : []),
+    ...(statusChips(j).length ? [sec(heading("Status"), ...statusChips(j))] : []),
+    skillsSection(j),
+    noteSection(j),
+    sec(heading("Files", j.files.length), fileList, body),
   ];
 }
 
@@ -397,12 +472,24 @@ try {
   // keep the claude default
 }
 
+$("zoom-in").onclick = () => {
+  userZoom = Math.min(2, scale * 1.2);
+  applyScale();
+};
+$("zoom-out").onclick = () => {
+  userZoom = Math.max(0.3, scale / 1.2);
+  applyScale();
+};
+$("zoom-fit").onclick = () => {
+  userZoom = null;
+  applyScale();
+};
 $("panel-toggle").onclick = () => {
   document.body.classList.toggle("with-panel");
-  drawWires();
+  applyScale();
 };
 document.body.classList.add("with-panel");
-window.addEventListener("resize", drawWires);
+window.addEventListener("resize", applyScale);
 document.addEventListener("visibilitychange", async () => {
   if (!document.hidden) await poll();
 });
