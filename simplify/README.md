@@ -32,6 +32,10 @@ Reply:
 
 The reply is only the reworded text, in plain words. No grammar lesson.
 
+## Explaining as you go
+
+Ask it to teach while it works, for example "explain as you go" or "teach me". The agent does the task as usual, explains why it chose one approach over the alternatives, points out patterns in the code, and puts a short `★ Insight` callout before and after each code change. The explanations stay in the chat, not in the code.
+
 ## Rules
 
 - Lead with the outcome or answer.
@@ -48,3 +52,4 @@ The reply is only the reworded text, in plain words. No grammar lesson.
 | `SKILL.md`                      | Rules the agent follows                                   |
 | `references/technical-check.md` | Two before/after examples of restating technical messages |
 | `references/sentence-check.md`  | Reword a user's own sentence in plain words               |
+| `references/explain-as-you-go.md` | Teaching mode: explain choices and patterns while working |
