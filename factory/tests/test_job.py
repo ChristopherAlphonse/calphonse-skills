@@ -1,4 +1,5 @@
 """Behavior tests for bin/job. Everything goes through the CLI or a real `serve 0` subprocess."""
+import hashlib
 import http.client
 import importlib.machinery
 import importlib.util
@@ -355,6 +356,44 @@ class TestShapeSpec(Factory):
         self.human_refused("approve", "j")
         self.wf("j", "spec.md", "# s\n")
         self.human("approve", "j")
+
+    def chat_key(self):
+        self.state.mkdir(parents=True, exist_ok=True)
+        (self.state / "chat.sha256").write_text(hashlib.sha256(b"k").hexdigest() + "\n")
+
+    def chat(self, *a):
+        return self.ok(*a, extra_env={"FACTORY_CHAT_KEY": "k"})
+
+    def chat_no(self, *a):
+        return self.no(*a, extra_env={"FACTORY_CHAT_KEY": "k"})
+
+    def test_edit_only_from_the_chat_bar(self):
+        self.ok("create", "j", "T")
+        self.wf("j", "shape.md", "x\n")
+        self.chat_key()
+        self.no("edit", "j", "shape.md", "x", "y")
+        self.no("edit", "j", "shape.md", "x", "y", extra_env={"FACTORY_CHAT_KEY": "wrong"})
+        self.chat("edit", "j", "shape.md", "x", "y")
+
+    def test_edit_changes_one_exact_piece_and_keeps_approval(self):
+        self.new_spec("j", spec=False)
+        self.wf("j", "spec.md", "# s\n- No button.\n- No button.\n")
+        self.human("approve", "j")
+        self.chat_key()
+        self.chat_no("edit", "j", "spec.md", "- No button.", "- A button.")
+        self.chat("edit", "j", "spec.md", "# s", "# spec")
+        self.assertTrue(self.js("j")["approvals"].get("spec"))
+        self.adv("j", "build")
+        self.assertIn("spec.md", (self.state / "audit.log").read_text())
+
+    def test_edit_refuses_guarded_lines_and_other_files(self):
+        self.ok("create", "j", "T")
+        self.chat_key()
+        self.wf("j", "shape.md", "STATUS: DRAFT\nx\n")
+        self.chat_no("edit", "j", "shape.md", "STATUS: DRAFT", "STATUS: READY")
+        self.chat_no("edit", "j", "job.json", '"stage"', '"x"')
+        self.chat_no("edit", "j", "../../config.json", "a", "b")
+        self.chat("edit", "j", "shape.md", "x", "y")
 
     def test_worktree_and_branch_created_on_build(self):
         self.to_build("j")

@@ -52,6 +52,7 @@ def favicon_svg(board, dot):
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#161616"/>'
             f'<g {stroke}>{glyph}</g>{badge}</svg>')
 SESSION = ""
+CHAT_KEY = ""
 CODE = ""
 KEYS = {}
 
@@ -102,7 +103,7 @@ def ask_args(engine, exe, me, system, question, session, model, effort):
     if engine == "claude":
         args = [exe, "-p", "--output-format", "json", "--append-system-prompt", system,
                 "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--tools", "Read,Grep,Glob,Bash",
-                "--allowedTools", f"Bash({me} skill:*)", f"Bash({me} brief:*)", f"Bash({me} note:*)",
+                "--allowedTools", f"Bash({me} skill:*)", f"Bash({me} brief:*)", f"Bash({me} note:*)", f"Bash({me} edit:*)",
                 f"Bash({me} pipeline show)", f"Bash({me} pipeline propose:*)", f"Bash({me} pipeline clear)", "Read", "Grep", "Glob"]
         args += (["--model", model] if model else []) + (["--effort", effort] if effort else [])
         return args + (["--resume", session] if session else []), question[:4000]
@@ -127,7 +128,7 @@ def ask(board, jid, question, session, engine, model, effort, act=False):
     args, stdin = ask_args(engine, exe, str(ENGINE.SELF), ENGINE.ask_system(jid, board, act), question, session, model, effort if effort in EFFORTS else "")
     try:
         r = subprocess.run(args, input=stdin, capture_output=True, text=True, timeout=ASK_TIMEOUT,
-                           cwd=str(ROOT), env={**os.environ, "FACTORY_ROOT": str(ROOT)})
+                           cwd=str(ROOT), env={**os.environ, "FACTORY_ROOT": str(ROOT), "FACTORY_CHAT_KEY": CHAT_KEY})
     except (OSError, subprocess.SubprocessError) as e:
         return {"error": f"chat failed: {e}"}
     if engine == "claude":
@@ -159,12 +160,8 @@ def mermaid_library():
         return None
 
 
-GUARDED_LINE = re.compile(r"^[A-Z]{3,}:.*$", re.M)
-
-
 def edit_file(old, new):
-    """Whether `new` may replace `old`. Lines such as STATUS: READY steer the stage machine, so they may not change here."""
-    return GUARDED_LINE.findall(old) == GUARDED_LINE.findall(new)
+    return ENGINE.edit_allowed(old, new)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -454,6 +451,9 @@ def cmd_watch(port):
     ENGINE.KEY = key
     ENGINE.STATE.mkdir(parents=True, exist_ok=True)
     write_private(ENGINE.STATE / ENGINE.HASH_FILE, hashlib.sha256(key.encode()).hexdigest() + "\n")
+    global CHAT_KEY
+    CHAT_KEY = secrets.token_urlsafe(32)
+    write_private(ENGINE.STATE / ENGINE.CHAT_HASH_FILE, hashlib.sha256(CHAT_KEY.encode()).hexdigest() + "\n")
     srv = bind(port)
     ENGINE.audit("watch", "", f"port {srv.server_port}")
     print(f"watch: 127.0.0.1:{srv.server_port}/?c={CODE}", flush=True)

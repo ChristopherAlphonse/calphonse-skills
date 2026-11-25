@@ -250,6 +250,8 @@ If `.planning/` has no map of the project, the `whats-going-on` skill makes one 
 
 Where your tool lets you pick a model, review, polish, prove and ship agents run on a smaller one. Shape, spec and build keep the model of your session.
 
+In Claude Code each stage's subagent gets `opus` (shape, spec, build), `sonnet` (review) or `haiku` (polish, prove, ship). In Kiro the model is picked per stage with `kiro-cli chat --model <id>`: `claude-opus-5.5` for shape, spec and build, `claude-sonnet-5.5` for review, `claude-haiku-5.5` for polish, prove and ship.
+
 ## Part 5: Running by itself
 
 ### 5.1 A pass

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Only writer of job.json. Refuses illegal stage moves. Serves the board and its chat."""
-import fcntl, fnmatch, hashlib, json, os, re, shlex, shutil, subprocess, sys, tempfile, threading, time
+import fcntl, fnmatch, hashlib, hmac, json, os, re, shlex, shutil, subprocess, sys, tempfile, threading, time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +23,7 @@ SELF = Path(__file__).resolve()
 WATCH_FIRST_PORT = 8766
 BOARD_SCRIPT = SELF.parent / "board"
 HASH_FILE = "human.sha256"
+CHAT_HASH_FILE = "chat.sha256"
 CTX = threading.local()
 BASE_REVIEWERS = ["code", "qa", "test"]
 EXTRA_REVIEWERS = {"architecture"}
@@ -1112,6 +1113,45 @@ def cmd_brief(jid, stage, text):
     audit("brief", jid, f"{stage}: {text[:100]}")
 
 
+def from_chat_bar():
+    """True only when FACTORY_CHAT_KEY, which the board hands to its own chat turns, hashes to the file the board wrote."""
+    try:
+        want = (STATE / CHAT_HASH_FILE).read_text().strip()
+    except OSError:
+        return False
+    return bool(want) and hmac.compare_digest(hashlib.sha256(os.environ.get("FACTORY_CHAT_KEY", "").encode()).hexdigest(), want)
+
+
+GUARDED_LINE = re.compile(r"^[A-Z]{3,}:.*$", re.M)
+
+
+def edit_allowed(old, new):
+    """Whether `new` may replace `old`. Lines such as STATUS: READY steer the stage machine, so they may not change."""
+    return GUARDED_LINE.findall(old) == GUARDED_LINE.findall(new)
+
+
+@serialized
+def cmd_edit(jid, name, old, new):
+    """Replace one exact piece of text in one of the job's .md files. Never touches job.json, and never a STATUS:-style line."""
+    need(from_chat_bar(), "edit is only available from the board's chat bar")
+    need(old and old != new, "edit needs the exact old text, and a different new text")
+    job = load(jid)
+    p = (jobdir(jid) / name).resolve()
+    need(jobdir(jid).resolve() in p.parents and p.suffix == ".md" and p.is_file(), f"no job file {name!r}")
+    text = p.read_text()
+    need(text.count(old) == 1, f"old text must appear exactly once in {name}, found {text.count(old)}")
+    out = text.replace(old, new)
+    need(edit_allowed(text, out), "that edit changes a STATUS:-style line, which steers the stages")
+    fd, tmp = tempfile.mkstemp(dir=p.parent, prefix=".edit-")
+    with os.fdopen(fd, "w") as f:
+        f.write(out)
+    os.replace(tmp, p)
+    audit("edit", jid, f"{name}: {old[:60]!r} -> {new[:60]!r}")
+    if name == SPEC_FILE and job["approvals"].get("spec"):
+        job["approvals"]["spec_sha"] = file_sha(p)
+        save(job)
+
+
 def human_only():
     need(is_human(), "this is a human action, use the board")
 
@@ -1348,7 +1388,7 @@ def ask_system(jid, board="build", act=False):
             f"The user is looking at {'review' if review else 'job'} {jid or '(none)'}. "
             + ("This is a read-only review: never edit, create, or delete code, and never post anywhere. " if review else "")
             + f"To change the board run only: {me} skill <id> <name> on|off, "
-            f"{me} brief <id> <stage> <text> (empty text clears), {me} note <id> <text>. "
+            f"{me} brief <id> <stage> <text> (empty text clears), {me} note <id> <text>, {me} edit <id> <file.md> <old text> <new text> (one exact, unique piece of a job file such as spec.md; when the user comments on lines or asks for a change to a job file, make it with this instead of a brief). "
             + ("Unblock is a button the user clicks. " if review else "Approve spec, Commit locally and Unblock are buttons the user clicks: say which one. ")
             + (BOT_PERSONA if act else "")
             + ("ACT MODE: the user chose Act. A pipeline change you propose is applied for them the moment you finish, so propose exactly what they asked and nothing else, and do not tell them to click Apply. " if act else
@@ -1362,7 +1402,7 @@ HUMAN_ONLY = {"approve", "commit", "unblock"}
 
 COMMANDS = {
     "create": (cmd_create, None), "advance": (cmd_advance, 2), "gate": (cmd_gate, 1), "stack": (cmd_stack, 1), "watch": (cmd_watch, 1), "board": (cmd_board, 0),
-    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_watch, 1), "pipeline": (cmd_pipeline, 0), "skill": (cmd_skill, 3), "brief": (cmd_brief, 3), "wait": (cmd_wait, 1),
+    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_watch, 1), "pipeline": (cmd_pipeline, 0), "skill": (cmd_skill, 3), "brief": (cmd_brief, 3), "edit": (cmd_edit, 4), "wait": (cmd_wait, 1),
 }
 
 if __name__ == "__main__":

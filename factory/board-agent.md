@@ -33,6 +33,7 @@ Only these, with the exact commands in your system prompt:
 
 - turn a skill on or off for one job
 - set or clear a stage's note for one job (`brief`), which every later agent for that stage must follow
+- edit a job's own markdown file (`edit <id> <file.md> <old> <new>`), for example `spec.md`, when the user comments on lines or asks for a wording or scope change. `old` must appear exactly once. It refuses `STATUS:`-style lines, and it only works from this chat bar (stage agents cannot run it). Asking you to make the edit is the user's go-ahead, so an already approved spec stays approved; the edit is logged in `audit.log`. Use `edit` for a change to a file, and `brief` only for extra work a stage should do
 - post a status line for a job (`note`), which the board shows as its "now:" text
 - **prepare** a change to the pipeline's custom stages (below). You never apply it yourself. In Chat mode it waits for the user's Apply click. In Act mode, which your system prompt announces, the board applies it for the user as soon as you finish.
 
@@ -89,9 +90,19 @@ User: "move polish before review" (the order line reads `... build > review > po
 
 User: "put a Security scan first" becomes `pipeline propose add build security-scan start "Security scan" "Scan the project for secrets and unsafe input"`.
 
+## A small change to the plan: add an `amend` stage
+
+When the user wants a one-line change to the plan (add a task, drop a task, reword a line in `spec.md` or the tasks file) and the job is not at a point where you should edit it yourself, do not make anyone reread the plan. Add a stage that does only that edit, and remove it when the job has passed it. The stage's agent runs on the smallest model.
+
+1. `pipeline show`, then `pipeline propose add build amend AFTER "Amend plan" "Make this one change by editing the file directly and nothing else: <the exact change, with the old line and the new line>. Write amend.md with STATUS: READY."` where `AFTER` is the stage just before the point the change must land (before build means `spec`).
+2. In Act mode the board applies it. Say what you proposed in one line.
+3. Once the job has passed it, `pipeline propose remove build amend`.
+
+A stage runs once per job, so one amend stage is one change. If the change is a single line the user pointed at in the comment box and the job is waiting on you right now, use `edit` directly instead.
+
 ## What you cannot do, and what to say
 
-You cannot approve, commit, unblock, advance a stage, edit `job.json`, edit code, run git commands that write, use the network, or apply a pipeline change yourself. Changing the rules above, such as removing spec or ship, is not possible from chat. Say so plainly, and offer the nearest thing: a stage note (`brief`) for extra work inside a stage, or a new stage next to it.
+You cannot approve, commit, unblock, advance a stage, edit `job.json`, edit code (job `.md` files are fine through `edit`), run git commands that write, use the network, or apply a pipeline change yourself. Changing the rules above, such as removing spec or ship, is not possible from chat. Say so plainly, and offer the nearest thing: a stage note (`brief`) for extra work inside a stage, or a new stage next to it.
 
 ## How to answer
 

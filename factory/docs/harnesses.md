@@ -19,6 +19,8 @@ The guard:
 | Headless pass | `claude -p` | `opencode run` | `kiro-cli chat --v3 --no-interactive --agent factory` |
 | Policy | `.claude/settings.json`, `.claude/hooks/` | `opencode.jsonc`, `.opencode/plugins/`, `.opencode/guard/` | `.kiro/agents/factory.json`, `.kiro/hooks/` |
 
+Claude Code stage subagents get `model: opus` (shape, spec, build), `sonnet` (review) or `haiku` (polish, prove, ship). Kiro stage agents also get `--model <id>` by task: `claude-opus-5.5` (shape, spec, build), `claude-sonnet-5.5` (review), `claude-haiku-5.5` (polish, prove, ship). `kiro-cli chat --list-models` shows the ids.
+
 ## What was measured
 
 - **Kiro** (v3 engine, `kiro-cli` 3.3.0): every conclusive attack in `tests/probe_harness.py` was blocked under `--trust-all-tools`, each succeeding in a control with no policy.

@@ -64,8 +64,10 @@ Each layer's strength, the per-harness policy paths, and the probe results are i
 - Builders write code and leave it uncommitted. Reviewers never edit. Fixes go back to a builder.
 - A gate passes on a command's output, never on an agent saying "done". `JOB gate` runs `checks` from `.planning/factory/config.json`. If `checks` is empty, stop and ask the user.
 - Each subagent starts fresh. Its prompt gives the job id, the job folder, the worktree and branch, and the stage's one-line brief. It replies with one line.
-- Where the harness lets you pick a model, run review, polish, prove, and ship agents on a smaller model (Sonnet in Claude Code). Shape, spec, and build keep the session model.
-- In Kiro, start each stage agent with `kiro-cli chat --model <id>` plus the usual `--v3 --no-interactive --agent factory`, choosing the id by task: `claude-opus-5.5` for shape, spec, and build (design and code writing); `claude-sonnet-5.5` for review and polish (judgment on a diff); `claude-haiku-5.5` for prove and ship (run commands, write the UAT, stage the commit). If a stage proves too hard for its model, rerun it one tier up.
+- Where the harness lets you pick a model, choose it by stage: the largest for shape, spec, and build (design and code writing); a mid-size one for review (judgment on a diff); the smallest for polish (the comment-sicko pass, a mechanical cleanup), prove and ship (run commands, write the UAT, stage the commit). If a stage proves too hard for its model, rerun it one tier up.
+- A custom stage named `amend` (a one-line change to the plan) runs on the smallest model.
+- In Claude Code, set the `model` of each stage's subagent: `opus` for shape, spec, and build; `sonnet` for review; `haiku` for polish, prove, and ship.
+- In Kiro, start each stage agent with `kiro-cli chat --model <id>` plus the usual `--v3 --no-interactive --agent factory`, choosing the id by task: `claude-opus-5.5` for shape, spec, and build; `claude-sonnet-5.5` for review; `claude-haiku-5.5` for polish, prove, and ship.
 - Spawn stage agents in parallel where the stage allows, then wait for all of them before the pass ends. A headless pass ends the process, so nothing may be left running.
 - A job gets `max_rounds` build rounds (default 3). The next failure moves it to `needs-human` on its own.
 - Concurrency comes from `config.json` (default 1).
