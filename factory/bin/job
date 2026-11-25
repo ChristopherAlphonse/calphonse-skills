@@ -9,7 +9,7 @@ ROOT = Path(os.environ.get("FACTORY_ROOT", Path.cwd())).resolve()
 STATE = ROOT / ".planning" / "factory"
 JOBS = STATE / "jobs"
 DEFAULTS = {
-    "concurrency": 1, "max_rounds": 3, "checks": "", "base_branch": "main", "checks_timeout": 1800,
+    "concurrency": 1, "max_rounds": 3, "checks": "", "checks_timeout": 1800,
 }
 PROTECTED_FLOOR = [
     ".github/**", ".gitlab/**", ".gitlab-ci.yml", "Jenkinsfile", "CODEOWNERS", "**/CODEOWNERS",
@@ -122,7 +122,6 @@ def config():
     extra = cfg.get("protected_paths", [])
     need(isinstance(extra, list) and all(isinstance(x, str) for x in extra), "protected_paths must be a list of strings")
     cfg["protected_paths"] = PROTECTED_FLOOR + [x for x in extra if x not in PROTECTED_FLOOR]
-    need(not str(cfg["base_branch"]).startswith("-"), "bad base_branch")
     return cfg
 
 
@@ -398,13 +397,13 @@ HOOK_FN = """human_ok() {
 """
 HOOK_PRE_COMMIT = HOOK_HEAD + HOOK_FN + 'human_ok || { echo "@@MSG@@" >&2; exit 1; }\nunset FACTORY_HUMAN_KEY\n'
 HOOK_PRE_PUSH = HOOK_HEAD + HOOK_FN + """in=$(cat)
-if ! human_ok && printf '%s' "$in" | grep -q 'refs/heads/factory/'; then echo "@@MSG@@" >&2; exit 1; fi
+if ! human_ok; then echo "@@MSG@@" >&2; exit 1; fi
 unset FACTORY_HUMAN_KEY
 """
 HOOK_REF_TX = HOOK_HEAD + HOOK_FN + """in=$(cat)
 if [ "$1" = "prepared" ] && ! human_ok; then
   printf '%s\\n' "$in" | while read old new ref; do
-    case "$ref" in refs/heads/factory/*) if [ "$new" != "0000000000000000000000000000000000000000" ]; then exit 1; fi;; esac
+    case "$ref" in @@REF@@) if [ "$new" != "0000000000000000000000000000000000000000" ]; then exit 1; fi;; esac
   done
   rc=$?
   [ $rc -eq 0 ] || { echo "@@MSG@@" >&2; exit $rc; }
@@ -439,7 +438,8 @@ def install_hooks(job):
     hdir = STATE / "hooks" / job["id"]
     hdir.mkdir(parents=True, exist_ok=True)
     hashfile = shlex.quote(str(STATE / HASH_FILE))
-    guarded = {n: t.replace("@@MSG@@", GUARD_MSG).replace("@@HASH@@", hashfile) for n, t in
+    ref_pat = shlex.quote(f"refs/heads/{job['branch']}") if job["branch"] else "'refs/heads/'*"
+    guarded = {n: t.replace("@@MSG@@", GUARD_MSG).replace("@@HASH@@", hashfile).replace("@@REF@@", ref_pat) for n, t in
                (("pre-commit", HOOK_PRE_COMMIT), ("pre-push", HOOK_PRE_PUSH),
                 ("reference-transaction", HOOK_REF_TX))}
     names = {f.name for f in Path(orig).glob("*") if f.is_file() and os.access(f, os.X_OK)} if Path(orig).is_dir() else set()
@@ -458,13 +458,21 @@ def install_hooks(job):
     job["hooks_path"], job["hooks_sha"] = str(hdir), hooks_digest(hdir)
 
 
+def ticket_branch(jid):
+    """A build job works on feature/<TICKET>, for example feature/PROJ-174. It must already exist: the factory never creates a branch."""
+    name = f"feature/{jid.upper()}"
+    need(git(["rev-parse", "--verify", "--quiet", f"refs/heads/{name}"], ROOT).returncode == 0,
+         f"branch {name} does not exist. Create it yourself (and keep the main working tree off it); the factory never creates a branch")
+    return name
+
+
 def make_worktree(job):
     if job["worktree"]:
         return
     wt = ROOT / ".worktrees" / job["id"]
-    branch = f"factory/{job['id']}"
-    start = job["review"]["head"] if job.get("review") else config()["base_branch"]
-    r = git(["worktree", "add", str(wt), "-b", branch, start], ROOT)
+    branch = None if job.get("review") else ticket_branch(job["id"])
+    cmd = ["worktree", "add", "--detach", str(wt), job["review"]["head"]] if job.get("review") else ["worktree", "add", str(wt), branch]
+    r = git(cmd, ROOT)
     need(r.returncode == 0, f"worktree failed: {r.stderr.strip()}")
     job["worktree"], job["branch"] = str(wt), branch
     job["base_commit"] = job["base_tip"] = job["tip"] = git(["rev-parse", "HEAD"], wt).stdout.strip()
@@ -474,7 +482,6 @@ def make_worktree(job):
         install_hooks(job)
     except BaseException:
         git(["worktree", "remove", "--force", str(wt)], ROOT)
-        git(["branch", "-D", branch], ROOT)
         raise
 
 
@@ -564,8 +571,8 @@ def integrity_problems(job):
 
 def worktree_problems(job, wt):
     probs = []
-    if git(["symbolic-ref", "HEAD"], wt).stdout.strip() != f"refs/heads/{job['branch']}":
-        probs.append("worktree is not on its factory branch")
+    if git(["symbolic-ref", "-q", "HEAD"], wt).stdout.strip() != (f"refs/heads/{job['branch']}" if job["branch"] else ""):
+        probs.append("worktree is not on the job's branch")
     tip = git(["rev-parse", "HEAD"], wt).stdout.strip()
     if tip != job["tip"]:
         probs.append(f"branch moved outside the factory: {job['tip'][:7]} -> {tip[:7]}")

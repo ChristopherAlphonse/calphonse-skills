@@ -114,7 +114,6 @@ Edit `.planning/factory/config.json`. Agents cannot edit this file.
 | `checks` | none | The command that must pass before review. Required. |
 | `concurrency` | 1 | How many jobs run at once. |
 | `max_rounds` | 3 | Build rounds before a job moves to Needs you. |
-| `base_branch` | `main` | The branch jobs start from. |
 | `protected_paths` | none | Extra paths that fail the gate when touched. |
 | `allow` | none | Extra shell patterns agents may run unattended, such as `make verify*`. |
 

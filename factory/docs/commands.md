@@ -59,7 +59,6 @@ Agents cannot edit this file.
 | `checks` | none | The command that must pass before review. Required |
 | `concurrency` | 1 | How many jobs run at once |
 | `max_rounds` | 3 | Build rounds before a job moves to Needs you |
-| `base_branch` | `main` | The branch jobs start from |
 | `protected_paths` | none | Extra paths that fail the gate when touched |
 | `allow` | none | Extra shell patterns agents may run unattended, such as `make verify*`. Your `checks` command is allowed already |
 | `auto_watch` | on | Set to `false` to stop `bin/job` starting the board by itself. `bin/job board` then fails, and you run `bin/job watch` |
@@ -79,7 +78,7 @@ State lives in the project, never in this repo.
 | `.planning/factory/scratch/<id>/<reviewer>/` | where a reviewer works on a copy |
 | `.planning/factory/loop.log` | output of a loop started in the background |
 | `.planning/factory-board/chat.jsonl` | the chat bar's saved conversation |
-| `.worktrees/<id>/` | the job's branch, `factory/<id>`, checked out locally |
+| `.worktrees/<id>/` | the job's branch, `feature/<TICKET>`, checked out locally |
 | `pipeline.json` (in the factory skill folder) | custom stages, for every project |
 | `policy.yaml`, `policy.build.yaml` (in the factory skill folder) | shell rules for all runs, and extra rules only build jobs load |
 

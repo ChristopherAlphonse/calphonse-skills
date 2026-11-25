@@ -51,7 +51,8 @@ class TestCreate(Review):
         self.assertEqual(self.git("rev-parse", "HEAD", cwd=self.wt("r")).stdout.strip(), tip)
         self.assertEqual(job["review"]["head"], tip)
         self.assertEqual(job["review"]["base"], self.git("rev-parse", "main").stdout.strip())
-        self.assertEqual(self.git("rev-list", "--count", "main..factory/r").stdout.strip(), "1")
+        self.assertEqual(self.git("symbolic-ref", "-q", "HEAD", cwd=self.wt("r"), check=False).stdout.strip(), "")
+        self.assertEqual(self.git("branch", "--list", "factory/*").stdout.strip(), "")
         self.assertEqual(self.git("status", "--porcelain", cwd=self.wt("r")).stdout, "")
 
     def test_bad_inputs_are_refused_and_leave_nothing_behind(self):

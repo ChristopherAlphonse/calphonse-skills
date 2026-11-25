@@ -86,7 +86,7 @@ After you approve, `spec.md` is locked. If anyone changes it later, the build st
 
 ### 2.5 The worktree and the branch
 
-When you approve, the factory makes a **worktree**: a private copy of your project in `.worktrees/<id>/`, on its own branch called `factory/<id>`. Agents play in the copy, so your own folder stays safe.
+When you approve, the factory makes a **worktree**: a private copy of your project in `.worktrees/<id>/`, on the ticket's branch, `feature/<TICKET>` (job `proj-174` uses `feature/PROJ-174`). The branch must already exist and must not be checked out in your own folder: the factory never creates a branch. A review job gets a detached copy with no branch. Agents play in the copy, so your own folder stays safe.
 
 ### 2.6 Build: "make it"
 
@@ -442,7 +442,6 @@ Everything lives in `.planning/factory/config.json`. Agents cannot change it.
 | `checks` | the command that must pass before review. The most important one |
 | `concurrency` | how many jobs run at once |
 | `max_rounds` | how many build tries before the job asks you for help |
-| `base_branch` | the branch jobs start from |
 | `protected_paths` | extra files agents must not touch |
 | `allow` | extra commands agents may run alone |
 | `auto_watch` | set to `false` so the board does not start itself |

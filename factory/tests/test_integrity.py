@@ -27,9 +27,9 @@ class Integrity(Factory):
         self.to_build("j")
         wt = self.wt("j")
         sha = self.sneak_commit_sha(wt)
-        blocked = self.git("update-ref", "refs/heads/factory/j", sha, cwd=wt, check=False)
+        blocked = self.git("update-ref", "refs/heads/feature/J", sha, cwd=wt, check=False)
         self.assertNotEqual(blocked.returncode, 0, "the hook should block a plain update-ref")
-        self.git("-c", "core.hooksPath=/dev/null", "update-ref", "refs/heads/factory/j", sha, cwd=wt)
+        self.git("-c", "core.hooksPath=/dev/null", "update-ref", "refs/heads/feature/J", sha, cwd=wt)
         self.assert_parked("branch moved")
 
     def test_direct_ref_write(self):

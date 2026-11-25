@@ -117,7 +117,9 @@ class Factory(unittest.TestCase):
         self.ok("advance", jid, to, **kw)
         self.assertEqual(self.stage(jid), to)
 
-    def new_spec(self, jid, spec=True):
+    def new_spec(self, jid, spec=True, branch=True):
+        if branch:
+            self.git("branch", f"feature/{jid.upper()}")
         self.ok("create", jid, "title")
         self.wf(jid, "shape.md", "STATUS: READY\n\nshape\n")
         self.adv(jid, "spec")
@@ -171,7 +173,7 @@ class Factory(unittest.TestCase):
             self.wf(jid, "commit.md", "feat: add feature\n")
 
     def commits(self, jid):
-        return int(self.git("rev-list", "--count", f"factory/{jid}", cwd=self.root).stdout.strip())
+        return int(self.git("rev-list", "--count", f"feature/{jid.upper()}", cwd=self.root).stdout.strip())
 
     # ---- server helpers
     def start_server(self):
@@ -395,13 +397,25 @@ class TestShapeSpec(Factory):
         self.chat_no("edit", "j", "../../config.json", "a", "b")
         self.chat("edit", "j", "shape.md", "x", "y")
 
+    def test_build_uses_the_ticket_branch_and_creates_no_other(self):
+        self.new_spec("proj-174")
+        self.human("approve", "proj-174")
+        self.adv("proj-174", "build")
+        head = self.git("rev-parse", "--abbrev-ref", "HEAD", cwd=self.wt("proj-174")).stdout.strip()
+        self.assertEqual(head, "feature/PROJ-174")
+        self.assertEqual(self.git("branch", "--list", "factory/*").stdout.strip(), "")
+
+    def test_missing_ticket_branch_refuses_and_creates_nothing(self):
+        self.new_spec("proj-9", branch=False)
+        self.human("approve", "proj-9")
+        self.no("advance", "proj-9", "build")
+        self.assertEqual(self.git("branch", "--list", "feature/*", "factory/*").stdout.strip(), "")
+
     def test_worktree_and_branch_created_on_build(self):
         self.to_build("j")
         self.assertTrue((self.wt("j") / ".git").exists())
-        branches = self.git("branch", "--list", "factory/j").stdout
-        self.assertIn("factory/j", branches)
         head = self.git("rev-parse", "--abbrev-ref", "HEAD", cwd=self.wt("j")).stdout.strip()
-        self.assertEqual(head, "factory/j")
+        self.assertEqual(head, "feature/J")
 
 
 class TestBuildGate(Factory):
@@ -767,7 +781,7 @@ class TestPolicy(Factory):
         self.git("init", "--bare", "-b", "main", str(bare))
         self.git("remote", "add", "origin", str(bare))
         self.to_build("j")
-        r = self.git("push", "origin", "factory/j", cwd=self.wt("j"), check=False)
+        r = self.git("push", "origin", "feature/J", cwd=self.wt("j"), check=False)
         self.assertNotEqual(r.returncode, 0)
         self.assertEqual(self.git("for-each-ref", cwd=bare).stdout.strip(), "")
         r = self.git("push", "origin", "main", cwd=self.wt("j"), check=False)
@@ -782,9 +796,9 @@ class TestPolicy(Factory):
         self.human("commit", "j")
         self.assertEqual(self.commits("j"), before + 1)
         self.assertTrue(self.js("j")["commit"])
-        msg = self.git("log", "-1", "--format=%s", "factory/j").stdout.strip()
+        msg = self.git("log", "-1", "--format=%s", "feature/J").stdout.strip()
         self.assertEqual(msg, "feat: add feature")
-        self.assertIn("feature.py", self.git("show", "--name-only", "--format=", "factory/j").stdout)
+        self.assertIn("feature.py", self.git("show", "--name-only", "--format=", "feature/J").stdout)
 
     def test_repo_precommit_hook_blocks_human_commit(self):
         ran = self.base / "policy-ran"
