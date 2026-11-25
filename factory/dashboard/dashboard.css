@@ -55,8 +55,8 @@ button { cursor: pointer; }
 .node h3 { margin: 0 0 4px; font-size: 14px; display: flex; justify-content: space-between; gap: 8px; }
 .node h3 span { color: var(--text-3); font-weight: 400; }
 .node p { margin: 0 0 10px; color: var(--text-2); font-size: 12px; }
-.jobs { display: grid; gap: 6px; }
-.jobchip { text-align: left; border: 0; background: var(--raise); border-radius: 10px; padding: 6px 9px; display: flex; gap: 8px; align-items: center; }
+.jobs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.jobchip { min-width: 0; text-align: left; border: 0; background: var(--raise); border-radius: 10px; padding: 6px 9px; display: flex; gap: 8px; align-items: center; }
 .jobchip:hover, .jobchip.on { background: var(--raise-2); }
 .jobchip i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; }
 .jobchip.hold i { background: var(--warn); }
