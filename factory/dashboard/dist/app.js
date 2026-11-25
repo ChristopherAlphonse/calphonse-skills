@@ -790,6 +790,17 @@ function noteSection(j     )              {
   return sec(heading("Stage note"), note, actions);
 }
 
+const GIT_ICON =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10"/><path d="M18 9c0 5-12 3-12 8"/></svg>';
+
+function placeBox(where        )              {
+  const box = el("div", "pp");
+  const icon = el("span");
+  icon.innerHTML = GIT_ICON;
+  box.append(icon, el("span", "", where));
+  return box;
+}
+
 function jobView(j     )                {
   const v = view();
   const ph = el("div", "ph");
@@ -817,7 +828,7 @@ function jobView(j     )                {
       ph,
       el("h2", "pt", j.title),
       el("p", `pd${last ? "" : " empty"}`, last ? `now: ${last.text}` : j.id),
-      where ? el("div", "pp", where) : null,
+      where ? placeBox(where) : null,
       el("div", "gap"),
       stats(...v.def.stats(j)),
     ),

@@ -1011,6 +1011,16 @@ class TestQueue(Factory):
         self.adv("b", "rejected")
         self.assertEqual(self.rows()["b"][0], "done")
 
+    def test_edited_spec_waits_for_approval_again(self):
+        self.new_spec("j")
+        self.human("approve", "j")
+        self.assertNotEqual(self.rows()["j"][0], "hold")
+        (self.jd("j") / "spec.md").write_text("STATUS: READY\n\n# changed\n")
+        self.assertEqual(self.rows()["j"][0], "hold")
+        self.no("advance", "j", "build")
+        self.human("approve", "j")
+        self.adv("j", "build")
+
     def test_ship_hold_and_ready_done(self):
         self.to_ship("a", commit_md=False)
         self.assertEqual(self.rows()["a"][0], "run")

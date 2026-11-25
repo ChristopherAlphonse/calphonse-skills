@@ -1267,7 +1267,9 @@ def waiting_on_human(job):
     if s in HUMAN_STAGES:
         return True
     if s == "spec":
-        return (d / SPEC_FILE).exists() and not job["approvals"].get("spec")
+        # An edited spec.md needs a new approval, so it waits on the user again.
+        return (d / SPEC_FILE).exists() and (not job["approvals"].get("spec")
+                or job["approvals"].get("spec_sha") != file_sha(d / SPEC_FILE))
     if s == "ship":
         return (d / "pr-body.md").exists() and (d / "commit.md").exists() and not job["commit"]
     return False
