@@ -880,6 +880,25 @@ class TestPolicy(Factory):
         self.adv("j", "ready")
         self.no("advance", "j", "build")
 
+    def test_ready_removes_the_worktree_and_keeps_the_branch_and_commit(self):
+        self.to_ship("j")
+        self.human("commit", "j")
+        wt = self.wt("j")
+        self.assertTrue(wt.exists())
+        self.adv("j", "ready")
+        self.assertFalse(wt.exists())
+        self.assertFalse((self.state / "hooks" / "j").exists())
+        self.assertNotIn(".worktrees", self.git("worktree", "list").stdout)
+        self.assertEqual(self.commits("j"), 2)
+        self.assertIsNone(self.js("j")["worktree"])
+
+    def test_ready_keeps_a_worktree_with_uncommitted_files(self):
+        self.to_ship("j")
+        self.human("commit", "j")
+        (self.wt("j") / "stray.txt").write_text("x\n")
+        self.adv("j", "ready")
+        self.assertTrue((self.wt("j") / "stray.txt").exists())
+
     def test_ready_needs_pr_body(self):
         self.to_ship("j")
         self.human("commit", "j")
@@ -901,6 +920,7 @@ class TestPolicy(Factory):
 
 class TestAudit(Factory):
     def test_actions_logged_with_fields_and_actors(self):
+        self.git("branch", "feature/J")
         self.ok("create", "j", "T")
         self.ok("progress", "j", 1, 2)
         self.ok("route", "j", "architecture")

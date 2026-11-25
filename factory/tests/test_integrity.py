@@ -36,7 +36,7 @@ class Integrity(Factory):
         self.to_build("j")
         wt = self.wt("j")
         sha = self.sneak_commit_sha(wt)
-        (self.root / ".git" / "refs" / "heads" / "factory" / "j").write_text(sha + "\n")
+        (self.root / ".git" / "refs" / "heads" / "feature" / "J").write_text(sha + "\n")
         self.assert_parked("branch moved")
 
     def test_unset_hooks_path_then_commit(self):
@@ -49,7 +49,7 @@ class Integrity(Factory):
     def test_detached_head(self):
         self.to_build("j")
         self.git("checkout", "-q", "--detach", cwd=self.wt("j"))
-        self.assert_parked("not on its factory branch")
+        self.assert_parked("not on the job's branch")
 
     def test_job_json_stage_edited(self):
         self.to_build("j")

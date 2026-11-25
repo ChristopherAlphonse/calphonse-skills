@@ -397,7 +397,7 @@ HOOK_FN = """human_ok() {
 """
 HOOK_PRE_COMMIT = HOOK_HEAD + HOOK_FN + 'human_ok || { echo "@@MSG@@" >&2; exit 1; }\nunset FACTORY_HUMAN_KEY\n'
 HOOK_PRE_PUSH = HOOK_HEAD + HOOK_FN + """in=$(cat)
-if ! human_ok; then echo "@@MSG@@" >&2; exit 1; fi
+if ! human_ok && printf '%s' "$in" | grep -qF @@REFF@@; then echo "@@MSG@@" >&2; exit 1; fi
 unset FACTORY_HUMAN_KEY
 """
 HOOK_REF_TX = HOOK_HEAD + HOOK_FN + """in=$(cat)
@@ -438,8 +438,9 @@ def install_hooks(job):
     hdir = STATE / "hooks" / job["id"]
     hdir.mkdir(parents=True, exist_ok=True)
     hashfile = shlex.quote(str(STATE / HASH_FILE))
-    ref_pat = shlex.quote(f"refs/heads/{job['branch']}") if job["branch"] else "'refs/heads/'*"
-    guarded = {n: t.replace("@@MSG@@", GUARD_MSG).replace("@@HASH@@", hashfile).replace("@@REF@@", ref_pat) for n, t in
+    ref_lit = shlex.quote(f"refs/heads/{job['branch']}" if job["branch"] else "refs/heads/")
+    ref_pat = ref_lit if job["branch"] else "'refs/heads/'*"
+    guarded = {n: t.replace("@@MSG@@", GUARD_MSG).replace("@@HASH@@", hashfile).replace("@@REF@@", ref_pat).replace("@@REFF@@", ref_lit) for n, t in
                (("pre-commit", HOOK_PRE_COMMIT), ("pre-push", HOOK_PRE_PUSH),
                 ("reference-transaction", HOOK_REF_TX))}
     names = {f.name for f in Path(orig).glob("*") if f.is_file() and os.access(f, os.X_OK)} if Path(orig).is_dir() else set()
@@ -483,6 +484,26 @@ def make_worktree(job):
     except BaseException:
         git(["worktree", "remove", "--force", str(wt)], ROOT)
         raise
+
+
+def release_worktree(job):
+    """A finished job leaves no folder behind. The branch and its commit stay. A tree with uncommitted
+    files is kept, so nothing is lost, and the user is told."""
+    wt = job["worktree"]
+    if not wt:
+        return
+    if Path(wt).exists():
+        if git(["status", "--porcelain"], wt).stdout.strip():
+            print(f"kept {wt}: it has uncommitted files", file=sys.stderr)
+            return
+        r = git(["worktree", "remove", wt], ROOT)
+        if r.returncode != 0:
+            print(f"kept {wt}: {r.stderr.strip()[-200:]}", file=sys.stderr)
+            return
+    shutil.rmtree(STATE / "hooks" / job["id"], ignore_errors=True)
+    git(["worktree", "prune"], ROOT)
+    job["worktree"] = None
+    audit("release", job["id"], f"removed {wt}")
 
 
 def fingerprint(cwd):
@@ -1021,6 +1042,9 @@ def cmd_advance(jid, to):
         job["ended"] = now()
     save(job)
     audit("advance", jid, f"{cur} -> {real}")
+    if real in TERMINAL:
+        release_worktree(job)
+        save(job)
     print(f"{jid}: {cur} -> {real}" + (" (round limit hit)" if real != to else ""))
     if waiting_on_human(job):
         announce_board()
