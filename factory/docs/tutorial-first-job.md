@@ -73,7 +73,7 @@ The job now waits on you. Its node is outlined, and it appears under the **Needs
 
 Read `spec.md`. If it is right, click **Approve spec** in the panel. If it is not, ask for changes in the chat bar at the bottom of the board.
 
-After you approve, the factory creates a worktree at `.worktrees/<id>/` and a local branch `factory/<id>`, and the job moves to **build**.
+After you approve, the factory creates a worktree at `.worktrees/<id>/` on the ticket's branch `feature/<TICKET>`, which must already exist (the factory never creates a branch), and the job moves to **build**.
 
 Do not edit `spec.md` after approving it. An edit blocks the build until you approve again.
 
@@ -101,7 +101,7 @@ Read both files. Click **Commit locally**.
 
 The click is refused if the gate did not pass on this exact working tree, if the branch holds a commit the board did not make, if a protected path changed, or if your repo's own hooks fail. The board states which check failed.
 
-On success, the job moves to **ready**. Your change is a commit on the branch `factory/<id>`.
+On success, the job moves to **ready**. Your change is a commit on the branch `feature/<TICKET>`.
 
 ## What you have now
 
