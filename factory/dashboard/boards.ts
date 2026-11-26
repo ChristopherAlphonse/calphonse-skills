@@ -63,6 +63,12 @@ function stackChips(job: Job): { text: string; cls?: string }[][] {
   return job.stack.length ? [job.stack.map((stackName) => ({ text: stackName }))] : [];
 }
 
+function humanActionPath(job: Job): string {
+  if (job.canApprove) return "approve";
+  if (job.canCommit) return "commit";
+  return "unblock";
+}
+
 export const BOARD_DEFINITIONS: Record<string, Omit<BoardDefinition, "id" | "label">> = {
   build: {
     blurb: "Take a feature from idea to a local commit.",
@@ -81,8 +87,7 @@ export const BOARD_DEFINITIONS: Record<string, Omit<BoardDefinition, "id" | "lab
       [job.files.length, "files"],
     ],
     place: (job) => job.branch ?? job.worktree,
-    humanActionPath: (job) =>
-      job.canApprove ? "approve" : job.canCommit ? "commit" : "unblock",
+    humanActionPath,
     statusBits: (job) => [
       [
         ...(job.stage === "gate" || job.gate

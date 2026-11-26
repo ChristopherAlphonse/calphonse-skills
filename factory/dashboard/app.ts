@@ -99,8 +99,10 @@ function restoreLayout(): StoredLayout | null {
 }
 
 async function postAction(action: string, body: Record<string, unknown>): Promise<void> {
+  const boardId = activeBoardId;
+  if (!boardId) return;
   try {
-    const response = await request(`/api/${activeBoardId}/${action}`, {
+    const response = await request(`/api/${boardId}/${action}`, {
       method: "POST",
       body: JSON.stringify(body),
     });

@@ -100,8 +100,10 @@ function restoreLayout()                      {
 }
 
 async function postAction(action        , body                         )                {
+  const boardId = activeBoardId;
+  if (!boardId) return;
   try {
-    const response = await request(`/api/${activeBoardId}/${action}`, {
+    const response = await request(`/api/${boardId}/${action}`, {
       method: "POST",
       body: JSON.stringify(body),
     });

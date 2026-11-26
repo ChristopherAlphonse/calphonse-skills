@@ -155,234 +155,303 @@ function createThreadCard(
   return card;
 }
 
-/** A line-numbered text editor for one job file, with the rendered file beside it and comments tied to line ranges. It lives in a tab. */
-export function openEditor(dependencies: EditorDependencies): EditorHandle {
-  let base = dependencies.base;
-  let savedText = dependencies.text;
-  let selectedLines: [number, number] = [1, 1];
-  let selectionAnchorLine = selectedLines[0];
-  let visibleLineCount = 0;
-  let wasDirty = false;
-  let isClosed = false;
+/** One editor's state and behavior. Each method stays small; `openEditor` only starts the session. */
+class EditorSession {
+  private readonly dependencies: EditorDependencies;
+  private readonly elements: EditorElements;
+  private readonly root: HTMLDivElement;
+  private readonly statusLabel: HTMLSpanElement;
+  private readonly banner: HTMLDivElement;
+  private readonly lineNumbers: HTMLDivElement;
+  private readonly textArea: HTMLTextAreaElement;
+  private readonly previewPane: HTMLDivElement;
+  private readonly selectedRangeLabel: HTMLDivElement;
+  private readonly selectedQuote: HTMLPreElement;
+  private readonly commentInput: HTMLTextAreaElement;
+  private readonly threadList: HTMLDivElement;
+  private readonly commentThreads: CommentThread[] = [];
+  private base: string;
+  private savedText: string;
+  private selectedLines: [number, number] = [1, 1];
+  private selectionAnchorLine = 1;
+  private visibleLineCount = 0;
+  private wasDirty = false;
+  private isClosed = false;
+  private previewTimeoutId = 0;
+  private filePollIntervalId = 0;
 
-  const elements = buildEditorElements(dependencies, () => void sendCommentToAgent());
-  const {
-    root, statusLabel, banner, lineNumbers, textArea, previewPane,
-    selectedRangeLabel, selectedQuote, commentInput, threadList,
-  } = elements;
-  const commentThreads: CommentThread[] = [];
-  let previewTimeoutId = 0;
+  constructor(dependencies: EditorDependencies) {
+    this.dependencies = dependencies;
+    this.base = dependencies.base;
+    this.savedText = dependencies.text;
+    this.elements = buildEditorElements(dependencies, () => void this.sendCommentToAgent());
+    this.root = this.elements.root;
+    this.statusLabel = this.elements.statusLabel;
+    this.banner = this.elements.banner;
+    this.lineNumbers = this.elements.lineNumbers;
+    this.textArea = this.elements.textArea;
+    this.previewPane = this.elements.previewPane;
+    this.selectedRangeLabel = this.elements.selectedRangeLabel;
+    this.selectedQuote = this.elements.selectedQuote;
+    this.commentInput = this.elements.commentInput;
+    this.threadList = this.elements.threadList;
+    this.wireHeader();
+    this.wireEvents();
+    this.startFilePoll();
+    document.body.append(this.root);
+    this.schedulePreview();
+    this.renderStatus();
+    this.selectLineRange(this.selectedLines[0], this.selectedLines[1], false);
+  }
 
-  const quoteForLines = (firstLine: number, lastLine: number): string =>
-    textArea.value.split("\n").slice(firstLine - 1, lastLine).join("\n");
-  const hasCommentOnLine = (lineNumber: number): boolean =>
-    commentThreads.some((thread) => lineNumber >= thread.firstLine && lineNumber <= thread.lastLine);
-  const isDirty = (): boolean => textArea.value !== savedText;
+  handle(): EditorHandle {
+    return {
+      root: this.root,
+      dirty: () => this.isDirty(),
+      requestClose: () => this.requestEditorClose(),
+      hide: () => {
+        this.root.hidden = true;
+      },
+      show: () => {
+        this.root.hidden = false;
+        this.textArea.focus();
+      },
+    };
+  }
 
-  function renderLineNumbers(): void {
-    const currentLineCount = lineCount(textArea.value);
-    const lockedAtOpen = new Set(
-      savedText.split("\n").flatMap((line, index) => (GUARDED_LINE_START_PATTERN.test(line) ? [index + 1] : [])),
+  private wireHeader(): void {
+    const header = createElement("div", "edhead");
+    header.append(
+      createButton("← Board", "", () => this.dependencies.back()),
+      createElement("b", "edname", this.dependencies.fileName),
+      this.statusLabel,
+      createElement("span", "grow"),
+      createButton("Save", "go", () => void this.saveFile()),
+      createButton("Close", "", () => this.requestEditorClose()),
     );
-    if (currentLineCount !== visibleLineCount) {
-      visibleLineCount = currentLineCount;
-      lineNumbers.replaceChildren(
-        ...Array.from({ length: currentLineCount }, (_, index) => {
-          const lineButton = createButton(String(index + 1), "ln", () => {});
-          lineButton.dataset.n = String(index + 1);
-          if (lockedAtOpen.has(index + 1)) {
-            lineButton.classList.add("lock");
-            lineButton.title = "This line steers the board and cannot be changed here";
-          }
-          return lineButton;
-        }),
-      );
+    this.root.prepend(header);
+  }
+
+  private wireEvents(): void {
+    this.textArea.addEventListener("input", () => {
+      this.syncSelectionFromCaret();
+      this.renderStatus();
+      this.schedulePreview();
+    });
+    for (const eventName of ["click", "keyup", "select"]) {
+      this.textArea.addEventListener(eventName, () => this.syncSelectionFromCaret());
     }
-    for (const lineButton of lineNumbers.children) {
-      const lineNumber = Number(lineButton instanceof HTMLElement ? lineButton.dataset.n : undefined);
-      lineButton.classList.toggle("on", lineNumber >= selectedLines[0] && lineNumber <= selectedLines[1]);
-      lineButton.classList.toggle("cmt", hasCommentOnLine(lineNumber));
-    }
-    selectedRangeLabel.textContent = `${dependencies.fileName}:${formatLineRange(selectedLines[0], selectedLines[1])}`;
-    selectedQuote.textContent = quoteForLines(selectedLines[0], selectedLines[1]);
+    this.textArea.addEventListener("scroll", () => {
+      this.lineNumbers.scrollTop = this.textArea.scrollTop;
+    });
+    this.lineNumbers.addEventListener("click", (event) => this.handleLineClick(event));
+    this.commentInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void this.sendCommentToAgent();
+    });
+    this.root.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "s") {
+        event.preventDefault();
+        void this.saveFile();
+      }
+    });
   }
 
-  function renderThreads(): void {
-    threadList.replaceChildren(
-      ...commentThreads.map((thread) => createThreadCard(thread, dependencies.fileName, (firstLine, lastLine) => {
-        selectLineRange(firstLine, lastLine, true);
-      })),
-    );
-    renderLineNumbers();
-  }
-
-  function renderStatus(text = ""): void {
-    statusLabel.textContent = text || (isDirty() ? "Unsaved changes" : "Saved");
-    statusLabel.classList.toggle("dirty", isDirty());
-    renderLineNumbers();
-    if (isDirty() !== wasDirty) {
-      wasDirty = isDirty();
-      dependencies.changed();
-    }
-  }
-
-  function renderPreview(): void {
-    const page = renderMarkdown(textArea.value);
-    void enhanceMermaid(page);
-    previewPane.replaceChildren(page);
-  }
-
-  function schedulePreview(): void {
-    window.clearTimeout(previewTimeoutId);
-    previewTimeoutId = window.setTimeout(renderPreview, PREVIEW_DEBOUNCE_MS);
-  }
-
-  function selectLineRange(firstLine: number, lastLine: number, focus: boolean): void {
-    selectedLines = [Math.min(firstLine, lastLine), Math.max(firstLine, lastLine)];
-    if (focus) {
-      const end = lineStartOffset(textArea.value, selectedLines[1] + 1);
-      textArea.setSelectionRange(lineStartOffset(textArea.value, selectedLines[0]), end > 0 ? end - 1 : textArea.value.length);
-      textArea.focus();
-    }
-    renderLineNumbers();
-  }
-
-  function syncSelectionFromCaret(): void {
-    const start = textArea.selectionStart;
-    const end = textArea.selectionEnd;
-    const last = end > start && textArea.value[end - 1] === "\n" ? end - 1 : end;
-    selectedLines = [lineAtPosition(textArea.value, start), lineAtPosition(textArea.value, last)];
-    selectionAnchorLine = selectedLines[0];
-    renderLineNumbers();
-  }
-
-  function showMessageBanner(text: string, ...actions: HTMLButtonElement[]): void {
-    banner.replaceChildren(createElement("span", "", text), ...actions);
-    banner.hidden = false;
-  }
-
-  function replaceFileContents(snapshot: Snapshot): void {
-    textArea.value = snapshot.text;
-    savedText = snapshot.text;
-    base = snapshot.base;
-    banner.hidden = true;
-    visibleLineCount = 0;
-    schedulePreview();
-    renderStatus();
-  }
-
-  async function saveFile(): Promise<void> {
-    const text = textArea.value;
-    if (!isDirty()) return;
-    if (guardedLines(text).join("\n") !== guardedLines(savedText).join("\n")) {
-      return showMessageBanner("Lines like STATUS: and VERDICT: steer the board. Put them back to save.");
-    }
-    const result = await dependencies.save(text, base);
-    if (!result.ok) return showMessageBanner(result.error);
-    savedText = text;
-    base = result.base;
-    banner.hidden = true;
-    visibleLineCount = 0;
-    renderStatus("Saved");
-  }
-
-  async function sendCommentToAgent(): Promise<void> {
-    const text = commentInput.value.trim();
-    if (!text) return;
-    if (isDirty()) await saveFile();
-    if (isDirty()) return;
-    const [firstLine, lastLine] = selectedLines;
-    const quotedText = quoteForLines(firstLine, lastLine).trim().replace(/\s+/g, " ").slice(0, MAX_QUOTE_LENGTH);
-    const thread: CommentThread = { firstLine, lastLine, quote: quotedText, note: text, answer: "" };
-    commentThreads.unshift(thread);
-    commentInput.value = "";
-    renderThreads();
-    thread.answer = await dependencies.comment(buildCommentText(dependencies.jobId, dependencies.fileName, firstLine, lastLine, quotedText, text));
-    renderThreads();
-  }
-
-  function closeEditor(): void {
-    isClosed = true;
-    window.clearTimeout(previewTimeoutId);
-    window.clearInterval(filePollIntervalId);
-    root.remove();
-    dependencies.closed();
-  }
-
-  function requestEditorClose(): void {
-    if (!isDirty()) return closeEditor();
-    showMessageBanner(
-      "You have unsaved changes.",
-      createButton("Discard and close", "", closeEditor),
-      createButton("Keep editing", "", () => (banner.hidden = true)),
-    );
-  }
-
-  const header = createElement("div", "edhead");
-  header.append(
-    createButton("← Board", "", dependencies.back),
-    createElement("b", "edname", dependencies.fileName),
-    statusLabel,
-    createElement("span", "grow"),
-    createButton("Save", "go", () => void saveFile()),
-    createButton("Close", "", requestEditorClose),
-  );
-  root.prepend(header);
-
-  textArea.addEventListener("input", () => {
-    syncSelectionFromCaret();
-    renderStatus();
-    schedulePreview();
-  });
-  for (const eventName of ["click", "keyup", "select"]) textArea.addEventListener(eventName, syncSelectionFromCaret);
-  textArea.addEventListener("scroll", () => {
-    lineNumbers.scrollTop = textArea.scrollTop;
-  });
-  lineNumbers.addEventListener("click", (event) => {
+  private handleLineClick(event: MouseEvent): void {
     const lineNumber = Number((event.target instanceof HTMLElement ? event.target.dataset.n : undefined) ?? 0);
     if (!lineNumber) return;
-    selectLineRange(event.shiftKey ? selectionAnchorLine : lineNumber, lineNumber, true);
-    if (!event.shiftKey) selectionAnchorLine = lineNumber;
-  });
-  commentInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void sendCommentToAgent();
-  });
-  root.addEventListener("keydown", (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key === "s") {
-      event.preventDefault();
-      void saveFile();
+    this.selectLineRange(event.shiftKey ? this.selectionAnchorLine : lineNumber, lineNumber, true);
+    if (!event.shiftKey) this.selectionAnchorLine = lineNumber;
+  }
+
+  private quoteForLines(firstLine: number, lastLine: number): string {
+    return this.textArea.value.split("\n").slice(firstLine - 1, lastLine).join("\n");
+  }
+
+  private hasCommentOnLine(lineNumber: number): boolean {
+    return this.commentThreads.some(
+      (thread) => lineNumber >= thread.firstLine && lineNumber <= thread.lastLine,
+    );
+  }
+
+  private isDirty(): boolean {
+    return this.textArea.value !== this.savedText;
+  }
+
+  private createLineButtons(): HTMLButtonElement[] {
+    // Lines that steer the board are locked at the text that was open, even after the file changes on disk.
+    const lockedAtOpen = new Set(
+      this.savedText.split("\n").flatMap((line, index) => (GUARDED_LINE_START_PATTERN.test(line) ? [index + 1] : [])),
+    );
+    return Array.from({ length: lineCount(this.textArea.value) }, (_, index) => {
+      const lineButton = createButton(String(index + 1), "ln", () => {});
+      lineButton.dataset.n = String(index + 1);
+      if (lockedAtOpen.has(index + 1)) {
+        lineButton.classList.add("lock");
+        lineButton.title = "This line steers the board and cannot be changed here";
+      }
+      return lineButton;
+    });
+  }
+
+  private renderLineNumbers(): void {
+    const currentLineCount = lineCount(this.textArea.value);
+    if (currentLineCount !== this.visibleLineCount) {
+      this.visibleLineCount = currentLineCount;
+      this.lineNumbers.replaceChildren(...this.createLineButtons());
     }
-  });
+    for (const lineButton of this.lineNumbers.children) {
+      const lineNumber = Number(lineButton instanceof HTMLElement ? lineButton.dataset.n : undefined);
+      lineButton.classList.toggle("on", lineNumber >= this.selectedLines[0] && lineNumber <= this.selectedLines[1]);
+      lineButton.classList.toggle("cmt", this.hasCommentOnLine(lineNumber));
+    }
+    const [firstLine, lastLine] = this.selectedLines;
+    this.selectedRangeLabel.textContent = `${this.dependencies.fileName}:${formatLineRange(firstLine, lastLine)}`;
+    this.selectedQuote.textContent = this.quoteForLines(firstLine, lastLine);
+  }
+
+  private renderThreads(): void {
+    this.threadList.replaceChildren(
+      ...this.commentThreads.map((thread) =>
+        createThreadCard(thread, this.dependencies.fileName, (firstLine, lastLine) => {
+          this.selectLineRange(firstLine, lastLine, true);
+        }),
+      ),
+    );
+    this.renderLineNumbers();
+  }
+
+  private renderStatus(text = ""): void {
+    this.statusLabel.textContent = text || (this.isDirty() ? "Unsaved changes" : "Saved");
+    this.statusLabel.classList.toggle("dirty", this.isDirty());
+    this.renderLineNumbers();
+    if (this.isDirty() !== this.wasDirty) {
+      this.wasDirty = this.isDirty();
+      this.dependencies.changed();
+    }
+  }
+
+  private renderPreview(): void {
+    const page = renderMarkdown(this.textArea.value);
+    void enhanceMermaid(page);
+    this.previewPane.replaceChildren(page);
+  }
+
+  private schedulePreview(): void {
+    window.clearTimeout(this.previewTimeoutId);
+    this.previewTimeoutId = window.setTimeout(() => this.renderPreview(), PREVIEW_DEBOUNCE_MS);
+  }
+
+  private selectLineRange(firstLine: number, lastLine: number, focus: boolean): void {
+    this.selectedLines = [Math.min(firstLine, lastLine), Math.max(firstLine, lastLine)];
+    if (focus) {
+      const [selectedStart, selectedEnd] = this.selectedLines;
+      const end = lineStartOffset(this.textArea.value, selectedEnd + 1);
+      this.textArea.setSelectionRange(
+        lineStartOffset(this.textArea.value, selectedStart),
+        end > 0 ? end - 1 : this.textArea.value.length,
+      );
+      this.textArea.focus();
+    }
+    this.renderLineNumbers();
+  }
+
+  private syncSelectionFromCaret(): void {
+    const start = this.textArea.selectionStart;
+    const end = this.textArea.selectionEnd;
+    const last = end > start && this.textArea.value[end - 1] === "\n" ? end - 1 : end;
+    this.selectedLines = [lineAtPosition(this.textArea.value, start), lineAtPosition(this.textArea.value, last)];
+    this.selectionAnchorLine = this.selectedLines[0];
+    this.renderLineNumbers();
+  }
+
+  private showMessageBanner(text: string, ...actions: HTMLButtonElement[]): void {
+    this.banner.replaceChildren(createElement("span", "", text), ...actions);
+    this.banner.hidden = false;
+  }
+
+  private replaceFileContents(snapshot: Snapshot): void {
+    this.textArea.value = snapshot.text;
+    this.savedText = snapshot.text;
+    this.base = snapshot.base;
+    this.banner.hidden = true;
+    this.visibleLineCount = 0;
+    this.schedulePreview();
+    this.renderStatus();
+  }
+
+  private async saveFile(): Promise<void> {
+    const text = this.textArea.value;
+    if (!this.isDirty()) return;
+    if (guardedLines(text).join("\n") !== guardedLines(this.savedText).join("\n")) {
+      return this.showMessageBanner("Lines like STATUS: and VERDICT: steer the board. Put them back to save.");
+    }
+    const result = await this.dependencies.save(text, this.base);
+    if (!result.ok) return this.showMessageBanner(result.error);
+    this.savedText = text;
+    this.base = result.base;
+    this.banner.hidden = true;
+    this.visibleLineCount = 0;
+    this.renderStatus("Saved");
+  }
+
+  private async sendCommentToAgent(): Promise<void> {
+    const text = this.commentInput.value.trim();
+    if (!text) return;
+    if (this.isDirty()) await this.saveFile();
+    if (this.isDirty()) return;
+    const [firstLine, lastLine] = this.selectedLines;
+    const quotedText = this.quoteForLines(firstLine, lastLine).trim().replace(/\s+/g, " ").slice(0, MAX_QUOTE_LENGTH);
+    const thread: CommentThread = { firstLine, lastLine, quote: quotedText, note: text, answer: "" };
+    this.commentThreads.unshift(thread);
+    this.commentInput.value = "";
+    this.renderThreads();
+    const commentText = buildCommentText(this.dependencies.jobId, this.dependencies.fileName, firstLine, lastLine, quotedText, text);
+    thread.answer = await this.dependencies.comment(commentText);
+    this.renderThreads();
+  }
+
+  private startFilePoll(): void {
+    this.filePollIntervalId = window.setInterval(() => void this.pollFile(), FILE_POLL_INTERVAL_MS);
+  }
 
   // Pick up the agent's changes. Clean text is swapped in; unsaved text is kept and flagged.
-  const filePollIntervalId = window.setInterval(async () => {
-    if (isClosed) return;
-    const snapshot = await dependencies.load();
-    if (isClosed) return;
-    if (!snapshot || snapshot.base === base) return;
-    if (!isDirty()) {
-      replaceFileContents(snapshot);
-      renderStatus("Updated by the agent");
-    } else {
-      showMessageBanner("The file changed on disk. Saving will be refused until you reload.", createButton("Reload and discard mine", "", () => replaceFileContents(snapshot)));
+  private async pollFile(): Promise<void> {
+    if (this.isClosed) return;
+    const snapshot = await this.dependencies.load();
+    if (this.isClosed) return;
+    if (!snapshot || snapshot.base === this.base) return;
+    if (this.isDirty()) {
+      this.showMessageBanner(
+        "The file changed on disk. Saving will be refused until you reload.",
+        createButton("Reload and discard mine", "", () => this.replaceFileContents(snapshot)),
+      );
+      return;
     }
-  }, FILE_POLL_INTERVAL_MS);
+    this.replaceFileContents(snapshot);
+    this.renderStatus("Updated by the agent");
+  }
 
-  document.body.append(root);
-  schedulePreview();
-  renderStatus();
-  selectLineRange(selectedLines[0], selectedLines[1], false);
+  private closeEditor(): void {
+    this.isClosed = true;
+    window.clearTimeout(this.previewTimeoutId);
+    window.clearInterval(this.filePollIntervalId);
+    this.root.remove();
+    this.dependencies.closed();
+  }
 
-  return {
-    root,
-    dirty: isDirty,
-    requestClose: requestEditorClose,
-    hide: () => {
-      root.hidden = true;
-    },
-    show: () => {
-      root.hidden = false;
-      textArea.focus();
-    },
-  };
+  private requestEditorClose(): void {
+    if (!this.isDirty()) return this.closeEditor();
+    this.showMessageBanner(
+      "You have unsaved changes.",
+      createButton("Discard and close", "", () => this.closeEditor()),
+      createButton("Keep editing", "", () => {
+        this.banner.hidden = true;
+      }),
+    );
+  }
+}
+
+/** A line-numbered text editor for one job file, with the rendered file beside it and comments tied to line ranges. It lives in a tab. */
+export function openEditor(dependencies: EditorDependencies): EditorHandle {
+  return new EditorSession(dependencies).handle();
 }
