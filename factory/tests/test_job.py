@@ -1337,7 +1337,9 @@ class TestServer(Factory):
     def test_wait_times_out_and_idles(self):
         self.new_spec("a")
         r = self.run_job("wait", 1)
-        self.assertEqual((r.returncode, "STILL WAITING on a" in r.stdout), (3, True))
+        self.assertEqual((r.returncode, "STILL WAITING on a" in r.stdout), (0, True))
+        self.assertIn("End your turn", r.stdout)
+        self.assertNotIn("Do not end your turn", r.stdout)
         self.human("approve", "a")
         r = self.run_job("wait", 1)
         self.assertEqual(r.returncode, 0)

@@ -1,4 +1,5 @@
-import contextlib, importlib.machinery, io, importlib.util, json, os, subprocess, sys, tempfile, unittest
+import contextlib, importlib.machinery, io, importlib.util, json, os, subprocess, sys, tempfile, time, unittest
+from unittest import mock
 from pathlib import Path
 
 TICK = Path(__file__).resolve().parent.parent / "bin" / "tick"
@@ -25,7 +26,7 @@ def set_harness(root, harness):
 def run(root, *args, extra_env=None, config=True):
     """Run tick. A harness named in args is written to config.json first unless one is set, or config=False.
 
-    FACTORY_PIPELINE points into the scratch folder, so the skill's own pipeline.json never leaks in.
+    FACTORY_PIPELINE points into the scratch folder, so a pipeline from outside the test never leaks in.
     """
     named = [a for a in args if a in HARNESSES]
     cfg = Path(root) / ".planning" / SKILL / "config.json"
@@ -135,6 +136,59 @@ class TickTests(unittest.TestCase):
         lines = [json.loads(l) for l in (self.root / ".planning" / "factory" / "audit.log").read_text().splitlines()]
         self.assertEqual([l["detail"] for l in lines], ["claude: start", "claude: exit 3"])
         self.assertTrue(all(l["actor"] == "tick" for l in lines))
+
+    def test_a_timed_out_pass_leaves_no_process_behind(self):
+        run(self.root, "install", "claude")
+        state = self.root / ".planning" / SKILL
+        state.mkdir(parents=True, exist_ok=True)
+        cfg = state / "config.json"
+        cfg.write_text(json.dumps({**json.loads(cfg.read_text()), "pass_timeout": 2}))
+        stub, pidfile = self.root / "bin", self.root / "grandchild.pid"
+        stub.mkdir()
+        (stub / "claude").write_text(f"#!/bin/sh\nsleep 60 &\necho $$ $! > '{pidfile}'\nwait\n")
+        (stub / "claude").chmod(0o755)
+        # No captured pipes: a surviving grandchild would hold them open and hide the leak.
+        env = {**os.environ, "FACTORY_ROOT": str(self.root), "PATH": f"{stub}:/usr/bin:/bin"}
+        code = subprocess.run([sys.executable, "-I", str(TICK), "claude"], env=env, timeout=30,
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
+        self.assertEqual(code, 124)
+        for pid in map(int, pidfile.read_text().split()):
+            for _ in range(50):
+                try:
+                    os.kill(pid, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(0.1)
+            else:
+                os.kill(pid, 9)
+                self.fail(f"process {pid} outlived the pass")
+        details = [json.loads(l)["detail"] for l in (state / "audit.log").read_text().splitlines()]
+        self.assertEqual(details[-1], "claude: exit 124")
+
+    def test_pass_timeout_defaults_to_two_hours(self):
+        with mock.patch.dict(os.environ, {"FACTORY_ROOT": str(self.root)}):
+            self.assertEqual(tick_module().pass_timeout(), 7200)
+
+    def test_pass_timeout_takes_only_a_positive_integer(self):
+        state = self.root / ".planning" / SKILL
+        state.mkdir(parents=True)
+        cfg = state / "config.json"
+        with mock.patch.dict(os.environ, {"FACTORY_ROOT": str(self.root)}):
+            tick = tick_module()
+            cfg.write_text(json.dumps({"pass_timeout": 30}))
+            self.assertEqual(tick.pass_timeout(), 30)
+            for bad in (0, -5, 2.5, "60", True, None, [60]):
+                with self.subTest(bad=bad):
+                    cfg.write_text(json.dumps({"pass_timeout": bad}))
+                    err = io.StringIO()
+                    with contextlib.redirect_stderr(err), self.assertRaises(SystemExit) as e:
+                        tick.pass_timeout()
+                    self.assertEqual(e.exception.code, 2)
+                    self.assertIn("`pass_timeout` must be a positive number of seconds", err.getvalue())
+            for broken in ("{not json", "[]", ""):
+                with self.subTest(broken=broken):
+                    cfg.write_text(broken)
+                    self.assertEqual(tick.pass_timeout(), 7200)
 
 
 class LoopTests(unittest.TestCase):
@@ -596,6 +650,17 @@ class StageAgentTests(unittest.TestCase):
         desc = lambda root: json.loads((root / ".kiro" / "agents" / f"{SKILL}-build.json").read_text())["description"]
         self.assertRegex(desc(self.root), r"factory-gen v1 sha256:[0-9a-f]{64}$")
         self.assertEqual(desc(self.root), desc(other))
+
+    def test_without_an_override_the_project_pipeline_is_used(self):
+        state = self.root / ".planning" / "factory"
+        state.mkdir(parents=True, exist_ok=True)
+        (state / "pipeline.json").write_text(json.dumps(CUSTOM))
+        set_harness(self.root, "kiro")
+        env = {k: v for k, v in os.environ.items() if k != "FACTORY_PIPELINE"}
+        env["FACTORY_ROOT"] = str(self.root)
+        r = subprocess.run([sys.executable, "-I", str(TICK), "install", "kiro"], capture_output=True, text=True, env=env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue((self.agents / f"{SKILL}-tidy.json").exists())
 
     def test_a_stale_stage_file_fails_check(self):
         self.install()

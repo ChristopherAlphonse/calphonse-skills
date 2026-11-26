@@ -312,9 +312,9 @@ The orchestrator acts only on `run`.
 
 `bin/job advance <id> <stage>` is the only way a job moves. It reads the stage's file and checks the first line. If the file is missing or the line is wrong, it refuses and says why. The orchestrator sends the stage back once with the problem named. After a second refusal, the builder writes `STATUS: BLOCKED`.
 
-### 5.5 Waiting for you without giving up
+### 5.5 Waiting for your click
 
-When a job waits on your click, the orchestrator does not quit. It runs `bin/job wait`. That sleeps until you click, then prints `RESUME` and the work carries on. If time runs out it prints `STILL WAITING` and tries again.
+When a job waits on your click, the orchestrator runs `bin/job wait` once. If you click in time it prints `RESUME` and the work carries on. If time runs out it prints `STILL WAITING`, and the orchestrator ends its turn with the board link and what to click. Keeping one turn open for hours makes a long session slow, so it does not. After you click, `TICK loop` picks the job up if it runs; otherwise say "continue".
 
 ### 5.6 The loop
 
@@ -375,7 +375,7 @@ Under the chat bar you choose which tool answers (Claude Code, OpenCode or Kiro)
 
 ### 6.8 Chat memory
 
-Every turn is saved in `.planning/factory-board/chat.jsonl` and restored when the page loads.
+Every turn is saved in `.planning/factory-board/chat.jsonl` and restored when the page loads. After 20 turns in one conversation the board starts a new one and says so in the answer, because a long resumed chat gets slow. Earlier messages stay on the page but the assistant no longer sees them. The count is kept in memory, so restarting the board resets it.
 
 ## Part 7: The safety guards
 
@@ -464,6 +464,7 @@ Everything lives in `.planning/factory/config.json`. Agents cannot change it.
 | `protected_paths` | extra files agents must not touch |
 | `allow` | extra commands agents may run alone |
 | `auto_watch` | set to `false` so the board does not start itself |
+| `pass_timeout` | seconds one background pass may run, 2 hours by default. A pass that runs over is stopped with every agent it started |
 
 ## Part 9: Custom stages (your own boxes on the belt)
 
@@ -480,7 +481,7 @@ After `shape`, `spec`, `build`, `review`, `polish` or `prove` on the Build board
 ### 9.3 Ask, then click Apply
 
 1. Tell the chat bar, for example "add a QA pass after review". It runs `job pipeline propose` to check everything. The board shows the waiting change under **Pipeline change**, with the new stage highlighted.
-2. Click **Apply**, or **Discard**. Only then is `pipeline.json` written.
+2. Click **Apply**, or **Discard**. Only then is `.planning/factory/pipeline.json` written.
 
 Apply is refused if a job sits in a stage the change removes, or if the pipeline changed since the proposal. In Act mode the board applies it for you.
 
@@ -492,9 +493,9 @@ Apply is refused if a job sits in a stage the change removes, or if the pipeline
 
 A stage that asks for a commit or a pull will stop with `STATUS: BLOCKED`, because the shell rules forbid them. The stage is still added. The bot says so in one sentence.
 
-### 9.6 Shared by every project
+### 9.6 Kept in each project
 
-`pipeline.json` sits beside `SKILL.md` and applies to every project. It is a plain file you can commit.
+`.planning/factory/pipeline.json` in the project holds its order and custom stages, and applies to that project only. With no file the project uses the default order.
 
 ## Part 10: What the factory will never do
 

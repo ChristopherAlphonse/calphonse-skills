@@ -4,7 +4,7 @@ Read this before you edit anything in `factory/`. It is for an agent working on 
 
 ## What it is
 
-A board of jobs. Each job moves through fixed stages, one fresh agent per stage, and `bin/job` is the only thing that moves it. Two workflows share one engine and one board: **Build** (shape, spec, build, gate, review, polish, prove, ship, ready) and **Review** (scope, review, reconcile, verify, report, ready). State lives in the target project (`.planning/factory/`, `.planning/factory-board/`, `.worktrees/`), never here.
+A board of jobs. Each job moves through fixed stages, one fresh agent per stage, and `bin/job` is the only thing that moves it. Two workflows share one engine and one board: **Build** (shape, spec, build, gate, review, polish, prove, ship, ready) and **Review** (scope, review, reconcile, verify, report, ready). State, including each project's own `pipeline.json`, lives in the target project (`.planning/factory/`, `.planning/factory-board/`, `.worktrees/`), never here.
 
 ## Files
 
@@ -18,7 +18,6 @@ A board of jobs. Each job moves through fixed stages, one fresh agent per stage,
 | `bin/board` | The board's HTTP server, the chat bar's `/api/ask`, saves, the chat log, the diagram frame. |
 | `bin/tick` | One headless pass per harness, or a loop. Refuses to run until the harness's deny policy is installed. |
 | `bin/guard` | Tool-call hook that blocks what the policy denies. Fails closed. |
-| `pipeline.json` | The custom stages. Written only by the board's Apply button. Empty by default. |
 | `policy.yaml`, `policy.build.yaml` | The shell allow, ask and deny rules. Deny beats ask, ask beats allow. Never loosen them to make something work. |
 | `dashboard/*.ts` | The page. `dashboard/dist/*.js` is generated and committed. |
 | `tests/` | `unittest`. `test_job.py` covers stages and the board over a real `serve 0` process. |
@@ -44,7 +43,7 @@ A board of jobs. Each job moves through fixed stages, one fresh agent per stage,
 
 ## Adding or changing a stage (a node)
 
-**A custom stage** is data, not code: `pipeline.json`, changed with `job pipeline propose ...` and applied by the user's click. Do not edit `pipeline.json` by hand to add one for a user, and never add a way to apply without the click. The engine compiles it in `bin/job` (`compile_pipeline`): a custom stage is wired between a built-in stage and that stage's normal next stage, and `ATTACH` lists the only built-in stages one may follow. Keep `gate`, `ship`, `report` and `ready` out of `ATTACH`.
+**A custom stage** is data, not code: the project's `.planning/factory/pipeline.json`, changed with `job pipeline propose ...` and applied by the user's click. Do not edit `pipeline.json` by hand to add one for a user, and never add a way to apply without the click. The engine compiles it in `bin/job` (`compile_pipeline`): a custom stage is wired between a built-in stage and that stage's normal next stage, and `ATTACH` lists the only built-in stages one may follow. Keep `gate`, `ship`, `report` and `ready` out of `ATTACH`.
 
 **A built-in stage** needs all of these, in one change:
 

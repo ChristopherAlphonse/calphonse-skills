@@ -529,10 +529,10 @@ def audit_lines():
 AUDIT_STAGE = {"create": "shape", "create-review": "scope", "violation": "needs-human", "retire": "rejected"}
 
 
-def audited_state(jid):
+def audited_state(jid, lines=None):
     """What the audit log says happened to a job, to cross-check job.json against."""
     st = {"stage": None, "spec": False, "commit": None}
-    for e in audit_lines():
+    for e in audit_lines() if lines is None else lines:
         if e.get("job") != jid:
             continue
         a, human = e["action"], e["actor"] == "human"
@@ -552,9 +552,9 @@ def audited_state(jid):
     return st
 
 
-def integrity_problems(job):
+def integrity_problems(job, lines=None):
     """Detect tampering the OS cannot prevent when the agent shares the user's file permissions."""
-    probs, a = [], audited_state(job["id"])
+    probs, a = [], audited_state(job["id"], lines)
     if a["stage"] != job["stage"]:
         probs.append(f"job.json says {job['stage']} but the audit log says {a['stage']}")
     if bool(job["approvals"].get("spec")) != a["spec"]:
@@ -617,7 +617,9 @@ def justify_review(job, cur, to):
 
 
 # ---- pipeline: the order of stages, and custom stages
-PIPELINE_FILE = Path(os.environ.get("FACTORY_PIPELINE") or SELF.parent.parent / "pipeline.json")
+# Each project's .planning/factory/pipeline.json holds its stage order and custom stages. No file means the default order.
+# FACTORY_PIPELINE overrides the path (tests only).
+PIPELINE_FILE = Path(os.environ.get("FACTORY_PIPELINE") or STATE / "pipeline.json")
 PROPOSAL_FILE = STATE / "pipeline-proposal.json"
 BASE_ORDER = {
     "build": ["shape", "spec", "build", "review", "polish", "prove", "ship"],
@@ -1340,10 +1342,9 @@ def waiting_on_human(job):
 
 
 def cmd_queue():
-    announce_board()
-    cap, running = config()["concurrency"], 0
+    cap, running, lines = config()["concurrency"], 0, audit_lines()
     for job in all_jobs():
-        if job["stage"] not in TERMINAL | HUMAN_STAGES and integrity_problems(job):
+        if job["stage"] not in TERMINAL | HUMAN_STAGES and integrity_problems(job, lines):
             try:
                 with locked():
                     enforce(load(job["id"]))
@@ -1395,8 +1396,7 @@ def cmd_wait(seconds):
         if freed:
             print(f"RESUME: {', '.join(freed)} no longer wait on the user. Run `JOB queue` and continue.")
             return
-    print(f"STILL WAITING on {', '.join(held)}. Run `JOB wait` again. Do not end your turn.")
-    sys.exit(3)
+    print(f"STILL WAITING on {', '.join(held)}. End your turn; the user's click or TICK loop resumes the job.")
 
 
 def snapshot(job):
