@@ -1,24 +1,32 @@
 // Generated from mermaid-frame.ts by build.mjs. Do not edit.
 // Runs inside the sandboxed diagram frame, which has no cookie and no access to the board. The page sends it a diagram; it sends back the drawing.
+// This stays a classic script: mermaid.html loads it without type="module".
                        
                                    
                                                                
   
-                
-                    
-                             
-   
- 
 
 const MAX_DIAGRAM_SOURCE_LENGTH = 50_000;
 
+function isMermaidLibrary(value         )                          {
+  if (typeof value !== "object" || value === null) return false;
+  if (!("initialize" in value) || !("render" in value)) return false;
+  return typeof value.initialize === "function" && typeof value.render === "function";
+}
+
+function currentLibrary()                             {
+  const candidate          = Reflect.get(window, "mermaid");
+  return isMermaidLibrary(candidate) ? candidate : undefined;
+}
+
 function loadMermaidLibrary()                          {
-  if (window.mermaid) return Promise.resolve(window.mermaid);
+  const loaded = currentLibrary();
+  if (loaded) return Promise.resolve(loaded);
   return new Promise((resolve, reject) => {
     const scriptElement = document.createElement("script");
     scriptElement.src = "/frame/mermaid.js";
     scriptElement.onload = () => {
-      const library = window.mermaid;
+      const library = currentLibrary();
       if (!library) return reject(new Error("the library did not load"));
       library.initialize({ startOnLoad: false, securityLevel: "strict", theme: "dark" });
       resolve(library);
