@@ -18,7 +18,7 @@ SKILLS = HERE.parent.parent
 DASH_DIR = HERE.parent / "dashboard"
 DIST_DIR = DASH_DIR / "dist"
 STATE = ROOT / ".planning" / "factory-board"
-STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "dom.js": "text/javascript", "markdown.js": "text/javascript", "editor.js": "text/javascript", "mermaid.js": "text/javascript", "boards.js": "text/javascript", "wires.js": "text/javascript"}
+STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "ask.js": "text/javascript", "dom.js": "text/javascript", "markdown.js": "text/javascript", "editor.js": "text/javascript", "mermaid.js": "text/javascript", "boards.js": "text/javascript", "wires.js": "text/javascript"}
 ENGINE_FILE = HERE / "job"
 # board id -> (label, which of the engine's jobs it shows)
 BOARD_SPECS = {"build": ("Build", lambda job: not job.get("review")), "review": ("Review", lambda job: bool(job.get("review")))}
