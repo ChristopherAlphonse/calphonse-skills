@@ -85,7 +85,7 @@ The safety layers differ in strength. Deny rules and the guard hook block the or
 
 ## What it does not do
 
-- It never pushes, opens a PR or MR, merges, or deploys. `ready` means a local commit exists and a PR body is written. You push by your own process.
+- No stage agent pushes, opens a PR or MR, merges, or deploys. `ready` means a local commit exists and a PR body is written. You push by your own process, or tell the orchestrator in chat to.
 - A review of a branch you do not trust runs that branch's tests, so it runs that code on your machine.
 - The gate is only as strong as your `checks` command. If your tests pass when no tests run, so does the gate.
 

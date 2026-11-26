@@ -27,7 +27,7 @@ A board of jobs. Each job moves through fixed stages, one fresh agent per stage,
 
 - `bin/job` is the only writer of `job.json`. Nothing else edits it.
 - **Approve spec**, **Commit locally** and **Unblock** are the user's buttons. The CLI refuses them, and the board's chat agent cannot run them. Do not add a path that approves or commits without a click.
-- No `git commit`, `push`, `merge`, `rebase`, `config`, no `gh`, `glab`, `curl`, `wget`, no network, in agent-run code paths.
+- No `git commit`, `push`, `merge`, `rebase`, `config`, no `gh`, `glab`, `curl`, `wget`, no network, in stage-agent and unattended-pass code paths. The user can tell the orchestrator in chat to commit or push.
 - A gate passes on a command's output, never on an agent saying "done".
 - A review never edits code or posts anything.
 - The page's security policy is strict on purpose: scripts and styles from the board only, no inline script or style, `frame-src 'self'`. Do not relax it for the whole page. Diagrams are drawn in a sandboxed frame with its own narrower policy instead.

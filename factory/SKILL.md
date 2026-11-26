@@ -1,6 +1,6 @@
 ---
 name: factory
-description: Take a feature from idea to a reviewed local commit by chaining this repo's skills as stages (shape, spec, build, review, polish, prove, ship) on a board of connected stages. Use when the user wants a whole feature driven end to end, a software factory, a pipeline, or the board. Also runs read-only code reviews of a branch or diff as review jobs, with a verified report and paste-ready comments. Never commits without the user's click; never pushes or opens a PR/MR; a review never edits code or posts unless the user says so.
+description: Take a feature from idea to a reviewed local commit by chaining this repo's skills as stages (shape, spec, build, review, polish, prove, ship) on a board of connected stages. Use when the user wants a whole feature driven end to end, a software factory, a pipeline, or the board. Also runs read-only code reviews of a branch or diff as review jobs, with a verified report and paste-ready comments. Stage agents never commit, push, or open a PR/MR on their own, and the user can tell the orchestrator to; a review never edits code or posts unless the user says so.
 ---
 
 # Factory
@@ -46,8 +46,10 @@ Only the user changes the pipeline: an agent can propose a change with `JOB pipe
 These hold in every harness and are enforced by structure, not by this text.
 
 - **Baseline shell rules.** `policy.yaml` is the human-in-the-loop baseline for every harness (Claude Code, Kiro, OpenCode). It denies `git push`, `aws s3 rm`, and `curl -X POST`, asks before every git verb that changes a repository, and allows a list of read-only commands. Deny beats ask, and ask beats allow. A command no rule names is not allowed, so it waits for a human. `TICK` turns the file into each harness's format and refuses a headless pass until the project's policy covers it. The factory's own denies below are stricter, never looser.
-- **No commit, push, PR, or MR without the user.** Agents leave changes uncommitted in the job's worktree. The only commit is `JOB commit`, which the user triggers from the board. It runs the repo's own hooks and refuses unless the tree matches the one that passed the gate.
-- **Never run** `git commit`, `git push`, `git merge`, `git rebase`, `git config`, `git -c`, `git -C`, `gh`, `glab`, `curl`, or `wget`. Never use the network.
+- **No commit, push, PR, or MR on an agent's own initiative.** Stage agents leave changes uncommitted in the job's worktree. The job's commit is `JOB commit`, which the user triggers from the board. It runs the repo's own hooks and refuses unless the tree matches the one that passed the gate.
+- **Stage agents and unattended `TICK` passes never run** `git commit`, `git push`, `git merge`, `git rebase`, `git config`, `git -c`, `git -C`, `gh`, `glab`, `curl`, or `wget`, and never use the network. Nobody is there to say yes, so policy blocks them.
+- **The user can tell you, in this chat, to commit, push, or open a PR or MR. Then do it.** Their words are the approval. Do the one named action, say plainly what you ran, and do not re-argue the rule. The harness's own permission prompt still applies. Before a push, check the branch and its remote tip. Never force-push unless the user said force, and use `--force-with-lease` with the tip you checked. Never push a branch that is not the one named.
+- **Board buttons** (Approve spec, Commit locally, Unblock) are the user's. If the user tells you in chat to press one for a named job, press it in the browser and report that you did. Never press one unasked.
 - **Never** try to run `approve`, `commit`, or `unblock` from the CLI. They are the user's buttons on the board, and the CLI refuses them. Starting the board (`JOB board`, `JOB watch`) is yours to do.
 - **Protected paths** (CI config, CODEOWNERS, `.env`, factory config, plus any in `config.json`) fail the gate when touched.
 - **Audit.** Every state change is one line in `.planning/factory/audit.log`.
@@ -176,4 +178,8 @@ The page has a collapsible left sidebar that lists the boards: Build shows build
 
 ## Out of scope
 
-The factory never pushes, opens a PR or MR, merges, or deploys. `ready` means a local commit exists and a PR body is written. The user pushes and opens the MR by their own process.
+No stage or unattended pass pushes, opens a PR or MR, merges, or deploys. `ready` means a local commit exists and a PR body is written. The user pushes and opens the MR by their own process, or tells you in chat to do it (see Enterprise policy).
+
+## Small tasks
+
+The pipeline is for features the user wants shaped, specced, reviewed and approved. For a fix, an edit, a history repair or any one-off command, skip it: do the work directly in the repo, run the repo's tests, and leave one change for the user to review. Do not create a job for it. If the user's own words say to skip the factory, skip it.

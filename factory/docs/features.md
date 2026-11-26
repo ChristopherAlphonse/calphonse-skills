@@ -127,7 +127,7 @@ You read the paperwork and click **Commit locally**. The factory makes the one a
 
 ### 2.13 Ready
 
-The job is done. A local commit exists and a pull request text is written. The factory never pushes. Pushing and opening the pull request is your job, done your own way.
+The job is done. A local commit exists and a pull request text is written. No stage pushes. Pushing and opening the pull request is yours, done your own way, or by telling the orchestrator in chat.
 
 ### 2.14 Rounds
 
