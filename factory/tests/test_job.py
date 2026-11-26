@@ -117,10 +117,10 @@ class Factory(unittest.TestCase):
         self.ok("advance", jid, to, **kw)
         self.assertEqual(self.stage(jid), to)
 
-    def new_spec(self, jid, spec=True, branch=True):
+    def new_spec(self, jid, spec=True, branch=True, repo=None, ticket=None):
         if branch:
-            self.git("branch", f"feature/{jid.upper()}")
-        self.ok("create", jid, "title")
+            self.git("branch", f"feature/{(ticket or jid).upper()}", cwd=self.root / repo if repo else None)
+        self.ok("create", jid, "title", *(("--repo", repo) if repo else ()))
         self.wf(jid, "shape.md", "STATUS: READY\n\nshape\n")
         self.adv(jid, "spec")
         if spec:
@@ -416,6 +416,80 @@ class TestShapeSpec(Factory):
         self.assertTrue((self.wt("j") / ".git").exists())
         head = self.git("rev-parse", "--abbrev-ref", "HEAD", cwd=self.wt("j")).stdout.strip()
         self.assertEqual(head, "feature/J")
+
+
+class TestRepos(Factory):
+    """A project folder that holds several repos (a GitLab group): one job per repo, each in its own lane."""
+    def repo(self, name, files):
+        r = self.root / name
+        r.mkdir()
+        self.git("init", "-b", "main", cwd=r)
+        for f, text in files.items():
+            (r / f).write_text(text)
+        self.git("add", "-A", cwd=r)
+        self.git("-c", "user.name=T", "-c", "user.email=t@example.invalid", "commit", "-m", "init", cwd=r)
+        return r
+
+    def test_jobs_on_one_ticket_work_in_their_own_repos(self):
+        a, b = self.repo("svc-a", {"app.py": "x = 1\n"}), self.repo("infra-b", {"main.tf": "\n"})
+        for jid, name in (("proj-174-svc-a", "svc-a"), ("proj-174-infra-b", "infra-b")):
+            self.new_spec(jid, repo=name, ticket="proj-174")
+            self.human("approve", jid)
+            self.adv(jid, "build")
+            self.assertEqual(self.js(jid)["repo"], str((self.root / name).resolve()))
+            self.assertEqual(self.git("rev-parse", "--abbrev-ref", "HEAD", cwd=self.wt(jid)).stdout.strip(), "feature/PROJ-174")
+        common = lambda jid: Path(self.git("rev-parse", "--path-format=absolute", "--git-common-dir", cwd=self.wt(jid)).stdout.strip())
+        self.assertEqual(common("proj-174-svc-a").resolve(), (a / ".git").resolve())
+        self.assertEqual(common("proj-174-infra-b").resolve(), (b / ".git").resolve())
+        self.assertEqual(self.js("proj-174-svc-a")["stack"], ["python"])
+        self.assertEqual(self.js("proj-174-infra-b")["stack"], ["aws"])
+
+    def test_repo_job_commits_to_its_repo_and_releases_its_worktree(self):
+        a = self.repo("svc-a", {"app.py": "x = 1\n"})
+        self.git("config", "user.name", "Test", cwd=a)
+        self.git("config", "user.email", "t@example.invalid", cwd=a)
+        self.new_spec("proj-1-svc-a", repo="svc-a", ticket="proj-1")
+        self.human("approve", "proj-1-svc-a")
+        self.adv("proj-1-svc-a", "build")
+        (self.wt("proj-1-svc-a") / "feature.py").write_text("y = 2\n")
+        self.wf("proj-1-svc-a", "build.md", "STATUS: READY\n")
+        self.adv("proj-1-svc-a", "gate")
+        self.assertIn("GATE: PASS", self.run_gate("proj-1-svc-a"))
+        self.adv("proj-1-svc-a", "review")
+        self.pass_reviews("proj-1-svc-a")
+        self.adv("proj-1-svc-a", "polish")
+        self.wf("proj-1-svc-a", "polish.md", "STATUS: DONE\n")
+        self.adv("proj-1-svc-a", "gate")
+        self.assertIn("GATE: PASS", self.run_gate("proj-1-svc-a"))
+        self.adv("proj-1-svc-a", "prove")
+        self.wf("proj-1-svc-a", "uat.md", "STATUS: PASS\n")
+        self.adv("proj-1-svc-a", "ship")
+        self.wf("proj-1-svc-a", "pr-body.md", "body\n")
+        self.wf("proj-1-svc-a", "commit.md", "feat: add feature\n")
+        self.human("commit", "proj-1-svc-a")
+        self.assertIn("feature.py", self.git("show", "--name-only", "--format=", "feature/PROJ-1", cwd=a).stdout)
+        self.assertEqual(self.git("branch", "--list", "feature/*").stdout.strip(), "")
+        self.adv("proj-1-svc-a", "ready")
+        self.assertFalse(self.wt("proj-1-svc-a").exists())
+        self.assertNotIn(".worktrees", self.git("worktree", "list", cwd=a).stdout)
+
+    def test_repo_must_be_the_top_of_a_git_repo(self):
+        self.repo("svc-a", {"app.py": "x = 1\n"})
+        (self.root / "svc-a" / "sub").mkdir()
+        (self.base / "plain").mkdir()
+        for bad in ("svc-a/sub", "nope", str(self.base / "plain")):
+            self.no("create", "j", "T", "--repo", bad)
+        self.no("create", "j", "T", "--repo")
+        self.assertFalse(self.jd("j").exists())
+
+    def test_ticket_is_the_ids_leading_key_and_number(self):
+        for jid, branch in (("proj-174-data-ui", "feature/PROJ-174"), ("j", "feature/J"), ("demo", "feature/DEMO")):
+            self.new_spec(jid, ticket=branch.split("/")[1])
+            self.human("approve", jid)
+            self.adv(jid, "build")
+            self.assertEqual(self.git("rev-parse", "--abbrev-ref", "HEAD", cwd=self.wt(jid)).stdout.strip(), branch)
+            self.wf(jid, "build.md", "STATUS: BLOCKED\n")
+            self.adv(jid, "needs-human")
 
 
 class TestBuildGate(Factory):
@@ -758,35 +832,6 @@ class TestPolicy(Factory):
         (self.wt(jid) / name).write_text("x\n")
         self.git("add", name, cwd=self.wt(jid))
 
-    def test_agent_commit_fails_including_no_verify(self):
-        self.to_build("j")
-        self.add_file("j")
-        before = self.commits("j")
-        self.assertNotEqual(self.git("commit", "-m", "x", cwd=self.wt("j"), check=False).returncode, 0)
-        self.assertNotEqual(self.git("commit", "--no-verify", "-m", "x", cwd=self.wt("j"), check=False).returncode, 0)
-        self.assertEqual(self.commits("j"), before)
-
-    def test_env_flags_do_not_unlock_worktree_commits_and_main_repo_is_unaffected(self):
-        self.to_build("j")
-        self.add_file("j")
-        for env in ({"FACTORY_HUMAN": "1"}, {"FACTORY_HUMAN_KEY": "guess"}):
-            r = self.git("commit", "-m", "x", cwd=self.wt("j"), extra_env=env, check=False)
-            self.assertNotEqual(r.returncode, 0, env)
-        (self.root / "main.txt").write_text("m\n")
-        self.git("add", "main.txt", cwd=self.root)
-        self.assertEqual(self.git("commit", "-m", "m", cwd=self.root, check=False).returncode, 0)
-
-    def test_agent_push_of_factory_branch_fails(self):
-        bare = self.base / "remote.git"
-        self.git("init", "--bare", "-b", "main", str(bare))
-        self.git("remote", "add", "origin", str(bare))
-        self.to_build("j")
-        r = self.git("push", "origin", "feature/J", cwd=self.wt("j"), check=False)
-        self.assertNotEqual(r.returncode, 0)
-        self.assertEqual(self.git("for-each-ref", cwd=bare).stdout.strip(), "")
-        r = self.git("push", "origin", "main", cwd=self.wt("j"), check=False)
-        self.assertEqual(r.returncode, 0, r.stderr)
-
     def test_job_commit_succeeds_for_human_only(self):
         self.to_ship("j")
         before = self.commits("j")
@@ -880,6 +925,30 @@ class TestPolicy(Factory):
         self.adv("j", "ready")
         self.no("advance", "j", "build")
 
+    def test_commits_and_pushes_in_the_worktree_are_never_blocked_and_never_park_the_job(self):
+        bare = self.base / "remote.git"
+        self.git("init", "--bare", "-b", "main", str(bare))
+        self.git("remote", "add", "origin", str(bare))
+        self.to_build("j")
+        wt = self.wt("j")
+        (wt / "a.txt").write_text("x\n")
+        self.git("add", "-A", cwd=wt)
+        self.git("commit", "-m", "mine", cwd=wt)
+        self.git("push", "origin", "feature/J", cwd=wt)
+        self.ok("queue")
+        self.assertEqual(self.stage("j"), "build")
+        self.assertEqual(self.git("config", "--worktree", "--get", "core.hooksPath", cwd=wt, check=False).stdout.strip(), "")
+        self.assertFalse((self.state / "hooks" / "j").exists())
+
+    def test_a_protected_path_committed_in_the_worktree_still_fails_the_gate(self):
+        self.to_gate("j")
+        wt = self.wt("j")
+        (wt / "CODEOWNERS").write_text("* @other\n")
+        self.git("add", "-A", cwd=wt)
+        self.git("commit", "-m", "mine", cwd=wt)
+        self.assertIn("GATE: FAIL", self.run_gate("j"))
+        self.assertEqual(self.stage("j"), "gate")
+
     def test_ready_removes_the_worktree_and_keeps_the_branch_and_commit(self):
         self.to_ship("j")
         self.human("commit", "j")
@@ -906,6 +975,16 @@ class TestPolicy(Factory):
         self.no("advance", "j", "ready")
         self.wf("j", "pr-body.md", "b\n")
         self.adv("j", "ready")
+
+    def test_users_own_push_of_the_board_commit_does_not_park_the_job(self):
+        bare = self.base / "remote.git"
+        self.git("init", "--bare", "-b", "main", str(bare))
+        self.git("remote", "add", "origin", str(bare))
+        self.to_ship("j")
+        self.human("commit", "j")
+        self.git("push", "origin", "feature/J", cwd=self.root)
+        self.adv("j", "ready")
+        self.assertEqual(self.js("j")["stage"], "ready")
 
     def test_no_remote_refs_and_no_forge_cli_after_full_run(self):
         bare = self.base / "remote.git"
@@ -1279,6 +1358,11 @@ class TestServer(Factory):
         self.assertIn("Factory Bot", mod.ask_system("a", "build", True))
         self.assertIn("only handle the factory board", mod.ask_system("a", "build", True))
         self.assertNotIn("Factory Bot", mod.ask_system("a", "build", False).split("# Factory board assistant")[0])
+        act = mod.ask_system("a", "build", True)
+        self.assertIn("pipeline show|propose|clear", act)
+        self.assertIn("Never refuse it", act)
+        self.assertIn("never perform it", guide)
+        self.assertIn("commit-and-push", guide)
 
     def test_approve_over_http(self):
         self.new_spec("a")
@@ -1364,15 +1448,6 @@ class TestHumanGate(Factory):
         text = (self.state / "human.sha256").read_text().strip()
         self.assertRegex(text, r"^[0-9a-f]{64}$")
 
-    def test_no_server_means_hooks_refuse_everyone(self):
-        self.to_build("j")
-        (self.wt("j") / "a.txt").write_text("x\n")
-        self.git("add", "a.txt", cwd=self.wt("j"))
-        self.stop_servers()
-        for key in ("", "guess"):
-            r = self.git("commit", "-m", "x", cwd=self.wt("j"), extra_env={"FACTORY_HUMAN_KEY": key}, check=False)
-            self.assertNotEqual(r.returncode, 0, f"commit succeeded with key {key!r} and no board running")
-
     def test_spec_edit_after_approval_blocks_build(self):
         self.new_spec("j")
         self.human("approve", "j")
@@ -1381,46 +1456,6 @@ class TestHumanGate(Factory):
         self.assertIn("spec changed", r.stdout + r.stderr)
         self.wf("j", "spec.md", "# spec\n")
         self.adv("j", "build")
-
-    def test_agent_commit_with_hooks_bypassed_parks_the_job(self):
-        self.to_gate("j")
-        wt = self.wt("j")
-        (wt / ".github").mkdir()
-        (wt / ".github" / "w.yml").write_text("evil\n")
-        self.git("add", "-A", cwd=wt)
-        r = self.git("-c", "core.hooksPath=/dev/null", "commit", "-m", "sneak", cwd=wt, check=False)
-        self.assertEqual(r.returncode, 0, "premise: the hook layer alone can be bypassed")
-        out = self.no("gate", "j")
-        self.assertIn("branch moved outside the factory", out.stdout + out.stderr)
-        self.assertEqual(self.stage("j"), "needs-human")
-        self.assertNotIn("GATE: PASS", self.checks("j"))
-
-    def test_protected_change_committed_by_agent_never_passes_the_gate(self):
-        self.to_gate("j")
-        wt = self.wt("j")
-        (wt / "CODEOWNERS").write_text("* @evil\n")
-        self.git("add", "-A", cwd=wt)
-        self.git("-c", "core.hooksPath=/dev/null", "commit", "-m", "sneak", cwd=wt)
-        self.no("gate", "j")
-        self.assertEqual(self.stage("j"), "needs-human")
-
-    def test_human_commit_refused_when_branch_has_foreign_commit(self):
-        self.to_ship("j")
-        wt = self.wt("j")
-        self.git("-c", "core.hooksPath=/dev/null", "commit", "--allow-empty", "-m", "sneak", cwd=wt)
-        self.human_refused("commit", "j")
-        self.assertIsNone(self.js("j")["commit"])
-
-    def test_tampered_hooks_park_the_job_and_unblock_restores_them(self):
-        self.to_ship("j")
-        hook = self.state / "hooks" / "j" / "pre-commit"
-        hook.write_text("#!/bin/sh\nexit 0\n")
-        self.human_refused("commit", "j")
-        self.assertEqual(self.stage("j"), "needs-human")
-        self.assertIn("hook files were changed", self.js("j")["note"])
-        self.human("unblock", "j")
-        self.assertIn("human_ok", hook.read_text())
-        self.assertEqual(self.stage("j"), "build")
 
     def test_repo_hook_does_not_see_the_key(self):
         seen = self.base / "seen"

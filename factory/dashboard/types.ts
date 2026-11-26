@@ -31,6 +31,7 @@ export interface Job {
   skills: string[];
   branch: string | null;
   worktree: string | null;
+  repo?: string | null;
   commit?: string | null;
   note: string;
   review?: ReviewRange;

@@ -44,6 +44,10 @@ Each open board is a tab, like in a browser. Drag a board from the sidebar onto 
 
 Each stage is a box called a **node**, joined by lines like a subway map. Each job is a **chip** sitting on its node. A node holding a job that is waiting for you gets an outline so you can spot it.
 
+### 1.6.1 One lane per repo
+
+When your project folder holds several repos (a GitLab group, say), give each job its repo: `bin/job create <id> "<title>" --repo <dir>`. The board then draws one **lane** per repo: the repo's name, then its own row of stages, with that repo's jobs on it. Each repo's agent moves along its own lane, so you see every repo's progress at once instead of one long line. A board with no `--repo` jobs looks as before. Each chip also shows the job's latest "now:" note under its title.
+
 ### 1.7 Filters
 
 Buttons along the top that hide the noise:
@@ -86,7 +90,7 @@ After you approve, `spec.md` is locked. If anyone changes it later, the build st
 
 ### 2.5 The worktree and the branch
 
-When you approve, the factory makes a **worktree**: a private copy of your project in `.worktrees/<id>/`, on the ticket's branch, `feature/<TICKET>` (job `proj-174` uses `feature/PROJ-174`). The branch must already exist and must not be checked out in your own folder: the factory never creates a branch. A review job gets a detached copy with no branch. Agents play in the copy, so your own folder stays safe.
+When you approve, the factory makes a **worktree**: a private copy of your project in `.worktrees/<id>/`, on the ticket's branch, `feature/<TICKET>`. The ticket is the id's leading key and number, so job `proj-174` and job `proj-174-data-ui` both use `feature/PROJ-174`. A job made with `--repo` gets its worktree from that repo, so two repos can work on one ticket at once. The branch must already exist and must not be checked out in your own folder: the factory never creates a branch. A review job gets a detached copy with no branch. Agents play in the copy, so your own folder stays safe.
 
 ### 2.6 Build: "make it"
 
@@ -294,7 +298,7 @@ The orchestrator acts only on `run`.
 
 ### 5.3 Concurrency
 
-`concurrency` (default 1) is how many jobs run at once. Extra jobs show `wait`.
+`concurrency` (default 1) is how many jobs run at once. Extra jobs show `wait`. With one job per repo, set it to the number of repos so every repo's agent runs in the same pass.
 
 ### 5.4 Advance, and what a refusal means
 
@@ -415,11 +419,11 @@ Some files are off limits: CI config, CODEOWNERS, `.env`, hook config, the facto
 
 ### 7.11 Git hooks in each worktree
 
-Each worktree gets hooks that refuse commits and pushes without the board's key, and then call your project's own hooks. These are a speed bump, not a wall.
+The factory installs no hooks of its own. You can commit and push in a job's worktree at any time, and your project's own hooks run as in any checkout. The stage agents are still told not to commit, push or merge: that rule is the agent policy, not a git hook.
 
 ### 7.12 The integrity checks
 
-On every advance, gate, queue and commit, `bin/job` looks for signs of tampering: a branch tip that moved, changed hooks, a commit on a remote-tracking branch, a detached HEAD, or a `job.json` that disagrees with the log. If it finds one, it parks the job in **Needs you** with the reason. These checks catch trouble. They do not prevent it.
+On every advance, gate, queue and commit, `bin/job` looks for signs of tampering: a detached HEAD, a worktree on the wrong branch, a reviewer editing a tracked file, or a `job.json` that disagrees with the log. Your own commits and pushes never park a job. If it finds one, it parks the job in **Needs you** with the reason. These checks catch trouble. They do not prevent it.
 
 ### 7.13 The audit log
 

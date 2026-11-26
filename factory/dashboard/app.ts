@@ -472,7 +472,11 @@ function node(v: View, s: Stage, jobs: Job[]): HTMLElement {
       `jobchip${j.needs_human ? " hold" : ""}${bad ? " FAIL" : ""}${j.id === v.openId ? " on" : ""}`,
     );
     c.type = "button";
-    c.append(el("i"), el("span", "", j.title));
+    const text = el("div");
+    text.append(el("span", "", j.title));
+    const now = j.activity?.at(-1)?.text;
+    if (now) text.append(el("small", "", now));
+    c.append(el("i"), text);
     c.onclick = () => openJobPanel(j.id);
     list.append(c);
   }
@@ -480,22 +484,32 @@ function node(v: View, s: Stage, jobs: Job[]): HTMLElement {
   return n;
 }
 
+const repoName = (j: Job): string => j.repo?.split("/").pop() ?? "";
+
+// One lane per repo, each a single row of stages, so every repo's agent shows on its own.
+// Jobs with no --repo share one lane, laid out as before.
 function renderCanvas(): void {
   const v = view();
-  const mine = v.jobs.filter((j) => visible(v, j));
-  const nodes = el("div", `nodes cols${v.def.columns}`);
-  nodes.append(
-    ...v.def.stages.map((s) =>
-      node(
-        v,
-        s,
-        mine.filter((j) => stageOf(v, j) === s.id),
+  const repos = v.jobs.length ? [...new Set(v.jobs.map(repoName))].sort() : [""];
+  const multi = repos.some(Boolean);
+  const lanes = repos.map((repo) => {
+    const mine = v.jobs.filter((j) => repoName(j) === repo && visible(v, j));
+    const nodes = el("div", multi ? "nodes compact" : `nodes cols${v.def.columns}`);
+    if (multi) nodes.style.gridTemplateColumns = `repeat(${v.def.stages.length}, 180px)`;
+    nodes.append(
+      ...v.def.stages.map((s) =>
+        node(
+          v,
+          s,
+          mine.filter((j) => stageOf(v, j) === s.id),
+        ),
       ),
-    ),
-  );
-  const lane = el("div", "lane");
-  lane.append(el("div", "rowlabel", v.def.lane), nodes);
-  $("lanes").replaceChildren(lane);
+    );
+    const lane = el("div", "lane");
+    lane.append(el("div", multi ? "rowlabel repo" : "rowlabel", repo || v.def.lane), nodes);
+    return lane;
+  });
+  $("lanes").replaceChildren(...lanes);
   applyScale();
 }
 

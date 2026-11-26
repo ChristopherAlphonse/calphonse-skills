@@ -99,7 +99,7 @@ When the job reaches **ship**, the agent has written `pr-body.md` and `commit.md
 
 Read both files. Click **Commit locally**.
 
-The click is refused if the gate did not pass on this exact working tree, if the branch holds a commit the board did not make, if a protected path changed, or if your repo's own hooks fail. The board states which check failed.
+The click is refused if the gate did not pass on this exact working tree, if a protected path changed, or if your repo's own hooks fail. The board states which check failed.
 
 On success, the job moves to **ready**. Your change is a commit on the branch `feature/<TICKET>`.
 

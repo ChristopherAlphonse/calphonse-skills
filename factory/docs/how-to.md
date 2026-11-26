@@ -86,7 +86,7 @@ $FACTORY/bin/job route <id> architecture
 
 1. Click the chip and read the reason in the panel.
 2. If a build was **blocked**, fix what the agent named. If rounds ran out, decide whether to change the spec or the code.
-3. If the reason is tampering, such as a moved branch tip or changed hooks, check the branch in `.worktrees/<id>/` first. Unblock accepts the state.
+3. If the reason is tampering, such as an edited `job.json`, check the branch in `.worktrees/<id>/` first. Unblock accepts the state.
 4. Click **Unblock**. The job retries its stage.
 
 `unblock` is not a CLI command. It runs only from the board.

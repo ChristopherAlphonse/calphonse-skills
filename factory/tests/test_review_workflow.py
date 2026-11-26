@@ -205,18 +205,6 @@ class TestNoHumanGatesAndNoWrites(Review):
         self.new_review()
         self.no("gate", "r")
 
-    def test_an_agent_cannot_commit_in_the_review_worktree(self):
-        self.new_review()
-        r = self.git("commit", "--allow-empty", "-m", "x", cwd=self.wt("r"), check=False)
-        self.assertNotEqual(r.returncode, 0)
-
-    def test_a_bypassed_commit_is_caught_and_parks_the_job(self):
-        self.new_review()
-        self.git("-c", "core.hooksPath=/dev/null", "commit", "--allow-empty", "-m", "x", cwd=self.wt("r"))
-        self.ok("queue")
-        self.assertEqual(self.stage("r"), "needs-human")
-        self.assertIn("branch moved", self.js("r")["note"])
-
     def test_a_reviewer_editing_a_tracked_file_parks_the_job_and_unblock_restores_it(self):
         self.new_review()
         target = self.wt("r") / "src" / "math.ts"

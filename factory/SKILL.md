@@ -28,6 +28,7 @@ When a job waits on the user (spec approval, **Commit locally**, **Unblock**), s
 This skill runs two workflows on one engine and one board, as two tabs:
 
 - **Build**: a feature idea becomes a local commit and a PR body. `JOB create <id> "<title>"` makes a build job.
+- **Several repos**: when the project folder holds several git repos (a GitLab group), make one build job per repo with `JOB create <id> "<title>" --repo <dir>`. Name it `<ticket>-<repo>` (for example `proj-174-data-ui`): the branch is `feature/<TICKET>` from the id's leading key and number, so every repo works on the same ticket. The board draws one lane per repo, and `concurrency` in `config.json` sets how many repo agents run at once.
 - **Review**: a branch or diff becomes a verified report and paste-ready comments, and no code is written. `JOB create <id> "<title>" --review <base> <head>` makes a review job. The two refs are local, so the user fetches the PR or MR branch first, for example `git fetch origin pull/42/head:pr-42`.
 
 The sections below say which workflow they belong to. A review job never edits code, commits, pushes, or posts.

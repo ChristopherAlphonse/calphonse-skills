@@ -7,6 +7,7 @@ Reference for every command, setting, file and environment variable. Run command
 | Command | Does |
 | --- | --- |
 | `bin/job create <id> "<title>"` | start a build job at shape |
+| `bin/job create <id> "<title>" --repo DIR` | start a build job that works in the git repo at `DIR` (relative to the project folder). The board shows one lane per repo. `--repo DIR` also goes before `--review BASE HEAD` |
 | `bin/job create <id> "<title>" --review BASE HEAD` | start a review job at scope. It shows on the Review board |
 | `bin/job stack <id>` | recompute the stack skills for a job |
 | `bin/job queue` | list jobs as `action id stage hint` |
@@ -73,7 +74,6 @@ State lives in the project, never in this repo.
 | `.planning/factory/jobs/<id>/job.json` | the job's state, written only by `bin/job` |
 | `.planning/factory/jobs/<id>/*.md` | the stage files |
 | `.planning/factory/audit.log` | one JSON line per state change, with the actor (`agent`, `human`, or `tick`) |
-| `.planning/factory/hooks/<id>/` | the per-worktree git hooks |
 | `.planning/factory/pipeline-proposal.json` | a pending stage change, waiting for Apply |
 | `.planning/factory/scratch/<id>/<reviewer>/` | where a reviewer works on a copy |
 | `.planning/factory/loop.log` | output of a loop started in the background |

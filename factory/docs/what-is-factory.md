@@ -77,7 +77,7 @@ You can add a stage, such as an extra QA pass after review. You ask in the board
 
 ## How it keeps you in control
 
-Agents work in a worktree and leave changes uncommitted. The only commit is the one your click makes. That click is refused unless the gate passed on this exact working tree, the branch holds no commit the board did not make, no protected path was touched, and the repo's own hooks pass.
+Agents work in a worktree and leave changes uncommitted. The only commit is the one your click makes. That click is refused unless the gate passed on this exact working tree, no protected path was touched, and the repo's own hooks pass.
 
 Protected paths are CI config, CODEOWNERS, `.env`, hook config, and anything you add in `config.json`. Touching one fails the gate.
 

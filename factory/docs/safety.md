@@ -32,20 +32,14 @@ The layers differ in strength. Only your remote's rules stop an agent that runs 
 flowchart TD
     A["Agent tries to commit or push"] --> B{"Does a deny rule match?"}
     B -- yes --> X["Blocked by Claude Code"]
-    B -- no --> C{"Do the git hooks allow it?"}
-    C -- no --> Y["Blocked by the pre-commit, pre-push, or reference-transaction hook"]
-    C -- "yes, hooks bypassed" --> D["The commit or push happens"]
-    D --> E["Next advance, gate, queue, or commit sees the change"]
-    E --> F["Job parked in Needs you with the reason"]
-    F --> G["You decide: Unblock to accept, or fix the branch"]
+    B -- no --> D["The commit or push happens, and your project's own hooks run"]
     R["Branch protection on your remote"] -.-> S["The one layer an agent on your machine cannot edit"]
 ```
 
 | Layer | What it does | Strength |
 | --- | --- | --- |
 | Policy from `bin/tick` (`policy.yaml` plus a stricter deny list, and file-write limits) | stop the agent running commit, push, merge, rebase, cherry-pick, revert, am, commit-tree, update-ref, symbolic-ref, config, fast-import, git global options (`-c`, `-C`), `gh`, `glab`, `curl`, `wget`, and `sh -c`. Any command that skips git hooks (`--no-verify`, `commit -n`, `core.hooksPath`, `SKIP=`, `PRE_COMMIT_ALLOW_NO_CONFIG`) is denied, even when the rest is allowed | Measured on Claude Code: 24 of 24 attack spellings blocked, each succeeding in a no-policy control. A script that shells out is not covered |
-| Integrity checks in `bin/job` | detect a moved branch tip, changed hooks, a commit on a remote ref, a detached HEAD, or `job.json` that disagrees with the audit log | Detects, does not prevent. Parks the job on you |
-| Git hooks in each worktree | refuse commits and pushes without the board's key, and chain to the repo's own hooks | A speed bump. `git -c core.hooksPath=/dev/null` and `push --no-verify` get past them, so the policy denies both spellings |
+| Integrity checks in `bin/job` | detect a detached HEAD, a worktree on the wrong branch, a reviewer editing a tracked file, or `job.json` that disagrees with the audit log | Detects, does not prevent. Parks the job on you. Your own commits and pushes never park a job |
 | Board key and session | keep approve, commit, and unblock out of the CLI | Stops an agent using the CLI. A process running as you could open its own terminal |
 | Protected paths | fail the gate when the diff touches CI config, CODEOWNERS, `.env`, hook config, and similar | Hard, for jobs the factory runs |
 | `bin/tick` | refuses a headless pass unless the policy is installed | Hard, for the runs it starts |
