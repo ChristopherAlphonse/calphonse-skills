@@ -18,6 +18,8 @@ Reference for every command, setting, file and environment variable. Run command
 | `bin/job note <id> "<text>"` | record what the agent is doing now. The card shows the latest note |
 | `bin/job skill <id> <name> on\|off` | switch a skill off or on for one job |
 | `bin/job brief <id> <stage> <text>` | set a note the next agent for that stage follows. Empty text clears it |
+| `bin/job close <id>` | finish a job at ship whose work you committed yourself on its branch: moves it to ready, removes its worktree, deletes the branch if merged |
+| `bin/job prune` | remove clean worktrees of finished jobs and delete their branches that git says are merged. Unmerged branches stay |
 | `bin/job wait [seconds]` | block until a job that waited on you is free. Prints `RESUME: <ids>`, or `STILL WAITING` and exits 3 on timeout. Default 90 seconds, maximum 3600 |
 | `bin/job board` | start the board if none runs and print its link |
 | `bin/job serve [port]` / `bin/job watch [port]` | run the board in the foreground (default ports 8765 / 8766) |

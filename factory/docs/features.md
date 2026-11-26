@@ -129,6 +129,10 @@ You read the paperwork and click **Commit locally**. The factory makes the one a
 
 The job is done. A local commit exists and a pull request text is written. No stage pushes. Pushing and opening the pull request is yours, done your own way, or by telling the orchestrator in chat.
 
+A finished job leaves no worktree folder behind. Its branch stays until git says it is merged, then `bin/job prune` (or `bin/job close`) deletes it. A branch that is not merged, or that another live job still uses, is never deleted.
+
+If you committed the work yourself instead of clicking **Commit locally**, run `bin/job close <id>`. It needs the job at ship, a passing gate, a clean worktree and a commit on the job branch. Then it moves the job to ready and removes the worktree.
+
 ### 2.14 Rounds
 
 Each trip back to build is a **round**. A job gets three rounds by default (`max_rounds`). After that it stops looping and asks you for help. This keeps a stuck job from running forever.

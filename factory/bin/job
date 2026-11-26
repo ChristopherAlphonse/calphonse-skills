@@ -1168,6 +1168,57 @@ def cmd_commit(jid):
     print(job["commit"])
 
 
+def drop_merged_branch(job):
+    branch, repo = job.get("branch"), repo_of(job)
+    if not branch:
+        return
+    if any(j["id"] != job["id"] and j["stage"] not in TERMINAL and j.get("branch") == branch and repo_of(j) == repo
+           for j in all_jobs()):
+        print(f"kept branch {branch}: another job still uses it", file=sys.stderr)
+        return
+    r = git(["branch", "-d", branch], repo)
+    if r.returncode != 0:
+        print(f"kept branch {branch}: not merged yet", file=sys.stderr)
+        return
+    audit("release", job["id"], f"deleted merged branch {branch}")
+    print(f"deleted merged branch {branch}")
+
+
+@serialized
+def cmd_close(jid):
+    job = load(jid)
+    need(job["stage"] == "ship", f"{jid} is at {job['stage']}, only a job at ship can be closed")
+    need((jobdir(jid) / "pr-body.md").exists(), "pr-body.md missing")
+    need(kv(jobdir(jid) / f"round-{job['round']}" / CHECKS_FILE).get("GATE") == "PASS", "no passing gate in this round")
+    wt = job["worktree"]
+    need(wt and Path(wt).exists(), "no worktree to close")
+    need(not git(["status", "--porcelain"], wt).stdout.strip(), "uncommitted files in the worktree: commit or discard them first")
+    head = git(["rev-parse", "HEAD"], wt).stdout.strip()
+    need(head != base_of(job), "nothing is committed on the job branch yet")
+    job["commit"] = job["tip"] = job["commit"] or head
+    job["stage"], job["ended"] = "ready", now()
+    save(job)
+    audit("close", jid, f"{job['commit']} committed outside the board")
+    release_worktree(job)
+    save(job)
+    drop_merged_branch(job)
+    print(f"{jid}: ship -> ready")
+
+
+@serialized
+def cmd_prune():
+    for job in all_jobs():
+        if job["stage"] not in TERMINAL:
+            continue
+        if job["worktree"]:
+            release_worktree(job)
+            save(job)
+        if not job["worktree"]:
+            drop_merged_branch(job)
+    for repo in {repo_of(j) for j in all_jobs()}:
+        git(["worktree", "prune"], repo)
+
+
 @serialized
 def cmd_unblock(jid):
     human_only()
@@ -1376,7 +1427,7 @@ HUMAN_ONLY = {"approve", "commit", "unblock"}
 
 COMMANDS = {
     "create": (cmd_create, None), "advance": (cmd_advance, 2), "gate": (cmd_gate, 1), "stack": (cmd_stack, 1), "watch": (cmd_watch, 1), "board": (cmd_board, 0),
-    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_watch, 1), "pipeline": (cmd_pipeline, 0), "skill": (cmd_skill, 3), "brief": (cmd_brief, 3), "edit": (cmd_edit, 4), "wait": (cmd_wait, 1),
+    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_watch, 1), "pipeline": (cmd_pipeline, 0), "skill": (cmd_skill, 3), "brief": (cmd_brief, 3), "edit": (cmd_edit, 4), "wait": (cmd_wait, 1), "close": (cmd_close, 1), "prune": (cmd_prune, 0),
 }
 
 if __name__ == "__main__":

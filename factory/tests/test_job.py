@@ -1004,6 +1004,56 @@ class TestPolicy(Factory):
         self.wf("j", "pr-body.md", "b\n")
         self.adv("j", "ready")
 
+    def user_commits_in_worktree(self, jid):
+        wt = self.wt(jid)
+        self.git("add", "-A", cwd=wt)
+        self.git("commit", "-m", "by hand", cwd=wt)
+
+    def branches(self):
+        return self.git("branch", "--list", "feature/*").stdout
+
+    def test_close_finishes_a_job_the_user_committed_by_hand_and_keeps_an_unmerged_branch(self):
+        self.to_ship("j")
+        self.user_commits_in_worktree("j")
+        self.ok("close", "j")
+        self.assertEqual(self.stage("j"), "ready")
+        self.assertFalse(self.wt("j").exists())
+        self.assertIsNone(self.js("j")["worktree"])
+        self.assertTrue(self.js("j")["commit"])
+        self.assertIn("feature/J", self.branches())
+
+    def test_close_deletes_the_branch_once_it_is_merged(self):
+        self.to_ship("j")
+        self.user_commits_in_worktree("j")
+        self.git("merge", "--no-edit", "feature/J")
+        self.ok("close", "j")
+        self.assertNotIn("feature/J", self.branches())
+
+    def test_close_refuses_without_a_commit_or_with_uncommitted_files(self):
+        self.to_ship("j")
+        self.no("close", "j")
+        (self.wt("j") / "stray.txt").write_text("x\n")
+        self.no("close", "j")
+        self.assertEqual(self.stage("j"), "ship")
+        self.assertTrue(self.wt("j").exists())
+
+    def test_close_only_works_from_ship(self):
+        self.to_gate("j")
+        self.no("close", "j")
+
+    def test_prune_removes_merged_branches_of_finished_jobs_and_keeps_the_rest(self):
+        self.to_ship("j")
+        self.human("commit", "j")
+        self.adv("j", "ready")
+        self.to_ship("k")
+        self.human("commit", "k")
+        self.adv("k", "ready")
+        self.git("merge", "--no-edit", "feature/J")
+        self.ok("prune")
+        out = self.branches()
+        self.assertNotIn("feature/J", out)
+        self.assertIn("feature/K", out)
+
     def test_users_own_push_of_the_board_commit_does_not_park_the_job(self):
         bare = self.base / "remote.git"
         self.git("init", "--bare", "-b", "main", str(bare))
