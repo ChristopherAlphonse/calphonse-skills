@@ -5,6 +5,7 @@
       "spec",
       "build",
       "polish",
+      "commit-and-push",
       "ship"
     ],
     "review": [
@@ -15,5 +16,12 @@
       "report"
     ]
   },
-  "stages": []
+  "stages": [
+    {
+      "brief": "Commit the job's changes and push the branch to the remote as feature/ARCH-LONG-SESSIONS.",
+      "id": "commit-and-push",
+      "label": "Commit and push",
+      "workflow": "build"
+    }
+  ]
 }

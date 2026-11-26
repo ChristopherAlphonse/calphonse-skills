@@ -97,7 +97,7 @@ class TestWatch(Watch):
         self.assertEqual(self.http_full("GET", "/", cookie=cookie, xfactory=False)[0], 200)
         app = (Path(JOB).resolve().parents[1] / "dashboard" / "dist" / "app.js").read_text()
         imported = set(re.findall(r'from "/static/([\w-]+\.js)"', app))
-        self.assertIn("markdown.js", imported)
+        self.assertIn("ask.js", imported)
         for name in sorted(imported | {"app.js"}):
             self.assertEqual(self.http_full("GET", f"/static/{name}", cookie=cookie, xfactory=False)[0], 200, name)
 
