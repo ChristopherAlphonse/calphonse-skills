@@ -38,10 +38,10 @@ stateDiagram-v2
 ## Quick start
 
 1. Link the factory and the skills it calls into `~/.claude/skills`: `factory`, `lets-talk-about-it`, `prd-mode`, `swe`, `code-review-frontend`, `qa-review`, `test-review`, `comment-sicko`, `prove-it-works`, `pr-body-style`, plus the stack skills you use.
-2. In the project, create `.planning/factory/config.json` and set the command that must pass before review:
+2. In the project, create `.planning/factory/config.json` and set your harness and the command that must pass before review:
 
    ```json
-   { "checks": "npm test" }
+   { "harness": "claude", "checks": "npm test" }
    ```
 
 3. Install the policy for your harness: `bin/tick install claude`.

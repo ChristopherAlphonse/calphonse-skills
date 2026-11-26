@@ -14,8 +14,25 @@ BLOCKED = prefixes()
 CORE = ["git commit", "git push", "gh", "glab"]
 
 
-def run(root, *args, extra_env=None):
-    env = {**os.environ, "FACTORY_ROOT": str(root), **(extra_env or {})}
+def set_harness(root, harness):
+    """Write `harness` into the project's config.json, keeping any other keys."""
+    path = Path(root) / ".planning" / SKILL / "config.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cfg = json.loads(path.read_text()) if path.exists() else {}
+    path.write_text(json.dumps({**cfg, "harness": harness}))
+
+
+def run(root, *args, extra_env=None, config=True):
+    """Run tick. A harness named in args is written to config.json first unless one is set, or config=False.
+
+    FACTORY_PIPELINE points into the scratch folder, so the skill's own pipeline.json never leaks in.
+    """
+    named = [a for a in args if a in HARNESSES]
+    cfg = Path(root) / ".planning" / SKILL / "config.json"
+    if config and named and not (cfg.exists() and "harness" in json.loads(cfg.read_text())):
+        set_harness(root, named[0])
+    env = {**os.environ, "FACTORY_ROOT": str(root), "FACTORY_PIPELINE": str(Path(root) / "pipeline.json"),
+           **(extra_env or {})}
     return subprocess.run([sys.executable, "-I", str(TICK), *args], capture_output=True, text=True, env=env)
 
 
@@ -341,18 +358,6 @@ class BaselinePolicyTests(unittest.TestCase):
                 self.assertEqual(r.returncode, 2)
                 self.assertIn("aws s3 rm*", r.stderr)
 
-    def test_each_kiro_stage_agent_starts_with_only_its_own_skill(self):
-        run(self.root, "install", "kiro")
-        agents = self.root / ".kiro" / "agents"
-        load = lambda name: json.loads((agents / f"{name}.json").read_text())["resources"]
-        self.assertEqual(load(SKILL), [f"skill://.kiro/skills/{SKILL}/SKILL.md"])
-        self.assertEqual(load(f"{SKILL}-build"), ["skill://.kiro/skills/swe/SKILL.md"])
-        self.assertEqual(load(f"{SKILL}-shape"), ["skill://.kiro/skills/lets-talk-about-it/SKILL.md"])
-        self.assertEqual(load(f"{SKILL}-spec"), ["skill://.kiro/skills/prd-mode/SKILL.md"])
-        self.assertEqual(load(f"{SKILL}-scope"), [])
-        for f in agents.glob("*.json"):
-            self.assertFalse(any("*" in r for r in json.loads(f.read_text())["resources"]), f.name)
-
     def test_an_allow_rule_does_not_stand_in_for_an_ask_rule(self):
         run(self.root, "install", "kiro")
         path = self.root / ".kiro" / "agents" / f"{SKILL}.json"
@@ -400,6 +405,273 @@ class BaselinePolicyTests(unittest.TestCase):
                                 "dotnet format*", "terraform fmt*", "npm run format*"):
                     self.assertIn(pattern, allow)
                 self.assertFalse(any(p.startswith("*--fix") for p in enforced(root, h)["ask"]))
+
+
+STACK_SKILLS = {"typescript-strict-style", "vercel-react-best-practices", "nextjs-proxy-csp-hardening", "dotnet", "python", "aws"}
+REVIEW_ORDER = ["scope", "review", "reconcile", "verify", "report"]
+NO_POLISH = {"order": {"build": ["shape", "spec", "build", "review", "prove", "ship"], "review": REVIEW_ORDER}, "stages": []}
+CUSTOM = {"order": {"build": ["shape", "spec", "build", "review", "polish", "tidy", "prove", "ship"], "review": REVIEW_ORDER},
+          "stages": [{"id": "tidy", "workflow": "build", "label": "Tidy", "brief": "Tidy the docs.", "skill": "documentation-writer"}]}
+
+
+class HarnessFromConfigTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(dir=SCRATCH)
+        self.root = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_harness_is_taken_from_config_not_path(self):
+        stub = self.root / "stubbin"
+        stub.mkdir()
+        for tool in ("claude", "kiro-cli"):
+            (stub / tool).write_text("#!/bin/sh\nexit 0\n")
+            (stub / tool).chmod(0o755)
+        set_harness(self.root, "opencode")
+        r = run(self.root, "install", extra_env={"PATH": f"{stub}:{os.environ['PATH']}"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue((self.root / "opencode.jsonc").exists())
+        self.assertFalse((self.root / ".claude").exists())
+        self.assertFalse((self.root / ".kiro").exists())
+        self.assertEqual(run(self.root, "check").returncode, 0)
+
+    def test_missing_or_mismatched_harness_is_refused(self):
+        for args in (["install"], ["check"], ["print"], ["install", "kiro"], ["claude", "--dry-run"], ["loop", "--once"]):
+            with self.subTest(args=args):
+                r = run(self.root, *args, config=False)
+                self.assertEqual(r.returncode, 2)
+                self.assertIn("set harness in config.json", r.stderr)
+        set_harness(self.root, "kiro")
+        for args in (["install", "claude"], ["check", "opencode"], ["print", "claude"], ["claude", "--dry-run"],
+                     ["loop", "claude", "--once"]):
+            with self.subTest(args=args):
+                r = run(self.root, *args)
+                self.assertEqual(r.returncode, 2)
+                self.assertIn("config.json says harness 'kiro'", r.stderr)
+        self.assertFalse((self.root / ".claude").exists())
+        set_harness(self.root, "bash")
+        self.assertEqual(run(self.root, "install").returncode, 2)
+
+
+class StageAgentTests(unittest.TestCase):
+    """Kiro gets one narrowed agent per stage, generated from the pipeline and stamped so install can refresh it."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(dir=SCRATCH)
+        self.root = Path(self.tmp.name)
+        self.agents = self.root / ".kiro" / "agents"
+        self.tick = tick_module()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def install(self):
+        r = run(self.root, "install", "kiro")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r
+
+    def agent(self, name):
+        return json.loads((self.agents / f"{name}.json").read_text())
+
+    def stage_files(self):
+        return sorted(f.name for f in self.agents.glob(f"{SKILL}-*.json"))
+
+    def pipeline(self, state):
+        (self.root / "pipeline.json").write_text(json.dumps(state))
+
+    def test_adding_a_stage_adds_exactly_one_file(self):
+        self.install()
+        before = set(self.stage_files())
+        self.pipeline(CUSTOM)
+        self.install()
+        self.assertEqual(set(self.stage_files()) - before, {f"{SKILL}-tidy.json"})
+        self.assertEqual(before - set(self.stage_files()), set())
+
+    def test_removing_a_stage_from_the_order_removes_its_file(self):
+        self.install()
+        self.assertIn(f"{SKILL}-polish.json", self.stage_files())
+        self.pipeline(NO_POLISH)
+        self.install()
+        self.assertNotIn(f"{SKILL}-polish.json", self.stage_files())
+        self.assertIn(f"{SKILL}-prove.json", self.stage_files())
+        self.assertEqual(run(self.root, "check", "kiro").returncode, 0)
+
+    def test_each_stage_agent_preloads_only_its_own_skill(self):
+        self.pipeline(CUSTOM)
+        self.install()
+        res = lambda name: self.agent(name)["resources"]
+        skill = lambda n: [f"skill://.kiro/skills/{n}/SKILL.md"]
+        self.assertEqual(res(SKILL), skill(SKILL))
+        want = {"shape": "lets-talk-about-it", "spec": "prd-mode", "build": "swe", "review": "review-blind-spots",
+                "polish": "comment-sicko", "prove": "prove-it-works", "ship": "pr-body-style", "reconcile": "reconcile-reviews",
+                "verify": "prove-it-works", "report": "simplify", "tidy": "documentation-writer"}
+        for stage, name in want.items():
+            with self.subTest(stage):
+                self.assertEqual(res(f"{SKILL}-{stage}"), skill(name))
+        self.assertEqual(res(f"{SKILL}-scope"), [])
+        self.assertNotIn(f"{SKILL}-gate.json", self.stage_files())
+        for f in self.agents.glob(f"{SKILL}-*.json"):
+            with self.subTest(f.name):
+                got = {r.split("/")[-2] for r in json.loads(f.read_text())["resources"]}
+                self.assertFalse(got & STACK_SKILLS)
+                self.assertIn("USER TURNED OFF", json.loads(f.read_text())["prompt"])
+
+    def test_every_stage_agent_has_the_same_shell_policy(self):
+        self.pipeline(CUSTOM)
+        self.install()
+        shell = lambda a: [r for r in a["permissions"]["rules"] if r["capability"] == "shell"]
+        no_write = lambda a: [r for r in a["permissions"]["rules"] if r["capability"] == "fs_write" and r["effect"] == "deny"]
+        main = self.agent(SKILL)
+        deny = {m for r in shell(main) if r["effect"] == "deny" for m in r["match"]}
+        for g in self.tick.GIT_WRITES:
+            self.assertIn(f"git * {g}", deny)
+            self.assertIn(f"git {g} *", deny)
+        hooks = self.root / ".kiro" / "hooks"
+        guard = json.loads((hooks / f"{SKILL}-guard.json").read_text())
+        for f in self.agents.glob(f"{SKILL}-*.json"):
+            with self.subTest(f.name):
+                a = json.loads(f.read_text())
+                self.assertEqual(json.dumps(shell(a)), json.dumps(shell(main)))
+                self.assertEqual(no_write(a), no_write(main))
+        for area in ("planning", "code", "notes"):
+            with self.subTest(area):
+                rules = json.loads((hooks / f"{SKILL}-guard-{area}.json").read_text())
+                for kind in ("deny", "ask", "allow", "no_write"):
+                    self.assertEqual(rules[kind], guard[kind])
+
+    def test_no_stage_agent_has_the_subagent_tool(self):
+        self.pipeline(CUSTOM)
+        self.install()
+        self.assertIn("subagent", self.agent(SKILL)["tools"])
+        for f in self.agents.glob(f"{SKILL}-*.json"):
+            with self.subTest(f.name):
+                self.assertNotIn("subagent", json.loads(f.read_text())["tools"])
+
+    def guard(self, area, path):
+        rules = self.root / ".kiro" / "hooks" / f"{SKILL}-guard-{area}.json"
+        event = {"tool_name": "fs_write", "tool_input": {"path": str(path), "content": "x"}, "cwd": str(self.root)}
+        return subprocess.run([sys.executable, str(TICK.parent / "guard"), str(rules)], input=json.dumps(event),
+                              capture_output=True, text=True).returncode
+
+    def test_reviewer_guard_blocks_a_write_in_the_worktree(self):
+        self.install()
+        review = self.agent(f"{SKILL}-review")
+        self.assertIn(f"{SKILL}-guard-notes.json", review["hooks"]["preToolUse"][0]["command"])
+        self.assertEqual(self.guard("notes", self.root / ".worktrees" / "j" / "app.py"), 2)
+        self.assertEqual(self.guard("notes", self.root / "app.py"), 2)
+        self.assertEqual(self.guard("notes", self.root / ".planning" / SKILL / "jobs" / "j" / "round-1" / "review-qa.md"), 0)
+        self.assertEqual(self.guard("notes", self.root / ".planning" / SKILL / "jobs" / "j" / "job.json"), 2)
+
+    def test_builder_guard_allows_the_worktree_and_blocks_the_main_checkout(self):
+        self.install()
+        self.assertIn(f"{SKILL}-guard-code.json", self.agent(f"{SKILL}-build")["hooks"]["preToolUse"][0]["command"])
+        self.assertEqual(self.guard("code", self.root / ".worktrees" / "j" / "src" / "app.py"), 0)
+        self.assertEqual(self.guard("code", self.root / ".planning" / SKILL / "jobs" / "j" / "build.md"), 0)
+        self.assertEqual(self.guard("code", self.root / "src" / "app.py"), 2)
+        self.assertEqual(self.guard("code", self.root / ".planning" / SKILL / "config.json"), 2)
+        self.assertEqual(self.guard("planning", self.root / ".planning" / "tasks" / "j.md"), 0)
+        self.assertEqual(self.guard("planning", self.root / ".worktrees" / "j" / "app.py"), 2)
+
+    def test_generation_is_byte_identical(self):
+        self.pipeline(CUSTOM)
+        first, second = run(self.root, "print", "kiro"), run(self.root, "print", "kiro")
+        self.assertEqual(first.returncode, 0, first.stderr)
+        self.assertEqual(first.stdout, second.stdout)
+        self.install()
+        snap = {f: f.read_bytes() for f in (self.root / ".kiro").rglob("*") if f.is_file()}
+        for f in snap:
+            f.unlink()
+        self.install()
+        self.assertEqual({f: f.read_bytes() for f in (self.root / ".kiro").rglob("*") if f.is_file()}, snap)
+
+    def test_the_stamp_leaves_the_project_folder_out(self):
+        other = self.root / "other"
+        other.mkdir()
+        self.pipeline(CUSTOM)
+        (other / "pipeline.json").write_text((self.root / "pipeline.json").read_text())
+        run(self.root, "install", "kiro")
+        run(other, "install", "kiro")
+        desc = lambda root: json.loads((root / ".kiro" / "agents" / f"{SKILL}-build.json").read_text())["description"]
+        self.assertRegex(desc(self.root), r"factory-gen v1 sha256:[0-9a-f]{64}$")
+        self.assertEqual(desc(self.root), desc(other))
+
+    def test_a_stale_stage_file_fails_check(self):
+        self.install()
+        self.assertEqual(run(self.root, "check", "kiro").returncode, 0)
+        self.pipeline(NO_POLISH)
+        r = run(self.root, "check", "kiro")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn(f".kiro/agents/{SKILL}-build.json", r.stderr)
+
+    def test_an_orphan_stage_file_fails_check(self):
+        self.install()
+        orphan = self.agents / f"{SKILL}-old.json"
+        orphan.write_text((self.agents / f"{SKILL}-build.json").read_text())
+        r = run(self.root, "check", "kiro")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn(f"{SKILL}-old.json is a generated stage agent that no stage uses", r.stderr)
+        mine = self.agents / f"{SKILL}-mine.json"
+        mine.write_text(json.dumps({"name": "mine", "description": "made by hand"}))
+        orphan.unlink()
+        self.assertEqual(run(self.root, "check", "kiro").returncode, 0)
+
+    def test_reinstall_after_a_pipeline_change_touches_only_stamped_files(self):
+        self.install()
+        mine = self.agents / f"{SKILL}-mine.json"
+        mine.write_text('{"description": "made by hand"}')
+        keep = {f: f.read_bytes() for f in (self.root / ".kiro").rglob("*")
+                if f.is_file() and not self.tick.STAMP.search(f.read_text())}
+        self.pipeline(CUSTOM)
+        r = self.install()
+        self.assertIn(f"installed .kiro/agents/{SKILL}-tidy.json", r.stdout)
+        for f, data in keep.items():
+            self.assertEqual(f.read_bytes(), data, f.name)
+        self.pipeline(NO_POLISH)
+        r = self.install()
+        self.assertIn(f"removed .kiro/agents/{SKILL}-tidy.json", r.stdout)
+        self.assertIn(f"removed .kiro/agents/{SKILL}-polish.json", r.stdout)
+        self.assertTrue(mine.exists())
+        self.assertEqual(run(self.root, "check", "kiro").returncode, 0)
+        build = self.agents / f"{SKILL}-build.json"
+        build.write_text('{"description": "mine now"}')
+        r = run(self.root, "install", "kiro")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn(f"{SKILL}-build.json", r.stderr)
+        self.assertEqual(build.read_text(), '{"description": "mine now"}')
+
+    def test_a_custom_stage_named_like_a_generated_file_is_refused(self):
+        self.pipeline({"order": {"build": ["shape", "spec", "build", "guard", "ship"], "review": REVIEW_ORDER},
+                       "stages": [{"id": "guard", "workflow": "build", "label": "G", "brief": ""}]})
+        r = run(self.root, "install", "kiro")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("clash", r.stderr)
+
+    def test_claude_and_opencode_keep_project_wide_settings(self):
+        for h in ("claude", "opencode"):
+            with self.subTest(h):
+                root = self.root / h
+                root.mkdir()
+                (root / "pipeline.json").write_text(json.dumps(CUSTOM))
+                self.assertEqual(run(root, "install", h).returncode, 0)
+                self.assertFalse((root / ".kiro").exists())
+                self.assertFalse(list(root.rglob(f"{SKILL}-tidy*")))
+
+    def test_agents_cannot_write_config_json(self):
+        glob = "**/.planning/**/config.json"
+        denied = {
+            "claude": lambda root: f"Edit({glob})" in json.loads((root / ".claude" / "settings.json").read_text())["permissions"]["deny"],
+            "opencode": lambda root: {"action": "edit", "resource": glob, "effect": "deny"} in json.loads((root / "opencode.jsonc").read_text())["permissions"],
+            "kiro": lambda root: all(glob in r["match"] for f in (root / ".kiro" / "agents").glob("*.json")
+                                     for r in json.loads(f.read_text())["permissions"]["rules"]
+                                     if r["capability"] == "fs_write" and r["effect"] == "deny"),
+        }
+        for h, check in denied.items():
+            with self.subTest(h):
+                root = self.root / h
+                root.mkdir()
+                self.assertEqual(run(root, "install", h).returncode, 0)
+                self.assertTrue(check(root))
 
 
 if __name__ == "__main__":

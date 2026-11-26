@@ -97,6 +97,9 @@ def make_scratch(base, policy, harness):
     for tool in ("gh", "glab", "curl", "wget"):
         (stubs / tool).write_text(f"#!/bin/sh\ntouch '{root}/marker-{tool}'\n")
         (stubs / tool).chmod(0o755)
+    cfg = repo / ".planning" / "factory" / "config.json"
+    cfg.parent.mkdir(parents=True)
+    cfg.write_text(json.dumps({"harness": harness}))
     if harness == "kiro":
         prepare_kiro(repo, policy)
     elif policy:

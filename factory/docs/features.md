@@ -405,7 +405,11 @@ Deny beats ask, and ask beats allow. A command no rule names counts as blocked.
 
 ### 7.6 Installing the rules
 
-`bin/tick install claude` turns the policy into the format your tool understands and writes it. `bin/tick check claude` says whether it is installed and up to date. `bin/tick print claude` shows what would be written. `bin/tick list` lists the policies. A scheduled pass **refuses to run** until the policy is installed.
+Set `harness` in `config.json` first (`claude`, `opencode` or `kiro`). `bin/tick` takes the tool from there and never guesses from what is installed. `bin/tick install` turns the policy into the format your tool understands and writes it. It replaces only files it stamped itself and refuses to touch anything else in the way. `bin/tick check` says whether it is installed and up to date. `bin/tick print` shows what would be written. `bin/tick list` lists the policies. A scheduled pass **refuses to run** until the policy is installed.
+
+### 7.6.1 One narrowed agent per stage (Kiro)
+
+In Kiro every stage gets its own agent, custom stages too. Each one starts with only its stage's skill, cannot start other agents, and may write only where its stage works: shape and spec in `.planning/`, build and polish in the worktrees and job folders, everything else only its notes in the job folder. Its shell rules are exactly the orchestrator's. Each file is stamped, so `bin/tick check` notices when a pipeline change left it stale, and `bin/tick install` refreshes it. Claude Code and OpenCode keep one set of rules for the whole project for now.
 
 ### 7.7 The guard hook
 
@@ -449,6 +453,7 @@ Everything lives in `.planning/factory/config.json`. Agents cannot change it.
 
 | Setting | Plain meaning |
 | --- | --- |
+| `harness` | which tool runs the factory: `claude`, `opencode` or `kiro`. `bin/tick` refuses without it |
 | `checks` | the command that must pass before review. The most important one |
 | `concurrency` | how many jobs run at once |
 | `max_rounds` | how many build tries before the job asks you for help |

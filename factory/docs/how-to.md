@@ -111,6 +111,7 @@ Edit `.planning/factory/config.json`. Agents cannot edit this file.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
+| `harness` | none | `claude`, `opencode` or `kiro`. `bin/tick` refuses without it. |
 | `checks` | none | The command that must pass before review. Required. |
 | `concurrency` | 1 | How many jobs run at once. |
 | `max_rounds` | 3 | Build rounds before a job moves to Needs you. |

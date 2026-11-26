@@ -45,13 +45,13 @@ Reference for every command, setting, file and environment variable. Run command
 | Command | Does |
 | --- | --- |
 | `bin/tick <harness> [--dry-run]` | run one headless pass if the policy is installed |
-| `bin/tick loop <harness> [seconds] [--once]` | run a pass whenever a job can run. Default 15 seconds. `--once` checks a single time |
-| `bin/tick install <harness>` | write the policy for the harness, without overwriting |
-| `bin/tick check <harness>` | exit non-zero if the policy is missing or stale |
-| `bin/tick print <harness>` | show what `install` would write |
+| `bin/tick loop [harness] [seconds] [--once]` | run a pass whenever a job can run. Default 15 seconds. `--once` checks a single time |
+| `bin/tick install [harness]` | write the policy for the harness. Replaces only files it stamped, deletes stamped stage agents no stage needs, refuses any other file in the way |
+| `bin/tick check [harness]` | exit non-zero if the policy is missing or stale, including a stale or orphaned Kiro stage agent |
+| `bin/tick print [harness]` | show what `install` would write |
 | `bin/tick list` | list the policies |
 
-`<harness>` is `claude`, `opencode` or `kiro`. The loop never approves anything, runs one loop per project, and stops retrying a state that changed no job file in two passes. The board shows that as `stalled`.
+The harness is `harness` in `config.json`: `claude`, `opencode` or `kiro`. Without it `bin/tick` refuses with "set harness in config.json". A harness argument must match it. The loop never approves anything, runs one loop per project, and stops retrying a state that changed no job file in two passes. The board shows that as `stalled`.
 
 ## Settings: .planning/factory/config.json
 
@@ -59,6 +59,7 @@ Agents cannot edit this file.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
+| `harness` | none | `claude`, `opencode` or `kiro`: the tool `bin/tick` installs the policy for and runs. Required by `bin/tick` |
 | `checks` | none | The command that must pass before review. Required |
 | `concurrency` | 1 | How many jobs run at once |
 | `max_rounds` | 3 | Build rounds before a job moves to Needs you |

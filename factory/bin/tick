@@ -2,14 +2,16 @@
 """Run one factory pass headlessly in any supported harness, only if its deny policy is installed.
 
   tick <harness> [--dry-run]   check policy, then run one pass
-  tick loop <harness> [seconds] [--once]
+  tick loop [harness] [seconds] [--once]
                                every few seconds, run a pass whenever `job queue` has a `run` row. Your board click
                                turns a `hold` into a `run`, so the next pass starts by itself. Stops retrying a
                                job that makes no progress (see STALL_LIMIT)
-  tick check <harness>         exit 0 when the project's policy covers policy.yaml and every blocked command
-  tick install <harness>       write the harness's policy into the project, never overwriting
-  tick print <harness>         print the policy to merge by hand
+  tick check [harness]         exit 0 when the project's policy covers policy.yaml and every blocked command
+  tick install [harness]       write the harness's policy into the project, replacing only files it stamped
+  tick print [harness]         print the policy to merge by hand
   tick list                    print the blocked command prefixes, one per line
+
+The harness is `harness` in .planning/factory/config.json. A harness argument that differs from it is refused.
 
 The baseline rules (deny, ask, allow) live in ../policy.yaml. Every harness gets them, plus the stricter
 denies below. Deny beats ask, and ask beats allow. An unattended pass cannot answer an ask, so an ask
@@ -38,15 +40,38 @@ KIRO_WRAPPERS = ["env", "xargs", "eval", "exec", "nohup", "sudo", "command", "bu
 # `git --no-pager commit` and every other global option hide the verb, so match the verb anywhere after `git`.
 KIRO_GIT_ANYWHERE = [m for g in GIT_WRITES for m in (f"git * {g}", f"git * {g} *")]
 KIRO_TOOLS = ["read", "write", "shell", "grep", "glob", "subagent"]
-# **/.planning/**/config.json is deliberately absent: agents may edit it.
-NO_WRITE = ["**/.kiro/**", "**/.claude/**", "**/.opencode/**", "**/opencode.json", "**/opencode.jsonc", "**/.git/**", "**/.planning/**/job.json", "**/.planning/**/audit.log"]
+STAGE_TOOLS = [t for t in KIRO_TOOLS if t != "subagent"]  # only the orchestrator spawns agents
+# config.json sets the harness, the allow list and the checks, so no agent may write it.
+NO_WRITE = ["**/.kiro/**", "**/.claude/**", "**/.opencode/**", "**/opencode.json", "**/opencode.jsonc", "**/.git/**",
+            "**/.planning/**/job.json", "**/.planning/**/audit.log", "**/.planning/**/config.json"]
 WRITE_ONLY = None
-STAGE_SKILLS = {
-    "shape": ["lets-talk-about-it"], "spec": ["prd-mode"], "build": ["swe"],
-    "review": ["qa-review", "test-review", "review-blind-spots"], "polish": ["comment-sicko", "simplify"],
-    "prove": ["prove-it-works"], "ship": ["pr-body-style", "demo-script"],
-    "scope": [], "reconcile": ["reconcile-reviews"], "verify": ["prove-it-works"], "report": ["simplify"],
+WRITE_AREAS = {
+    "planning": ["**/.planning/**"],
+    "code": ["**/.worktrees/**", "**/.planning/factory/jobs/**"],
+    "notes": ["**/.planning/factory/jobs/**"],
 }
+AREA_TEXT = {
+    "planning": "files under .planning/",
+    "code": "the job's worktree under .worktrees/ and the job folder under .planning/factory/jobs/",
+    "notes": "your own notes in the job folder under .planning/factory/jobs/",
+}
+STAGE_AREA = {"shape": "planning", "spec": "planning", "build": "code", "polish": "code"}  # every other stage: notes
+STAGE_SKILL = {
+    "shape": "lets-talk-about-it", "spec": "prd-mode", "build": "swe", "review": "review-blind-spots",
+    "polish": "comment-sicko", "prove": "prove-it-works", "ship": "pr-body-style",
+    "scope": "", "reconcile": "reconcile-reviews", "verify": "prove-it-works", "report": "simplify",
+}
+ON_DEMAND = {
+    "shape": "Load spike only if the shape rests on an unknown, and simplify for the decisions at the top of shape.md.",
+    "spec": "Load simplify for spec.md and the tasks file.",
+    "review": "The brief names your reviewer skill (qa-review by its absolute path, test-review, the code lens, or "
+              "architecture-review): read it before you start.",
+    "polish": "Load simplify for prose you touched.",
+    "ship": "Load demo-script only if the brief asks for a demo.",
+}
+GEN_VERSION = "factory-gen v1"
+STAMP = re.compile(r"factory-gen v\d+ sha256:[0-9a-f]{64}")
+HARNESS_SOURCE = "set harness in config.json"
 KIRO_DESCRIPTION = "Software factory orchestrator. Runs one pass of the factory skill and never commits, pushes, or opens a PR or MR."
 KIRO_PROMPT = "Use the factory skill. Run one pass and stop. Never commit, push, merge, or create a PR or MR."
 COMMANDS = {
@@ -54,6 +79,7 @@ COMMANDS = {
     "opencode": lambda p: ["opencode", "run", p],
     "kiro": lambda p: ["kiro-cli", "chat", "--v3", "--no-interactive", "--agent", "factory", p],
 }
+CONFIG = ROOT / ".planning" / SKILL / "config.json"
 
 
 def die(msg, code=2):
@@ -136,9 +162,9 @@ def shell_policy(harness):
 def project_allow():
     """Commands this project allowed on top of policy.yaml: `allow` patterns and the `checks` command.
 
-    Agents may edit this file, so they can widen their own allow list. A deny or ask still wins.
+    No agent may write this file (NO_WRITE). A deny or ask still wins over anything it allows.
     """
-    path = ROOT / ".planning" / SKILL / "config.json"
+    path = CONFIG
     cfg = read_json(path) if path.exists() else {}
     extra = cfg.get("allow", [])
     if not (isinstance(extra, list) and all(isinstance(x, str) and x.strip() for x in extra)):
@@ -224,6 +250,14 @@ def kiro_gaps(pol):
     gaps += guard_gaps("kiro", cfg.get("hooks"))
     if cfg.get("allowedTools"):
         gaps.append("agent must not carry allowedTools, which widen the rules")
+    for rel, text in kiro_stage_files().items():
+        try:
+            current = (ROOT / rel).read_text()
+        except OSError:
+            current = None
+        if current != text:
+            gaps.append(f"{rel} is missing or differs from `tick print kiro`")
+    gaps += [f"{rel} is a generated stage agent that no stage uses" for rel in stamped_orphans()]
     return gaps
 
 
@@ -252,18 +286,26 @@ export const FactoryGuard = async ({ directory }) => ({
 """
 
 
+def guard_rules(write_only):
+    return json.dumps({**shell_policy("kiro"), "no_write": NO_WRITE, "write_only": write_only or []}, indent=2) + "\n"
+
+
+def guard_command(harness, rules_rel):
+    py = str(ROOT / f"{GUARD_DIR[harness]}/{SKILL}-guard.py")
+    return f"python3 {shlex.quote(py)} {shlex.quote(str(ROOT / rules_rel))}"
+
+
 def guard_files(harness):
     """The tool-call hook that enforces the whole policy even where the harness's own modes skip an ask.
 
     Returns ({relative path: text}, hook config for the harness, or None when the harness loads files itself).
+    The rules use the strictest (Kiro) shell list.
     """
-    pol = shell_policy("kiro")  # the strictest list
-    rules = {**pol, "no_write": NO_WRITE, "write_only": WRITE_ONLY or []}
     base = f"{GUARD_DIR[harness]}/{SKILL}-guard"
     py, js = str(ROOT / f"{base}.py"), str(ROOT / f"{base}.json")
     files = {f"{base}.py": (Path(__file__).resolve().parent / "guard").read_text(),
-             f"{base}.json": json.dumps(rules, indent=2) + "\n"}
-    command = f"python3 {shlex.quote(py)} {shlex.quote(js)}"
+             f"{base}.json": guard_rules(WRITE_ONLY)}
+    command = guard_command(harness, f"{base}.json")
     if harness == "kiro":
         return files, {"preToolUse": [{"matcher": "*", "command": command}]}
     if harness == "claude":
@@ -295,7 +337,6 @@ def policy_files(harness):
     if harness == "opencode":
         return {"opencode.jsonc": json.dumps({"permissions": opencode_rules()}, indent=2) + "\n", **guard_files("opencode")[0]}
     if harness == "kiro":
-        pol = shell_policy("kiro")
         files, hooks = guard_files("kiro")
         agent = {
             "name": SKILL,
@@ -304,22 +345,124 @@ def policy_files(harness):
             "tools": KIRO_TOOLS,
             "resources": [f"skill://.kiro/skills/{SKILL}/SKILL.md"],
             "hooks": hooks,
-            "permissions": {"rules": [
-                {"capability": "fs_read", "effect": "allow"},
-                {"capability": "fs_write", "effect": "allow", **({"match": WRITE_ONLY} if WRITE_ONLY else {})},
-                {"capability": "shell", "effect": "allow", "match": pol["allow"]},
-                {"capability": "shell", "effect": "ask", "match": pol["ask"]},
-                {"capability": "fs_write", "effect": "deny", "match": NO_WRITE},
-                {"capability": "shell", "effect": "deny", "match": pol["deny"]},
-            ]},
+            "permissions": kiro_permissions(WRITE_ONLY),
         }
-        agents = {f".kiro/agents/{SKILL}.json": agent}
-        for stage, skills in STAGE_SKILLS.items():
-            agents[f".kiro/agents/{SKILL}-{stage}.json"] = {
-                **agent, "name": f"{SKILL}-{stage}", "description": f"Factory {stage} stage agent.",
-                "resources": [f"skill://.kiro/skills/{n}/SKILL.md" for n in skills]}
-        return {**{rel: json.dumps(a, indent=2) + "\n" for rel, a in agents.items()}, **files}
+        return {f".kiro/agents/{SKILL}.json": json.dumps(agent, indent=2) + "\n", **files, **kiro_stage_files()}
     die(f"unknown harness {harness!r}, expected one of {', '.join(COMMANDS)}")
+
+
+def kiro_permissions(write_only):
+    pol = shell_policy("kiro")
+    return {"rules": [
+        {"capability": "fs_read", "effect": "allow"},
+        {"capability": "fs_write", "effect": "allow", **({"match": write_only} if write_only else {})},
+        {"capability": "shell", "effect": "allow", "match": pol["allow"]},
+        {"capability": "shell", "effect": "ask", "match": pol["ask"]},
+        {"capability": "fs_write", "effect": "deny", "match": NO_WRITE},
+        {"capability": "shell", "effect": "deny", "match": pol["deny"]},
+    ]}
+
+
+def job_module():
+    """bin/job, loaded once, so the stage list and pipeline.json checks live in one place."""
+    if "job" not in _JOB_MOD:
+        from importlib.machinery import SourceFileLoader
+        from importlib.util import module_from_spec, spec_from_loader
+        loader = SourceFileLoader("factory_job", str(JOB))
+        mod = module_from_spec(spec_from_loader(loader.name, loader))
+        loader.exec_module(mod)
+        _JOB_MOD["job"] = mod
+    return _JOB_MOD["job"]
+
+
+_JOB_MOD = {}
+
+
+def pipeline_stages():
+    """[(stage id, skill, brief)] for every stage either workflow runs, in order, without the gate."""
+    job = job_module()
+    try:
+        state = job.read_state()
+    except SystemExit:
+        sys.exit(2)
+    custom = {c["id"]: c for c in state["stages"]}
+    out = {}
+    for wf in job.BASE_ORDER:
+        for sid in state["order"][wf]:
+            if sid == "gate" or sid in out:
+                continue
+            c = custom.get(sid)
+            out[sid] = (c.get("skill", ""), c["brief"]) if c else (STAGE_SKILL[sid], "")
+    names = [f"{SKILL}-{sid}" for sid in out]
+    clash = [n for n in names if n == f"{SKILL}-guard" or names.count(n) > 1]
+    if clash:
+        die(f"stage id would clash with a generated file: {', '.join(sorted(set(clash)))}")
+    return [(sid, skill, brief) for sid, (skill, brief) in out.items()]
+
+
+def stamp():
+    """Hash of pipeline.json and the generator version. The project folder is left out on purpose."""
+    try:
+        data = job_module().PIPELINE_FILE.read_bytes()
+    except OSError:
+        data = b""
+    digest = hashlib.sha256(GEN_VERSION.encode() + b"\0" + data).hexdigest()
+    return f"{GEN_VERSION} sha256:{digest}"
+
+
+def stage_prompt(sid, skill, brief, area):
+    parts = [f"You are the factory {sid} stage agent. The orchestrator's message gives the job id, the job folder, "
+             "the worktree and branch, and this stage's brief. Do this stage only."]
+    if brief:
+        parts.append(f"Stage brief: {brief}")
+    parts.append(f"Your preloaded skill is {skill}." if skill else "No skill is preloaded for this stage.")
+    if sid in ON_DEMAND:
+        parts.append(ON_DEMAND[sid])
+    parts += [
+        "Before you edit a file, load the stack skill for that kind of file (.ts -> typescript-strict-style, "
+        ".py -> python, and so on).",
+        f"You may write only {AREA_TEXT[area]}. Everything else is read-only.",
+        "A `USER TURNED OFF, do not use: ...` line in the brief wins over anything preloaded here: never use a skill it names.",
+        "Never commit, push, merge, rebase, or open a PR or MR, and never use the network.",
+        "Write the stage's file with its status line first, then reply with one line.",
+    ]
+    return " ".join(parts)
+
+
+def kiro_stage_files():
+    """One narrowed agent per stage, plus one guard rules file per write area."""
+    files = {f"{GUARD_DIR['kiro']}/{SKILL}-guard-{a}.json": guard_rules(g) for a, g in WRITE_AREAS.items()}
+    mark = stamp()
+    for sid, skill, brief in pipeline_stages():
+        area = STAGE_AREA.get(sid, "notes")
+        agent = {
+            "name": f"{SKILL}-{sid}",
+            "description": f"Factory {sid} stage agent. {mark}",
+            "prompt": stage_prompt(sid, skill, brief, area),
+            "tools": STAGE_TOOLS,
+            "resources": [f"skill://.kiro/skills/{skill}/SKILL.md"] if skill else [],
+            "hooks": {"preToolUse": [{"matcher": "*", "command": guard_command(
+                "kiro", f"{GUARD_DIR['kiro']}/{SKILL}-guard-{area}.json")}]},
+            "permissions": kiro_permissions(WRITE_AREAS[area]),
+        }
+        files[f".kiro/agents/{SKILL}-{sid}.json"] = json.dumps(agent, indent=2) + "\n"
+    return files
+
+
+def is_stamped(path):
+    try:
+        desc = json.loads(path.read_text()).get("description", "")
+    except (OSError, ValueError, AttributeError):
+        return False
+    return isinstance(desc, str) and bool(STAMP.search(desc))
+
+
+def stamped_orphans(expected=None):
+    """Stage agent files this tool made that no stage produces any more."""
+    expected = set(kiro_stage_files() if expected is None else expected)
+    folder = ROOT / ".kiro" / "agents"
+    found = sorted(folder.glob(f"{SKILL}-*.json")) if folder.is_dir() else []
+    return [str(p.relative_to(ROOT)) for p in found if str(p.relative_to(ROOT)) not in expected and is_stamped(p)]
 
 
 def log(harness, detail):
@@ -335,11 +478,24 @@ def log(harness, detail):
 
 
 def cmd_install(harness):
+    """Write what is missing, replace only stamped stage files, delete stamped orphans, refuse any other clash."""
     files = policy_files(harness)
-    clashes = [f for f in files if (ROOT / f).exists()]
+
+    def current(rel):
+        try:
+            return (ROOT / rel).read_text()
+        except OSError:
+            return None
+    clashes = [f for f, text in files.items()
+               if (ROOT / f).exists() and current(f) != text and not is_stamped(ROOT / f)]
     if clashes:
         die(f"already exists, merge the output of `tick print {harness}` by hand: " + ", ".join(clashes))
+    for rel in stamped_orphans(files) if harness == "kiro" else []:
+        (ROOT / rel).unlink()
+        print(f"removed {rel}")
     for rel, text in files.items():
+        if current(rel) == text:
+            continue
         dest = ROOT / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(text)
@@ -437,22 +593,38 @@ def cmd_loop(harness, seconds, once):
         pass
 
 
+def harness_for(given=None):
+    """The project's harness, from `harness` in config.json. A different argument is refused. PATH is never read."""
+    if given is not None and given not in COMMANDS:
+        die(f"unknown harness {given!r}, expected one of {', '.join(COMMANDS)}")
+    cfg = read_json(CONFIG) if CONFIG.exists() else {}
+    chosen = cfg.get("harness") if isinstance(cfg, dict) else None
+    if chosen is None:
+        die(f"{HARNESS_SOURCE} ({CONFIG}): one of {', '.join(COMMANDS)}")
+    if chosen not in COMMANDS:
+        die(f"harness in config.json is {chosen!r}, expected one of {', '.join(COMMANDS)}")
+    if given is not None and given != chosen:
+        die(f"config.json says harness {chosen!r}, not {given!r}")
+    return chosen
+
+
+USAGE = "usage: tick <harness> [--dry-run] | check|install|print [harness] | loop [harness] [seconds] [--once] | list"
+
 if __name__ == "__main__":
     a = sys.argv[1:]
-    if len(a) == 2 and a[0] == "install":
-        cmd_install(a[1])
-    elif len(a) == 2 and a[0] == "check":
-        cmd_check(a[1])
-    elif len(a) == 2 and a[0] == "print":
-        cmd_print(a[1])
-    elif len(a) >= 2 and a[0] == "loop" and a[1] in COMMANDS:
-        nums = [x for x in a[2:] if x != "--once"]
-        if len(nums) > 1 or a[2:].count("--once") > 1 or not all(n.isdigit() and int(n) > 0 for n in nums):
-            die("usage: tick loop <claude|opencode|kiro> [seconds] [--once]")
-        cmd_loop(a[1], int(nums[0]) if nums else 15, "--once" in a)
+    if len(a) in (1, 2) and a[0] in ("install", "check", "print"):
+        h = harness_for(a[1] if len(a) == 2 else None)
+        {"install": cmd_install, "check": cmd_check, "print": cmd_print}[a[0]](h)
+    elif a and a[0] == "loop":
+        rest = a[1:]
+        given = rest.pop(0) if rest and not rest[0].isdigit() and rest[0] != "--once" else None
+        nums = [x for x in rest if x != "--once"]
+        if len(nums) > 1 or rest.count("--once") > 1 or not all(n.isdigit() and int(n) > 0 for n in nums):
+            die("usage: tick loop [harness] [seconds] [--once]")
+        cmd_loop(harness_for(given), int(nums[0]) if nums else 15, "--once" in rest)
     elif a == ["list"]:
         print("\n".join(name(b) for b in BLOCKED))
     elif len(a) in (1, 2) and a[0] in COMMANDS and (len(a) == 1 or a[1] == "--dry-run"):
-        cmd_run(a[0], len(a) == 2)
+        cmd_run(harness_for(a[0]), len(a) == 2)
     else:
-        die("usage: tick <claude|opencode|kiro> [--dry-run] | check|install|print <h> | list")
+        die(USAGE)

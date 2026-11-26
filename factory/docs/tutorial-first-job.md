@@ -30,10 +30,10 @@ Open a terminal in your project's root.
 
 Add `.planning/` and `.worktrees/` to `.gitignore`. The factory keeps its state and job checkouts there.
 
-Now create `.planning/factory/config.json`. Set `checks` to the command that must pass before review:
+Now create `.planning/factory/config.json`. Set `harness` to the tool you use (`claude`, `opencode` or `kiro`) and `checks` to the command that must pass before review:
 
 ```json
-{ "checks": "npm test" }
+{ "harness": "claude", "checks": "npm test" }
 ```
 
 Use your own test command. Make sure it fails when no tests run, because the gate trusts it.
