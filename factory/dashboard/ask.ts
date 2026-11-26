@@ -220,7 +220,7 @@ function registerAskEvents(): void {
   };
 
   document.addEventListener("pointerdown", (event) => {
-    if (!(event.target as HTMLElement).closest(".menu")) {
+    if (!(event.target instanceof HTMLElement) || !event.target.closest(".menu")) {
       for (const closeCallback of [...openMenuCloseCallbacks]) closeCallback();
     }
   });

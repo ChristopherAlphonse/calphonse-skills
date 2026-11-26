@@ -1,12 +1,12 @@
-import { el } from "/static/dom.js";
+import { createButton, createElement } from "/static/dom.js";
 import { renderMarkdown } from "/static/markdown.js";
 import { enhanceMermaid } from "/static/mermaid.js";
 
 export type Snapshot = { text: string; base: string };
 export type SaveResult = { ok: true; base: string } | { ok: false; error: string };
-export type EditorDeps = {
-  job: string;
-  name: string;
+export type EditorDependencies = {
+  jobId: string;
+  fileName: string;
   text: string;
   base: string;
   load: () => Promise<Snapshot | null>;
@@ -30,292 +30,359 @@ export type EditorHandle = {
   requestClose: () => void;
 };
 
-const GUARDED = /^[A-Z]{3,}:.*$/gm;
-const POLL_MS = 3000;
-const PREVIEW_MS = 150;
-const MAX_QUOTE = 600;
+type CommentThread = {
+  firstLine: number;
+  lastLine: number;
+  quote: string;
+  note: string;
+  answer: string;
+};
+
+interface EditorElements {
+  root: HTMLDivElement;
+  statusLabel: HTMLSpanElement;
+  banner: HTMLDivElement;
+  lineNumbers: HTMLDivElement;
+  textArea: HTMLTextAreaElement;
+  previewPane: HTMLDivElement;
+  selectedRangeLabel: HTMLDivElement;
+  selectedQuote: HTMLPreElement;
+  commentInput: HTMLTextAreaElement;
+  threadList: HTMLDivElement;
+}
+
+const GUARDED_LINE_PATTERN = /^[A-Z]{3,}:.*$/gm;
+const GUARDED_LINE_START_PATTERN = /^[A-Z]{3,}:/;
+const FILE_POLL_INTERVAL_MS = 3000;
+const PREVIEW_DEBOUNCE_MS = 150;
+const MAX_QUOTE_LENGTH = 600;
 
 /** The text sent to the agent. The quote is the anchor; the line range is a hint that can drift after an edit. */
-function commentText(job: string, file: string, l1: number, l2: number, quote: string, note: string): string {
+function buildCommentText(
+  jobId: string,
+  fileName: string,
+  firstLine: number,
+  lastLine: number,
+  quotedText: string,
+  noteText: string,
+): string {
   return [
-    `Comment on .planning/factory/jobs/${job}/${file}, lines ${label(l1, l2)} (job ${job}):`,
-    `> ${quote}`,
-    note,
+    `Comment on .planning/factory/jobs/${jobId}/${fileName}, lines ${formatLineRange(firstLine, lastLine)} (job ${jobId}):`,
+    `> ${quotedText}`,
+    noteText,
     "Re-find the quoted text in the file before acting, because line numbers may have moved.",
   ].join("\n");
 }
 
-const guarded = (text: string): string[] => text.match(GUARDED) ?? [];
-const lineCount = (text: string): number => text.split("\n").length;
-const label = (a: number, b: number): string => (a === b ? `${a}` : `${a}-${b}`);
+function guardedLines(text: string): string[] {
+  return text.match(GUARDED_LINE_PATTERN) ?? [];
+}
 
-function btn(text: string, cls: string, onclick: () => void): HTMLButtonElement {
-  const b = el("button", cls, text);
-  b.type = "button";
-  b.onclick = onclick;
-  return b;
+function lineCount(text: string): number {
+  return text.split("\n").length;
+}
+
+function formatLineRange(firstLine: number, lastLine: number): string {
+  return firstLine === lastLine ? `${firstLine}` : `${firstLine}-${lastLine}`;
+}
+
+function lineStartOffset(text: string, lineNumber: number): number {
+  let offset = 0;
+  for (let line = 1; line < lineNumber; line++) offset = text.indexOf("\n", offset) + 1;
+  return offset;
+}
+
+function lineAtPosition(text: string, position: number): number {
+  return text.slice(0, position).split("\n").length;
+}
+
+function buildEditorElements(config: EditorDependencies, onSendComment: () => void): EditorElements {
+  const root = createElement("div", "ed");
+  root.hidden = true;
+  const statusLabel = createElement("span", "edstate");
+  const banner = createElement("div", "edbanner");
+  banner.hidden = true;
+  const lineNumbers = createElement("div", "gutter");
+  const textArea = createElement("textarea");
+  textArea.wrap = "off";
+  textArea.spellcheck = false;
+  textArea.value = config.text;
+  const previewPane = createElement("div", "edprev");
+  const wrap = createElement("div", "edwrap");
+  wrap.append(lineNumbers, textArea);
+  const main = createElement("div", "edmain split");
+  main.append(wrap, previewPane);
+
+  const selectedRangeLabel = createElement("div", "edref");
+  const selectedQuote = createElement("pre", "edpick");
+  const commentInput = createElement("textarea");
+  commentInput.placeholder = "Say what should change in these lines";
+  commentInput.rows = 4;
+  commentInput.spellcheck = false;
+  const sendRow = createElement("div", "edsend");
+  sendRow.append(
+    createElement("span", "edhint", "Cmd+Enter sends. Unsaved edits are saved first."),
+    createButton("Send to agent", "go", onSendComment),
+  );
+  const composer = createElement("div", "edcompose");
+  composer.append(createElement("div", "edh", "Comment on lines"), selectedRangeLabel, selectedQuote, commentInput, sendRow);
+  const threadList = createElement("div", "edthreads");
+  const sidebar = createElement("aside", "edside");
+  sidebar.append(composer, threadList);
+  main.append(sidebar);
+  root.append(banner, main);
+  return {
+    root, statusLabel, banner, lineNumbers, textArea, previewPane,
+    selectedRangeLabel, selectedQuote, commentInput, threadList,
+  };
+}
+
+function createThreadCard(
+  thread: CommentThread,
+  fileName: string,
+  onJump: (firstLine: number, lastLine: number) => void,
+): HTMLDivElement {
+  const card = createElement("div", "edthread");
+  const jump = createButton(`${fileName}:${formatLineRange(thread.firstLine, thread.lastLine)}`, "edjump", () => {
+    onJump(thread.firstLine, thread.lastLine);
+  });
+  card.append(
+    jump,
+    createElement("div", "edq", thread.quote),
+    createElement("div", "edn", thread.note),
+    createElement("div", "eda", thread.answer || "Asking the agent..."),
+  );
+  return card;
 }
 
 /** A line-numbered text editor for one job file, with the rendered file beside it and comments tied to line ranges. It lives in a tab. */
-export function openEditor(d: EditorDeps): EditorHandle {
-  let base = d.base;
-  let saved = d.text;
-  let sel: [number, number] = [1, 1];
-  let anchor = sel[0];
-  let shownLines = 0;
+export function openEditor(dependencies: EditorDependencies): EditorHandle {
+  let base = dependencies.base;
+  let savedText = dependencies.text;
+  let selectedLines: [number, number] = [1, 1];
+  let selectionAnchorLine = selectedLines[0];
+  let visibleLineCount = 0;
   let wasDirty = false;
+  let isClosed = false;
 
-  const root = el("div", "ed");
-  root.hidden = true;
-  const state = el("span", "edstate");
-  const banner = el("div", "edbanner");
-  banner.hidden = true;
-  const gutter = el("div", "gutter");
-  const area = el("textarea");
-  area.wrap = "off";
-  area.spellcheck = false;
-  area.value = d.text;
-  const preview = el("div", "edprev");
-  const main = el("div", "edmain");
-  const wrap = el("div", "edwrap");
-  wrap.append(gutter, area);
-  main.append(wrap, preview);
+  const elements = buildEditorElements(dependencies, () => void sendCommentToAgent());
+  const {
+    root, statusLabel, banner, lineNumbers, textArea, previewPane,
+    selectedRangeLabel, selectedQuote, commentInput, threadList,
+  } = elements;
+  const commentThreads: CommentThread[] = [];
+  let previewTimeoutId = 0;
 
-  // Comments sidebar: a composer tied to the selected lines, then the comments sent so far with the agent's answers.
-  type Thread = { l1: number; l2: number; quote: string; note: string; answer: string };
-  const threads: Thread[] = [];
-  const where = el("div", "edref");
-  const picked = el("pre", "edpick");
-  const note = el("textarea");
-  note.placeholder = "Say what should change in these lines";
-  note.rows = 4;
-  note.spellcheck = false;
-  const send = btn("Send to agent", "go", () => void sendComment());
-  const hint = el("span", "edhint", "Cmd+Enter sends. Unsaved edits are saved first.");
-  const composer = el("div", "edcompose");
-  const sendRow = el("div", "edsend");
-  sendRow.append(hint, send);
-  composer.append(el("div", "edh", "Comment on lines"), where, picked, note, sendRow);
-  const list = el("div", "edthreads");
-  const side = el("aside", "edside");
-  side.append(composer, list);
-  main.append(side);
+  const quoteForLines = (firstLine: number, lastLine: number): string =>
+    textArea.value.split("\n").slice(firstLine - 1, lastLine).join("\n");
+  const hasCommentOnLine = (lineNumber: number): boolean =>
+    commentThreads.some((thread) => lineNumber >= thread.firstLine && lineNumber <= thread.lastLine);
+  const isDirty = (): boolean => textArea.value !== savedText;
 
-  const quoteOf = (l1: number, l2: number): string => area.value.split("\n").slice(l1 - 1, l2).join("\n");
-  const commented = (n: number): boolean => threads.some((t) => n >= t.l1 && n <= t.l2);
-
-  const dirty = (): boolean => area.value !== saved;
-
-  const lineStart = (n: number): number => {
-    let at = 0;
-    for (let i = 1; i < n; i++) at = area.value.indexOf("\n", at) + 1;
-    return at;
-  };
-  const lineAt = (pos: number): number => area.value.slice(0, pos).split("\n").length;
-
-  function paintGutter(): void {
-    const n = lineCount(area.value);
+  function renderLineNumbers(): void {
+    const currentLineCount = lineCount(textArea.value);
     const lockedAtOpen = new Set(
-      saved.split("\n").flatMap((l, i) => (/^[A-Z]{3,}:/.test(l) ? [i + 1] : [])),
+      savedText.split("\n").flatMap((line, index) => (GUARDED_LINE_START_PATTERN.test(line) ? [index + 1] : [])),
     );
-    if (n !== shownLines) {
-      shownLines = n;
-      gutter.replaceChildren(
-        ...Array.from({ length: n }, (_, i) => {
-          const b = btn(String(i + 1), "ln", () => {});
-          b.dataset.n = String(i + 1);
-          if (lockedAtOpen.has(i + 1)) {
-            b.classList.add("lock");
-            b.title = "This line steers the board and cannot be changed here";
+    if (currentLineCount !== visibleLineCount) {
+      visibleLineCount = currentLineCount;
+      lineNumbers.replaceChildren(
+        ...Array.from({ length: currentLineCount }, (_, index) => {
+          const lineButton = createButton(String(index + 1), "ln", () => {});
+          lineButton.dataset.n = String(index + 1);
+          if (lockedAtOpen.has(index + 1)) {
+            lineButton.classList.add("lock");
+            lineButton.title = "This line steers the board and cannot be changed here";
           }
-          return b;
+          return lineButton;
         }),
       );
     }
-    for (const b of gutter.children) {
-      const k = Number((b as HTMLElement).dataset.n);
-      b.classList.toggle("on", k >= sel[0] && k <= sel[1]);
-      b.classList.toggle("cmt", commented(k));
+    for (const lineButton of lineNumbers.children) {
+      const lineNumber = Number(lineButton instanceof HTMLElement ? lineButton.dataset.n : undefined);
+      lineButton.classList.toggle("on", lineNumber >= selectedLines[0] && lineNumber <= selectedLines[1]);
+      lineButton.classList.toggle("cmt", hasCommentOnLine(lineNumber));
     }
-    where.textContent = `${d.name}:${label(sel[0], sel[1])}`;
-    picked.textContent = quoteOf(sel[0], sel[1]);
+    selectedRangeLabel.textContent = `${dependencies.fileName}:${formatLineRange(selectedLines[0], selectedLines[1])}`;
+    selectedQuote.textContent = quoteForLines(selectedLines[0], selectedLines[1]);
   }
 
-  function paintThreads(): void {
-    list.replaceChildren(
-      ...threads.map((t) => {
-        const card = el("div", "edthread");
-        const jump = btn(`${d.name}:${label(t.l1, t.l2)}`, "edjump", () => selectLines(t.l1, t.l2, true));
-        card.append(jump, el("div", "edq", t.quote), el("div", "edn", t.note), el("div", "eda", t.answer || "Asking the agent..."));
-        return card;
-      }),
+  function renderThreads(): void {
+    threadList.replaceChildren(
+      ...commentThreads.map((thread) => createThreadCard(thread, dependencies.fileName, (firstLine, lastLine) => {
+        selectLineRange(firstLine, lastLine, true);
+      })),
     );
-    paintGutter();
+    renderLineNumbers();
   }
 
-  function paintState(text = ""): void {
-    state.textContent = text || (dirty() ? "Unsaved changes" : "Saved");
-    state.classList.toggle("dirty", dirty());
-    paintGutter();
-    if (dirty() !== wasDirty) {
-      wasDirty = dirty();
-      d.changed();
+  function renderStatus(text = ""): void {
+    statusLabel.textContent = text || (isDirty() ? "Unsaved changes" : "Saved");
+    statusLabel.classList.toggle("dirty", isDirty());
+    renderLineNumbers();
+    if (isDirty() !== wasDirty) {
+      wasDirty = isDirty();
+      dependencies.changed();
     }
   }
 
-  let previewTimer = 0;
-  function paintPreview(): void {
-    clearTimeout(previewTimer);
-    previewTimer = window.setTimeout(() => {
-      const page = renderMarkdown(area.value);
-      void enhanceMermaid(page);
-      preview.replaceChildren(page);
-    }, PREVIEW_MS);
+  function renderPreview(): void {
+    const page = renderMarkdown(textArea.value);
+    void enhanceMermaid(page);
+    previewPane.replaceChildren(page);
   }
 
-  function selectLines(a: number, b: number, focus: boolean): void {
-    sel = [Math.min(a, b), Math.max(a, b)];
+  function schedulePreview(): void {
+    window.clearTimeout(previewTimeoutId);
+    previewTimeoutId = window.setTimeout(renderPreview, PREVIEW_DEBOUNCE_MS);
+  }
+
+  function selectLineRange(firstLine: number, lastLine: number, focus: boolean): void {
+    selectedLines = [Math.min(firstLine, lastLine), Math.max(firstLine, lastLine)];
     if (focus) {
-      const end = lineStart(sel[1] + 1);
-      area.setSelectionRange(lineStart(sel[0]), end > 0 ? end - 1 : area.value.length);
-      area.focus();
+      const end = lineStartOffset(textArea.value, selectedLines[1] + 1);
+      textArea.setSelectionRange(lineStartOffset(textArea.value, selectedLines[0]), end > 0 ? end - 1 : textArea.value.length);
+      textArea.focus();
     }
-    paintGutter();
+    renderLineNumbers();
   }
 
-  function fromCaret(): void {
-    const start = area.selectionStart;
-    const end = area.selectionEnd;
-    const last = end > start && area.value[end - 1] === "\n" ? end - 1 : end;
-    sel = [lineAt(start), lineAt(last)];
-    anchor = sel[0];
-    paintGutter();
+  function syncSelectionFromCaret(): void {
+    const start = textArea.selectionStart;
+    const end = textArea.selectionEnd;
+    const last = end > start && textArea.value[end - 1] === "\n" ? end - 1 : end;
+    selectedLines = [lineAtPosition(textArea.value, start), lineAtPosition(textArea.value, last)];
+    selectionAnchorLine = selectedLines[0];
+    renderLineNumbers();
   }
 
-  function showBanner(text: string, ...actions: HTMLButtonElement[]): void {
-    banner.replaceChildren(el("span", "", text), ...actions);
+  function showMessageBanner(text: string, ...actions: HTMLButtonElement[]): void {
+    banner.replaceChildren(createElement("span", "", text), ...actions);
     banner.hidden = false;
   }
 
-  function adopt(snap: Snapshot): void {
-    area.value = snap.text;
-    saved = snap.text;
-    base = snap.base;
+  function replaceFileContents(snapshot: Snapshot): void {
+    textArea.value = snapshot.text;
+    savedText = snapshot.text;
+    base = snapshot.base;
     banner.hidden = true;
-    shownLines = 0;
-    paintPreview();
-    paintState();
+    visibleLineCount = 0;
+    schedulePreview();
+    renderStatus();
   }
 
-  async function save(): Promise<void> {
-    const text = area.value;
-    if (!dirty()) return;
-    if (guarded(text).join("\n") !== guarded(saved).join("\n")) {
-      return showBanner("Lines like STATUS: and VERDICT: steer the board. Put them back to save.");
+  async function saveFile(): Promise<void> {
+    const text = textArea.value;
+    if (!isDirty()) return;
+    if (guardedLines(text).join("\n") !== guardedLines(savedText).join("\n")) {
+      return showMessageBanner("Lines like STATUS: and VERDICT: steer the board. Put them back to save.");
     }
-    const r = await d.save(text, base);
-    if (!r.ok) return showBanner(r.error);
-    saved = text;
-    base = r.base;
+    const result = await dependencies.save(text, base);
+    if (!result.ok) return showMessageBanner(result.error);
+    savedText = text;
+    base = result.base;
     banner.hidden = true;
-    shownLines = 0;
-    paintState("Saved");
+    visibleLineCount = 0;
+    renderStatus("Saved");
   }
 
-  async function sendComment(): Promise<void> {
-    const text = note.value.trim();
+  async function sendCommentToAgent(): Promise<void> {
+    const text = commentInput.value.trim();
     if (!text) return;
-    if (dirty()) await save();
-    if (dirty()) return;
-    const [l1, l2] = sel;
-    const quote = quoteOf(l1, l2).trim().replace(/\s+/g, " ").slice(0, MAX_QUOTE);
-    const thread: Thread = { l1, l2, quote, note: text, answer: "" };
-    threads.unshift(thread);
-    note.value = "";
-    paintThreads();
-    thread.answer = await d.comment(commentText(d.job, d.name, l1, l2, quote, text));
-    paintThreads();
+    if (isDirty()) await saveFile();
+    if (isDirty()) return;
+    const [firstLine, lastLine] = selectedLines;
+    const quotedText = quoteForLines(firstLine, lastLine).trim().replace(/\s+/g, " ").slice(0, MAX_QUOTE_LENGTH);
+    const thread: CommentThread = { firstLine, lastLine, quote: quotedText, note: text, answer: "" };
+    commentThreads.unshift(thread);
+    commentInput.value = "";
+    renderThreads();
+    thread.answer = await dependencies.comment(buildCommentText(dependencies.jobId, dependencies.fileName, firstLine, lastLine, quotedText, text));
+    renderThreads();
   }
 
-  const destroy = (): void => {
-    clearInterval(timer);
+  function closeEditor(): void {
+    isClosed = true;
+    window.clearTimeout(previewTimeoutId);
+    window.clearInterval(filePollIntervalId);
     root.remove();
-    d.closed();
-  };
-  const requestClose = (): void => {
-    if (!dirty()) return destroy();
-    showBanner(
+    dependencies.closed();
+  }
+
+  function requestEditorClose(): void {
+    if (!isDirty()) return closeEditor();
+    showMessageBanner(
       "You have unsaved changes.",
-      btn("Discard and close", "", destroy),
-      btn("Keep editing", "", () => (banner.hidden = true)),
+      createButton("Discard and close", "", closeEditor),
+      createButton("Keep editing", "", () => (banner.hidden = true)),
     );
-  };
+  }
 
-  const head = el("div", "edhead");
-  head.append(
-    btn("\u2190 Board", "", d.back),
-    el("b", "edname", d.name),
-    state,
-    el("span", "grow"),
-    btn("Save", "go", () => void save()),
-    btn("Close", "", requestClose),
+  const header = createElement("div", "edhead");
+  header.append(
+    createButton("← Board", "", dependencies.back),
+    createElement("b", "edname", dependencies.fileName),
+    statusLabel,
+    createElement("span", "grow"),
+    createButton("Save", "go", () => void saveFile()),
+    createButton("Close", "", requestEditorClose),
   );
-  main.classList.add("split");
-  root.append(head, banner, main);
+  root.prepend(header);
 
-  area.addEventListener("input", () => {
-    fromCaret();
-    paintState();
-    paintPreview();
+  textArea.addEventListener("input", () => {
+    syncSelectionFromCaret();
+    renderStatus();
+    schedulePreview();
   });
-  for (const ev of ["click", "keyup", "select"]) area.addEventListener(ev, fromCaret);
-  area.addEventListener("scroll", () => {
-    gutter.scrollTop = area.scrollTop;
+  for (const eventName of ["click", "keyup", "select"]) textArea.addEventListener(eventName, syncSelectionFromCaret);
+  textArea.addEventListener("scroll", () => {
+    lineNumbers.scrollTop = textArea.scrollTop;
   });
-  gutter.addEventListener("click", (e) => {
-    const n = Number((e.target as HTMLElement).dataset?.n);
-    if (!n) return;
-    selectLines(e.shiftKey ? anchor : n, n, true);
-    if (!e.shiftKey) anchor = n;
+  lineNumbers.addEventListener("click", (event) => {
+    const lineNumber = Number((event.target instanceof HTMLElement ? event.target.dataset.n : undefined) ?? 0);
+    if (!lineNumber) return;
+    selectLineRange(event.shiftKey ? selectionAnchorLine : lineNumber, lineNumber, true);
+    if (!event.shiftKey) selectionAnchorLine = lineNumber;
   });
-  note.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void sendComment();
+  commentInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void sendCommentToAgent();
   });
-  root.addEventListener("keydown", (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-      e.preventDefault();
-      void save();
+  root.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "s") {
+      event.preventDefault();
+      void saveFile();
     }
   });
 
   // Pick up the agent's changes. Clean text is swapped in; unsaved text is kept and flagged.
-  const timer = window.setInterval(async () => {
-    if (!root.isConnected) return clearInterval(timer);
-    const snap = await d.load();
-    if (!snap || snap.base === base) return;
-    if (!dirty()) {
-      adopt(snap);
-      paintState("Updated by the agent");
+  const filePollIntervalId = window.setInterval(async () => {
+    if (isClosed) return;
+    const snapshot = await dependencies.load();
+    if (isClosed) return;
+    if (!snapshot || snapshot.base === base) return;
+    if (!isDirty()) {
+      replaceFileContents(snapshot);
+      renderStatus("Updated by the agent");
     } else {
-      showBanner("The file changed on disk. Saving will be refused until you reload.", btn("Reload and discard mine", "", () => adopt(snap)));
+      showMessageBanner("The file changed on disk. Saving will be refused until you reload.", createButton("Reload and discard mine", "", () => replaceFileContents(snapshot)));
     }
-  }, POLL_MS);
+  }, FILE_POLL_INTERVAL_MS);
 
   document.body.append(root);
-  paintPreview();
-  paintState();
-  selectLines(sel[0], sel[1], false);
+  schedulePreview();
+  renderStatus();
+  selectLineRange(selectedLines[0], selectedLines[1], false);
 
   return {
     root,
-    dirty,
-    requestClose,
+    dirty: isDirty,
+    requestClose: requestEditorClose,
     hide: () => {
       root.hidden = true;
     },
     show: () => {
       root.hidden = false;
-      area.focus();
+      textArea.focus();
     },
   };
 }
