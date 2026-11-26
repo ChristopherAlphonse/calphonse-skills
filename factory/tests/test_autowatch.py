@@ -1,4 +1,5 @@
-import json, os, signal, socket, stat, subprocess, sys, time, unittest
+from pathlib import Path
+import json, os, shutil, signal, socket, stat, subprocess, sys, time, unittest
 
 from test_job import JOB, Factory
 
@@ -96,6 +97,26 @@ class TestAutoStart(AutoWatch):
         self.assertTrue(job["needs_human"])
         self.assertTrue(job["can_approve"])
         self.assertTrue((self.state / "human.sha256").exists())
+
+
+class TestOutOfDate(AutoWatch):
+    def board_from(self, copy):
+        r = subprocess.run([sys.executable, "-I", str(copy / "bin" / "job"), "board"], cwd=str(self.base), env=self.env,
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r
+
+    def test_board_says_to_restart_when_its_code_changed(self):
+        copy = self.base / "factory-copy"
+        shutil.copytree(Path(JOB).resolve().parents[1], copy, ignore=shutil.ignore_patterns("tests", "__pycache__"))
+        first = self.board_from(copy)
+        again = self.board_from(copy)
+        self.assertEqual(again.stdout, first.stdout)
+        self.assertNotIn("restart the board", again.stderr)
+        os.utime(copy / "bin" / "board", (1, 1))
+        changed = self.board_from(copy)
+        self.assertEqual(changed.stdout, first.stdout)
+        self.assertIn(f"restart the board: its code changed since it started (stop process {self.watch_info()['pid']}", changed.stderr)
 
 
 class TestOptOut(AutoWatch):

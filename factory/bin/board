@@ -31,6 +31,11 @@ def own_fingerprint():
 STARTED_AS = own_fingerprint()
 
 
+def stored_fingerprint():
+    """own_fingerprint() as watch.json holds it: JSON has no tuples."""
+    return [list(f) for f in own_fingerprint()]
+
+
 def board_is_stale():
     try:
         return own_fingerprint() != STARTED_AS
@@ -217,16 +222,18 @@ class Handler(BaseHTTPRequestHandler):
     def get_root(self, q):
         if not self.host_ok():
             return self.send(403, "{}")
-        if self.session_ok():
-            page = (DASH_DIR / "index.html").read_bytes()
-            if board_is_stale():
-                page = page.replace(b'<span id="meta">connecting</span>', STALE_META)
-            return self.send(200, page, "text/html; charset=utf-8")
         supplied = q.get("c", [""])[0]
         if supplied and CODE and hmac.compare_digest(supplied.encode(), CODE.encode()):
             cookie = f"{COOKIE}-{self.server.server_port}={SESSION}; HttpOnly; SameSite=Strict; Path=/"
             return self.send(303, "", extra={"Location": "/", "Set-Cookie": cookie})
-        return self.send(403, "{}")
+        if not self.session_ok():
+            return self.send(403, "{}")
+        if "c" in q:
+            return self.send(303, "", extra={"Location": "/"})
+        page = (DASH_DIR / "index.html").read_bytes()
+        if board_is_stale():
+            page = page.replace(b'<span id="meta">connecting</span>', STALE_META)
+        return self.send(200, page, "text/html; charset=utf-8")
 
     def get_frame(self, name):
         """Files for the sandboxed diagram frame. It has no cookie, so only the Host check guards them; none holds anything private."""
@@ -331,7 +338,8 @@ class Handler(BaseHTTPRequestHandler):
                 "custom": {c["id"]: {"label": c["label"], "blurb": c["brief"] or c["label"]} for c in ENGINE.pipeline_custom() if c["workflow"] == board},
                 "proposal": ENGINE.proposal_state()}))
         if m.group(2) == "jobs":
-            return self.send(200, json.dumps([ENGINE.snapshot(j) for j in ENGINE.all_jobs() if BOARD_SPECS[board][1](j)]))
+            return self.send(200, json.dumps([ENGINE.snapshot(j) for j in ENGINE.all_jobs() if BOARD_SPECS[board][1](j)]),
+                             extra={"X-Board-Stale": "1"} if board_is_stale() else None)
         return self.get_file(board, q.get("job", [""])[0], q.get("name", [""])[0])
 
     def do_POST(self):
@@ -511,6 +519,8 @@ def cmd_ensure():
             info = {}
         if info.get("url") and pid_alive(info.get("pid")) and port_listening(info.get("port", 0)):
             print(info["url"])
+            if info.get("fingerprint", stored_fingerprint()) != stored_fingerprint():
+                print(f"restart the board: its code changed since it started (stop process {info['pid']}, then run JOB board)", file=sys.stderr)
             return
         child = subprocess.Popen(
             [sys.executable, "-I", str(Path(__file__).resolve()), "watch", "auto"], cwd=str(ROOT),
@@ -524,7 +534,8 @@ def cmd_ensure():
             child.kill()
             child.wait()
             sys.exit("refused: the board could not start")
-        write_private(STATE / WATCH_FILE, json.dumps({"pid": child.pid, "port": int(m.group(2)), "url": m.group(1)}))
+        write_private(STATE / WATCH_FILE, json.dumps({"pid": child.pid, "port": int(m.group(2)), "url": m.group(1),
+                                                     "fingerprint": stored_fingerprint()}))
         print(m.group(1))
 
 

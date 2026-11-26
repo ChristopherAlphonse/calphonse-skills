@@ -1351,6 +1351,8 @@ def ensure_watcher():
                            text=True, timeout=20, env={**os.environ, "FACTORY_ROOT": str(ROOT)})
     except (OSError, subprocess.SubprocessError):
         return None
+    if r.stderr:
+        print(r.stderr.rstrip(), file=sys.stderr)
     return r.stdout.strip() or None
 
 

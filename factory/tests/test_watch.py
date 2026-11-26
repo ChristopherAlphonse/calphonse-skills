@@ -60,6 +60,16 @@ class TestWatch(Watch):
         self.assertIn(b"restart the board", page)
         self.assertNotIn(b"connecting", page)
 
+    def test_the_jobs_response_flags_a_board_whose_code_changed(self):
+        copy = self.base / "factory-copy"
+        shutil.copytree(Path(JOB).resolve().parents[1], copy, ignore=shutil.ignore_patterns("tests", "__pycache__"))
+        self.start_watch(job=copy / "bin" / "job")
+        self.assertNotIn("X-Board-Stale", self.http_full("GET", "/api/build/jobs")[2])
+        os.utime(copy / "bin" / "board", (1, 1))
+        status, _, headers = self.http_full("GET", "/api/build/jobs")
+        self.assertEqual(status, 200)
+        self.assertEqual(headers.get("X-Board-Stale"), "1")
+
     def test_login_rules(self):
         self.start_watch()
         self.assertEqual(self.http_full("GET", "/", cookie=False)[0], 403)
@@ -69,6 +79,27 @@ class TestWatch(Watch):
         self.assertEqual(self.http("GET", "/api/build/jobs", cookie=False)[0], 403)
         self.assertEqual(self.http("GET", "/api/build/jobs", xfactory=False)[0], 403)
         self.assertEqual(self.http("GET", "/api/build/jobs")[0], 200)
+
+    def test_a_link_code_always_lands_on_a_clean_root(self):
+        self.start_watch()
+        status, _, headers = self.http_full("GET", f"/?c={self.code}")
+        self.assertEqual((status, headers["Location"]), (303, "/"))
+        self.assertIn("Set-Cookie", headers)
+        status, _, headers = self.http_full("GET", "/?c=wrong")
+        self.assertEqual((status, headers["Location"]), (303, "/"))
+        self.assertNotIn("Set-Cookie", headers)
+
+    def test_a_fresh_redeem_loads_the_page_and_its_scripts(self):
+        self.start_watch()
+        status, _, headers = self.http_full("GET", f"/?c={self.code}", cookie=False)
+        self.assertEqual(status, 303)
+        cookie = headers["Set-Cookie"].split(";")[0].split("=", 1)[1]
+        self.assertEqual(self.http_full("GET", "/", cookie=cookie, xfactory=False)[0], 200)
+        app = (Path(JOB).resolve().parents[1] / "dashboard" / "dist" / "app.js").read_text()
+        imported = set(re.findall(r'from "/static/([\w-]+\.js)"', app))
+        self.assertIn("markdown.js", imported)
+        for name in sorted(imported | {"app.js"}):
+            self.assertEqual(self.http_full("GET", f"/static/{name}", cookie=cookie, xfactory=False)[0], 200, name)
 
     def test_it_serves_the_board(self):
         self.spec_ready_job()

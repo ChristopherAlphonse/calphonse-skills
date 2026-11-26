@@ -33,6 +33,7 @@ const POLL_INTERVAL_MS = 2000;
 const LAYOUT_STORAGE_KEY = "factory.board";
 const CANVAS_HORIZONTAL_PADDING = 56;
 const CANVAS_VERTICAL_PADDING = 200;
+const STALE_BOARD_TEXT = "restart the board: its code changed since it started";
 
 // ---- state: one View per board, plus which boards are open as tabs
 const viewsByBoardId = new Map<string, BoardView>();
@@ -44,6 +45,7 @@ const editorsByKey = new Map<string, TabbedEditor>();
 let activeEditorKey: string | null = null;
 let currentScale = 1;
 let sidebarCollapsed = false;
+let boardIsStale = false;
 
 function currentView(): BoardView {
   if (!activeBoardId) throw new Error("no active board");
@@ -312,7 +314,7 @@ function renderTabs(): void {
       return filterButton;
     }),
   );
-  requireElement("meta").textContent = `updated ${new Date().toLocaleTimeString()}`;
+  requireElement("meta").textContent = boardIsStale ? STALE_BOARD_TEXT : `updated ${new Date().toLocaleTimeString()}`;
   updateFaviconAndTitle();
 }
 
@@ -784,6 +786,7 @@ async function fetchJobs(boardView: BoardView): Promise<void> {
     if (!jobsResponse.ok || !stagesResponse.ok) {
       throw new Error(`status ${jobsResponse.status}/${stagesResponse.status}`);
     }
+    boardIsStale = jobsResponse.headers.get("X-Board-Stale") === "1";
     const [jobsText, stagesText] = await Promise.all([jobsResponse.text(), stagesResponse.text()]);
     const payloadSignature = `${jobsText}\n${stagesText}`;
     if (payloadSignature === boardView.payloadSignature) {
