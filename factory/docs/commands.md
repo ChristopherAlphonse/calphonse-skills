@@ -54,6 +54,13 @@ Reference for every command, setting, file and environment variable. Run command
 
 The harness is `harness` in `config.json`: `claude`, `opencode` or `kiro`. Without it `bin/tick` refuses with "set harness in config.json". A harness argument must match it. The loop never approves anything, runs one loop per project, and stops retrying a state that changed no job file in two passes. The board shows that as `stalled`.
 
+## bin/status
+
+| Command | Does |
+| --- | --- |
+| `bin/status [--root DIR]` | print a one-line summary of the project's jobs, or nothing outside a factory project. Read-only, never fails. See [Harnesses](harnesses.md#status-line) |
+| `bin/status --claude` | the same for Claude Code's `statusLine`, which sends its JSON on stdin. `tick install claude` wires this up |
+
 ## Settings: .planning/factory/config.json
 
 Agents cannot edit this file.

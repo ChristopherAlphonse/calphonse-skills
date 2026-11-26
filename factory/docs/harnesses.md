@@ -20,9 +20,20 @@ The guard:
 | Skills dir | `.claude/skills` | `.agents/skills` | `.kiro/skills` |
 | Headless pass | `claude -p` | `opencode run` | `kiro-cli chat --v3 --no-interactive --agent factory` |
 | Policy | `.claude/settings.json`, `.claude/hooks/`, `.claude/agents/factory-<stage>.md` | `opencode.jsonc` (with `agent.factory-<stage>`), `.opencode/plugins/`, `.opencode/guard/` | `.kiro/agents/factory.json` and `factory-<stage>.json`, `.kiro/hooks/` (`factory-guard.json` plus `factory-guard-planning.json`, `-code.json`, `-notes.json`) |
+| Status line | native: `statusLine` in `.claude/settings.json`, installed by `tick install` | none for a custom command; run `bin/status` | none for a custom command (Kiro's `chat.statusLine.*` settings only show or hide its built-in segments); run `bin/status` |
 | Stage agents | one per stage, narrowed by tool and model only | one per stage, narrowed by tool and write folder | one per stage, narrowed by tool and write folder |
 
 Claude Code stage subagents get `model: opus` (shape, spec, build), `sonnet` (review) or `haiku` (polish, prove, ship). Kiro stage agents also get `--model <id>` by task: `claude-opus-5.5` (shape, spec, build), `claude-sonnet-5.5` (review), `claude-haiku-5.5` (polish, prove, ship). `kiro-cli chat --list-models` shows the ids.
+
+## Status line
+
+`bin/status` prints one line from `.planning/factory/jobs/*/job.json`, for example `factory: a build r2 3/7 | b review r1 | +1 more | 1 need you | 1 ready`, or `factory: idle`. It is read-only, needs only `python3`, finds the project by walking up from where it is run, and prints nothing outside a factory project. It never fails.
+
+- **Claude Code:** `tick install claude` copies it to `.claude/hooks/factory-status.py` and sets `statusLine` in `.claude/settings.json` to run it with `--claude`, which reads Claude Code's JSON on stdin to find the project. `tick check` does not look at it, so a missing status line never stops a pass. A project-level `statusLine` replaces your user-level one in that project.
+- **Kiro:** no custom status line command. Its `chat.statusLine.*` settings only show or hide built-in segments. Run `bin/status` yourself, for example `watch -n 5 bin/status` in a second pane or in tmux `status-right`.
+- **OpenCode:** no `statusLine` setting. A footer line is a TUI plugin, and the factory does not ship one: the plugin types installed with OpenCode 2.3.2 describe an older plugin API than the one its binary uses, and a plugin renders only in a live terminal, so one could not be checked here. Use `bin/status` as for Kiro, or install a footer plugin of your own and have it run `bin/status`.
+
+Not verified: the line rendering inside a live Claude Code session. The script and the install are tested; the rendering is Claude Code's.
 
 ## Kiro stage agents
 

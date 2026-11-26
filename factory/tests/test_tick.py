@@ -107,6 +107,59 @@ class TickTests(unittest.TestCase):
                     if f.is_file() and ".planning" not in f.parts:
                         self.assertIn(f.read_text().strip(), shown)
 
+    def test_claude_install_wires_the_status_line_to_the_installed_copy(self):
+        run(self.root, "install", "claude")
+        line = json.loads((self.root / ".claude" / "settings.json").read_text())["statusLine"]
+        copy = self.root / ".claude" / "hooks" / "factory-status.py"
+        self.assertEqual(line["type"], "command")
+        self.assertIn(str(copy), line["command"])
+        self.assertEqual(copy.read_text(), (TICK.parent / "status").read_text())
+        self.assertEqual(run(self.root, "check", "claude").returncode, 0)
+
+    def test_check_does_not_gate_a_pass_on_the_status_line(self):
+        run(self.root, "install", "claude")
+        (self.root / ".claude" / "hooks" / "factory-status.py").unlink()
+        settings = self.root / ".claude" / "settings.json"
+        cfg = json.loads(settings.read_text())
+        del cfg["statusLine"]
+        settings.write_text(json.dumps(cfg, indent=2) + "\n")
+        self.assertEqual(run(self.root, "check", "claude").returncode, 0)
+
+    def test_status_summarises_jobs_and_never_fails(self):
+        status = TICK.parent / "status"
+
+        def line(*args, stdin=""):
+            r = subprocess.run([sys.executable, "-I", str(status), *args], input=stdin, capture_output=True,
+                               text=True, env={**os.environ, "FACTORY_ROOT": ""})
+            self.assertEqual(r.returncode, 0, r.stderr)
+            return r.stdout.strip()
+
+        jobs = self.root / ".planning" / "factory" / "jobs"
+        for jid, stage, rnd, prog in [("a", "build", 2, [3, 7]), ("b", "review", 1, [0, 0]), ("c", "spec", 0, [0, 0]),
+                                      ("d", "needs-human", 3, [0, 0]), ("e", "ready", 1, [0, 0]),
+                                      ("f", "rejected", 0, [0, 0])]:
+            (jobs / jid).mkdir(parents=True)
+            (jobs / jid / "job.json").write_text(json.dumps({"id": jid, "stage": stage, "round": rnd, "progress": prog}))
+        (jobs / "bad").mkdir()
+        (jobs / "bad" / "job.json").write_text("{not json")
+        deep = self.root / "src" / "deep"
+        deep.mkdir(parents=True)
+        want = "factory: a build r2 3/7 | b review r1 | +1 more | 1 need you | 1 ready"
+        self.assertEqual(line("--root", str(deep)), want)
+        self.assertEqual(line("--claude", stdin=json.dumps({"workspace": {"current_dir": str(deep)}})), want)
+        self.assertEqual(line("--claude", stdin=json.dumps({"cwd": str(deep)})), want)
+        self.assertEqual(line("--claude", stdin="not json"), "")
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as bare:
+            self.assertEqual(line("--root", bare), "")
+
+    def test_status_says_idle_when_nothing_is_open(self):
+        job = self.root / ".planning" / "factory" / "jobs" / "x"
+        job.mkdir(parents=True)
+        (job / "job.json").write_text(json.dumps({"id": "x", "stage": "rejected", "round": 0}))
+        r = subprocess.run([sys.executable, "-I", str(TICK.parent / "status"), "--root", str(self.root)],
+                           capture_output=True, text=True)
+        self.assertEqual(r.stdout.strip(), "factory: idle")
+
     def test_policy_covers_the_bypass_spellings_found_by_the_probe(self):
         for needed in ["git -c", "git -C", "git commit-tree", "git update-ref", "git merge", "git config",
                        "gh", "glab", "curl", "sh -c"]:

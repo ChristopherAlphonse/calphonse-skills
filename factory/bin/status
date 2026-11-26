@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Print a one-line summary of the project's factory jobs. Read-only, never fails.
+
+  status [--root DIR]    summary for the project at DIR (default: FACTORY_ROOT, else the current folder)
+  status --claude        the same, as a Claude Code status line: reads its JSON on stdin to find the project
+
+Works under any harness: run it from a shell, `watch -n 5`, or a tmux status-right.
+`tick install claude` wires it into Claude Code's own statusLine. OpenCode and Kiro have no custom
+status line command, so there it is the shell command above.
+"""
+import json, os, sys
+from pathlib import Path
+
+TERMINAL = {"ready", "rejected"}  # mirrors bin/job
+HUMAN = {"needs-human"}
+SHOWN = 2
+
+
+def find_root(start):
+    for d in [start, *start.parents]:
+        if (d / ".planning" / "factory").is_dir():
+            return d
+    return None
+
+
+def read_jobs(root):
+    jobs = []
+    for p in sorted((root / ".planning" / "factory" / "jobs").glob("*/job.json")):
+        try:
+            job = json.loads(p.read_text())
+        except (OSError, ValueError):
+            continue
+        if isinstance(job, dict) and isinstance(job.get("stage"), str):
+            jobs.append(job)
+    return jobs
+
+
+def label(job):
+    out = f"{job.get('id', '?')} {job['stage']}"
+    if job.get("round"):
+        out += f" r{job['round']}"
+    done, total = (job.get("progress") or [0, 0])[:2]
+    if total:
+        out += f" {done}/{total}"
+    return out
+
+
+def summary(jobs):
+    stages = [j["stage"] for j in jobs]
+    need = stages.count("needs-human")
+    ready = stages.count("ready")
+    active = [j for j in jobs if j["stage"] not in TERMINAL | HUMAN]
+    parts = [label(j) for j in active[:SHOWN]]
+    if len(active) > SHOWN:
+        parts.append(f"+{len(active) - SHOWN} more")
+    if need:
+        parts.append(f"{need} need you")
+    if ready:
+        parts.append(f"{ready} ready")
+    return "factory: " + (" | ".join(parts) if parts else "idle")
+
+
+def start_folder(argv):
+    if "--root" in argv:
+        return Path(argv[argv.index("--root") + 1])
+    if "--claude" in argv:
+        data = json.loads(sys.stdin.read() or "{}")
+        where = (data.get("workspace") or {}).get("current_dir") or data.get("cwd")
+        if where:
+            return Path(where)
+    return Path(os.environ.get("FACTORY_ROOT") or Path.cwd())
+
+
+def main(argv):
+    try:
+        root = find_root(start_folder(argv).resolve())
+        if root:
+            print(summary(read_jobs(root)))
+    except Exception:  # a status line must never print a traceback
+        pass
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

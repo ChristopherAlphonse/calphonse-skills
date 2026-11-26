@@ -354,7 +354,10 @@ def policy_files(harness):
     if harness == "claude":
         perms = {kind: claude_rules(kind) for kind in ("deny", "ask", "allow")}
         files, hooks = guard_files("claude")
-        settings = {"permissions": perms, "hooks": hooks}
+        status_rel = f".claude/hooks/{SKILL}-status.py"
+        status = {"type": "command", "command": f"python3 {shlex.quote(str(ROOT / status_rel))} --claude"}
+        settings = {"permissions": perms, "hooks": hooks, "statusLine": status}
+        files[status_rel] = (Path(__file__).resolve().parent / "status").read_text()
         return {".claude/settings.json": json.dumps(settings, indent=2) + "\n", **files, **claude_stage_files()}
     if harness == "opencode":
         cfg = {"permissions": opencode_rules(), "agent": opencode_stage_agents()}
