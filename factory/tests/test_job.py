@@ -441,8 +441,33 @@ class TestRepos(Factory):
         common = lambda jid: Path(self.git("rev-parse", "--path-format=absolute", "--git-common-dir", cwd=self.wt(jid)).stdout.strip())
         self.assertEqual(common("proj-174-svc-a").resolve(), (a / ".git").resolve())
         self.assertEqual(common("proj-174-infra-b").resolve(), (b / ".git").resolve())
+        self.assertEqual(self.js("proj-174-svc-a")["stack"], [])
+        (self.wt("proj-174-svc-a") / "more.py").write_text("y = 2\n")
+        (self.wt("proj-174-infra-b") / "more.tf").write_text("\n")
+        self.ok("stack", "proj-174-svc-a")
+        self.ok("stack", "proj-174-infra-b")
         self.assertEqual(self.js("proj-174-svc-a")["stack"], ["python"])
         self.assertEqual(self.js("proj-174-infra-b")["stack"], ["aws"])
+
+    def test_the_stack_follows_the_changed_files_not_the_whole_repo(self):
+        self.repo("mixed", {"app.py": "x = 1\n", "web.ts": "export {};\n"})
+        for jid, files, want, banned in (("ts-only", ["new.ts"], ["typescript-strict-style"], "python"),
+                                         ("py-only", ["new.py"], ["python"], "typescript-strict-style"),
+                                         ("both", ["a.ts", "b.py"], ["typescript-strict-style", "python"], None)):
+            self.new_spec(jid, repo="mixed")
+            self.human("approve", jid)
+            self.adv(jid, "build")
+            self.assertEqual(self.js(jid)["stack"], [], jid)
+            self.assertIn("no stack skill suggested yet", self.ok("queue").stdout)
+            for f in files:
+                (self.wt(jid) / f).write_text("\n")
+            self.ok("stack", jid)
+            stack = self.js(jid)["stack"]
+            self.assertEqual(sorted(stack), sorted(want), jid)
+            hint = [l for l in self.ok("queue").stdout.splitlines() if f"\t{jid}\t" in l][0]
+            self.assertIn("suggested stack skills", hint)
+            if banned:
+                self.assertNotIn(banned, hint.split("suggested stack skills")[1], jid)
 
     def test_repo_job_commits_to_its_repo_and_releases_its_worktree(self):
         a = self.repo("svc-a", {"app.py": "x = 1\n"})

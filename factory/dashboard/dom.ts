@@ -1,30 +1,37 @@
-export const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string | null): HTMLElementTagNameMap[K] => {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
-};
-
-export const chip = (text: string, cls = ""): HTMLSpanElement => el("span", `chip ${cls}`, text);
-
-export const $ = (id: string): HTMLElement => {
-  const node = document.getElementById(id);
-  if (!node) throw new Error(`missing element #${id}`);
-  return node;
-};
-
-export function button(
-  label: string,
-  cls: string,
-  onclick: () => void,
-): HTMLButtonElement {
-  const b = el("button", cls, label);
-  b.type = "button";
-  b.onclick = onclick;
-  return b;
+export function createElement<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className?: string,
+  text?: string | null,
+): HTMLElementTagNameMap[K] {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text != null) element.textContent = text;
+  return element;
 }
-export function row(...chips: HTMLElement[]): HTMLDivElement {
-  const r = el("div", "row");
-  r.append(...chips);
-  return r;
+
+export function createChip(text: string, className = ""): HTMLSpanElement {
+  return createElement("span", `chip ${className}`, text);
+}
+
+export function requireElement(id: string): HTMLElement {
+  const element = document.getElementById(id);
+  if (!element) throw new Error(`missing element #${id}`);
+  return element;
+}
+
+export function createButton(
+  label: string,
+  className: string,
+  onClick: () => void,
+): HTMLButtonElement {
+  const button = createElement("button", className, label);
+  button.type = "button";
+  button.onclick = onClick;
+  return button;
+}
+
+export function createChipRow(...chips: HTMLElement[]): HTMLDivElement {
+  const row = createElement("div", "row");
+  row.append(...chips);
+  return row;
 }

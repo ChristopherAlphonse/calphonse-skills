@@ -110,14 +110,14 @@ class TestStackDetection(Review):
         self.new_review("r", {"Api/Program.cs": "x\n"})
         self.assertIn("stack skills: dotnet", self.run_queue())
 
-    def test_build_jobs_detect_the_stack_from_the_repo_and_can_refresh_it(self):
+    def test_build_jobs_detect_the_stack_from_changed_files_and_can_refresh_it(self):
         self.to_build("b")
-        self.assertEqual(self.js("b")["stack"], ["python"])
+        self.assertEqual(self.js("b")["stack"], [])
         wt = self.wt("b")
         (wt / "Svc.cs").write_text("x\n")
         self.git("add", "Svc.cs", cwd=wt)
-        self.assertEqual(self.ok("stack", "b").stdout.strip(), "dotnet,python")
-        self.assertEqual(self.js("b")["stack"], ["dotnet", "python"])
+        self.assertEqual(self.ok("stack", "b").stdout.strip(), "dotnet")
+        self.assertEqual(self.js("b")["stack"], ["dotnet"])
 
 
 class TestStages(Review):

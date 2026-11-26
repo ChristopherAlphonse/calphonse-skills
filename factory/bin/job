@@ -84,7 +84,10 @@ def hint_for(job):
     stack = [s for s in job.get("stack") or [] if s not in off]
     forward = sorted(transitions(job).get(job["stage"], set()) - {"build", "needs-human", "rejected"})
     out = hint + (f" | on success advance to: {forward[0]}" if hint and forward else "")
-    out += (f" | stack skills: {', '.join(stack)}" if stack and hint else "")
+    if hint and stack:
+        out += f" | suggested stack skills: {', '.join(stack)} (from the files changed so far; override with what the files you touch need)"
+    elif hint and job["stage"] == "build":
+        out += " | no stack skill suggested yet: pick by the files you touch (.ts -> typescript-strict-style, .py -> python), then run `job stack <id>`"
     if hint and off:
         out += f" | USER TURNED OFF, do not use: {', '.join(sorted(off))}"
     note = job.get("briefs", {}).get(job["stage"])
@@ -249,6 +252,11 @@ def git_files(args, cwd):
     return [f for f in git_out(args, cwd).split("\0") if f]
 
 
+def build_files(job):
+    """What a build job has changed so far in its worktree, so the stack follows the task and not the whole repo."""
+    return changed_files(job["worktree"] or repo_of(job), base_of(job))
+
+
 def review_files(job):
     return git_files(["diff", "--name-only", "-z", job["review"]["base"], job["review"]["head"]], repo_of(job))
 
@@ -291,8 +299,7 @@ def cmd_create(jid, title, *opts):
 def cmd_stack(jid):
     job = load(jid)
     review = job.get("review")
-    files = review_files(job) if review else git_files(["ls-files", "-z"], job["worktree"] or repo_of(job))
-    job["stack"] = detect_stack(files)
+    job["stack"] = detect_stack(review_files(job) if review else build_files(job))
     save(job)
     print(",".join(job["stack"]))
 
@@ -439,8 +446,6 @@ def make_worktree(job):
     need(r.returncode == 0, f"worktree failed: {r.stderr.strip()}")
     job["worktree"], job["branch"] = str(wt), branch
     job["base_commit"] = job["base_tip"] = job["tip"] = git(["rev-parse", "HEAD"], wt).stdout.strip()
-    if not job.get("review"):
-        job["stack"] = detect_stack(git_files(["ls-files", "-z"], wt))
 
 
 def release_worktree(job):
@@ -975,6 +980,8 @@ def cmd_advance(jid, to):
     if real == "needs-human":
         job["parked_from"] = cur
     job["stage"] = real
+    if cur == "build" and job["worktree"]:
+        job["stack"] = detect_stack(build_files(job))
     if real in TERMINAL:
         job["ended"] = now()
     save(job)

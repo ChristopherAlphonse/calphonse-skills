@@ -42,6 +42,13 @@ KIRO_TOOLS = ["read", "write", "shell", "grep", "glob", "subagent"]
 # 2026-11-16: the user approved agents editing **/.planning/**/config.json, so it is deliberately absent here. Do not re-add it.
 NO_WRITE = ["**/.kiro/**", "**/.claude/**", "**/.opencode/**", "**/opencode.json", "**/opencode.jsonc", "**/.git/**", "**/.planning/**/job.json", "**/.planning/**/audit.log"]
 WRITE_ONLY = None
+# The skills each stage agent starts with. Anything else it reads on demand from .kiro/skills/<name>/SKILL.md.
+STAGE_SKILLS = {
+    "shape": ["lets-talk-about-it"], "spec": ["prd-mode"], "build": ["swe"],
+    "review": ["qa-review", "test-review", "review-blind-spots"], "polish": ["comment-sicko", "simplify"],
+    "prove": ["prove-it-works"], "ship": ["pr-body-style", "demo-script"],
+    "scope": [], "reconcile": ["reconcile-reviews"], "verify": ["prove-it-works"], "report": ["simplify"],
+}
 KIRO_DESCRIPTION = "Software factory orchestrator. Runs one pass of the factory skill and never commits, pushes, or opens a PR or MR."
 KIRO_PROMPT = "Use the factory skill. Run one pass and stop. Never commit, push, merge, or create a PR or MR."
 COMMANDS = {
@@ -297,7 +304,7 @@ def policy_files(harness):
             "description": KIRO_DESCRIPTION,
             "prompt": KIRO_PROMPT,
             "tools": KIRO_TOOLS,
-            "resources": ["skill://.kiro/skills/*/SKILL.md"],
+            "resources": [f"skill://.kiro/skills/{SKILL}/SKILL.md"],
             "hooks": hooks,
             "permissions": {"rules": [
                 {"capability": "fs_read", "effect": "allow"},
@@ -308,7 +315,12 @@ def policy_files(harness):
                 {"capability": "shell", "effect": "deny", "match": pol["deny"]},
             ]},
         }
-        return {f".kiro/agents/{SKILL}.json": json.dumps(agent, indent=2) + "\n", **files}
+        agents = {f".kiro/agents/{SKILL}.json": agent}
+        for stage, skills in STAGE_SKILLS.items():
+            agents[f".kiro/agents/{SKILL}-{stage}.json"] = {
+                **agent, "name": f"{SKILL}-{stage}", "description": f"Factory {stage} stage agent.",
+                "resources": [f"skill://.kiro/skills/{n}/SKILL.md" for n in skills]}
+        return {**{rel: json.dumps(a, indent=2) + "\n" for rel, a in agents.items()}, **files}
     die(f"unknown harness {harness!r}, expected one of {', '.join(COMMANDS)}")
 
 

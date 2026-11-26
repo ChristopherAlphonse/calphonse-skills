@@ -1,3 +1,19 @@
 {
+  "order": {
+    "build": [
+      "shape",
+      "spec",
+      "build",
+      "polish",
+      "ship"
+    ],
+    "review": [
+      "scope",
+      "review",
+      "reconcile",
+      "verify",
+      "report"
+    ]
+  },
   "stages": []
 }

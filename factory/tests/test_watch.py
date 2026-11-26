@@ -1,3 +1,4 @@
+from pathlib import Path
 import http.client, json, os, re, shutil, subprocess, sys, unittest
 
 from test_dashboard_build import NODE_24
@@ -38,6 +39,26 @@ class TestWatch(Watch):
         status, _, headers = self.http_full("GET", "/static/app.js", xfactory=False)
         self.assertEqual(status, 200)
         self.assertEqual(headers["Content-Type"], "text/javascript")
+
+    def test_any_script_in_dist_is_served_and_nothing_outside_it(self):
+        self.start_watch()
+        dist = Path(JOB).resolve().parents[1] / "dashboard" / "dist"
+        extra = dist / "zz-new-module.js"
+        extra.write_text("export {};\n")
+        self.addCleanup(extra.unlink)
+        self.assertEqual(self.http_full("GET", "/static/zz-new-module.js")[0], 200)
+        for name in ("..%2Fbin%2Fjob", "app.ts", "zz-new-module.js%00.css", "ZZ.js"):
+            self.assertEqual(self.http_full("GET", f"/static/{name}")[0], 403, name)
+
+    def test_a_board_whose_code_changed_says_to_restart(self):
+        copy = self.base / "factory-copy"
+        shutil.copytree(Path(JOB).resolve().parents[1], copy, ignore=shutil.ignore_patterns("tests", "__pycache__"))
+        self.start_watch(job=copy / "bin" / "job")
+        self.assertIn(b"connecting", self.http("GET", "/")[1])
+        os.utime(copy / "bin" / "board", (1, 1))
+        page = self.http("GET", "/")[1]
+        self.assertIn(b"restart the board", page)
+        self.assertNotIn(b"connecting", page)
 
     def test_login_rules(self):
         self.start_watch()

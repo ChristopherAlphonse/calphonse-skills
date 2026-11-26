@@ -342,6 +342,18 @@ class BaselinePolicyTests(unittest.TestCase):
                 self.assertEqual(r.returncode, 2)
                 self.assertIn("aws s3 rm*", r.stderr)
 
+    def test_each_kiro_stage_agent_starts_with_only_its_own_skill(self):
+        run(self.root, "install", "kiro")
+        agents = self.root / ".kiro" / "agents"
+        load = lambda name: json.loads((agents / f"{name}.json").read_text())["resources"]
+        self.assertEqual(load(SKILL), [f"skill://.kiro/skills/{SKILL}/SKILL.md"])
+        self.assertEqual(load(f"{SKILL}-build"), ["skill://.kiro/skills/swe/SKILL.md"])
+        self.assertEqual(load(f"{SKILL}-shape"), ["skill://.kiro/skills/lets-talk-about-it/SKILL.md"])
+        self.assertEqual(load(f"{SKILL}-spec"), ["skill://.kiro/skills/prd-mode/SKILL.md"])
+        self.assertEqual(load(f"{SKILL}-scope"), [])
+        for f in agents.glob("*.json"):
+            self.assertFalse(any("*" in r for r in json.loads(f.read_text())["resources"]), f.name)
+
     def test_an_allow_rule_does_not_stand_in_for_an_ask_rule(self):
         run(self.root, "install", "kiro")
         path = self.root / ".kiro" / "agents" / f"{SKILL}.json"

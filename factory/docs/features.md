@@ -211,7 +211,7 @@ A **skill** is a packaged set of instructions. Each stage runs one skill. The fa
 | `.py`, `.pyi`, `pyproject.toml`, `uv.lock` | `python` |
 | `.tf`, `cdk.json`, `serverless.yml`, `samconfig.toml` | `aws` |
 
-For a build job it looks at the whole repo. For a review job it looks only at the files in the diff. Run `bin/job stack <id>` to look again after the build adds new files.
+For a build job it looks at the files the job has changed so far (none at the start, so the hint says to pick by the files you touch), and the suggestion is refreshed when the build ends. For a review job it looks only at the files in the diff. Run `bin/job stack <id>` to look again after the build adds new files.
 
 ### 4.3 The skill switch
 

@@ -1,76 +1,85 @@
-type Pt = [number, number];
+type Point = [x: number, y: number];
+
+interface Bounds {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
 // A right-angle route with rounded corners, like Floorplan's connectors.
-function routed(pts: Pt[], radius = 12): string {
-  let d = `M${pts[0][0]},${pts[0][1]}`;
-  for (let i = 1; i < pts.length - 1; i++) {
-    const [px, py] = pts[i - 1];
-    const [cx, cy] = pts[i];
-    const [nx, ny] = pts[i + 1];
-    const inLen = Math.hypot(cx - px, cy - py) || 1;
-    const outLen = Math.hypot(nx - cx, ny - cy) || 1;
-    const r = Math.min(radius, inLen / 2, outLen / 2);
-    d += ` L${cx - ((cx - px) / inLen) * r},${cy - ((cy - py) / inLen) * r} Q${cx},${cy} ${cx + ((nx - cx) / outLen) * r},${cy + ((ny - cy) / outLen) * r}`;
+function routeWithRoundedCorners(points: readonly [Point, ...Point[]], radius = 12): string {
+  let pathData = `M${points[0][0]},${points[0][1]}`;
+  for (let pointIndex = 1; pointIndex < points.length - 1; pointIndex++) {
+    const [previousX, previousY] = points[pointIndex - 1];
+    const [cornerX, cornerY] = points[pointIndex];
+    const [nextX, nextY] = points[pointIndex + 1];
+    const incomingLength = Math.hypot(cornerX - previousX, cornerY - previousY) || 1;
+    const outgoingLength = Math.hypot(nextX - cornerX, nextY - cornerY) || 1;
+    const cornerRadius = Math.min(radius, incomingLength / 2, outgoingLength / 2);
+    pathData += ` L${cornerX - ((cornerX - previousX) / incomingLength) * cornerRadius},${cornerY - ((cornerY - previousY) / incomingLength) * cornerRadius} Q${cornerX},${cornerY} ${cornerX + ((nextX - cornerX) / outgoingLength) * cornerRadius},${cornerY + ((nextY - cornerY) / outgoingLength) * cornerRadius}`;
   }
-  const last = pts[pts.length - 1];
-  return `${d} L${last[0]},${last[1]}`;
+  const lastPoint = points[points.length - 1];
+  return `${pathData} L${lastPoint[0]},${lastPoint[1]}`;
 }
 
 export function drawWires(svg: HTMLElement, lanes: HTMLElement, scale: number): void {
   const base = lanes.getBoundingClientRect();
-  const ns = "http://www.w3.org/2000/svg";
-  const at = (r: DOMRect) => ({
-    l: (r.left - base.left) / scale,
-    r: (r.right - base.left) / scale,
-    t: (r.top - base.top) / scale,
-    b: (r.bottom - base.top) / scale,
+  const svgNamespace = "http://www.w3.org/2000/svg";
+  const relativeBounds = (rect: DOMRect): Bounds => ({
+    left: (rect.left - base.left) / scale,
+    right: (rect.right - base.left) / scale,
+    top: (rect.top - base.top) / scale,
+    bottom: (rect.bottom - base.top) / scale,
   });
-  const shapes: SVGElement[] = [];
-  const mk = <K extends keyof SVGElementTagNameMap>(
+  const wireShapes: SVGElement[] = [];
+  const createSvgElement = <K extends keyof SVGElementTagNameMap>(
     tag: K,
-    attrs: Record<string, string>,
-    cls: string,
+    attributes: Record<string, string>,
+    className: string,
   ): SVGElementTagNameMap[K] => {
-    const e = document.createElementNS(ns, tag);
-    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
-    e.setAttribute("class", cls);
-    return e;
+    const element = document.createElementNS(svgNamespace, tag);
+    for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value);
+    element.setAttribute("class", className);
+    return element;
   };
-  for (const nodes of document.querySelectorAll<HTMLElement>(".nodes")) {
-    const cards = [...nodes.children] as HTMLElement[];
-    for (let i = 0; i + 1 < cards.length; i++) {
-      const a = at(cards[i].getBoundingClientRect());
-      const b = at(cards[i + 1].getBoundingClientRect());
-      const lit = cards[i].classList.contains("lit") ? " lit" : "";
-      const y1 = (a.t + a.b) / 2;
-      const y2 = (b.t + b.b) / 2;
-      const wrap = b.t > a.b;
-      const route: Pt[] = wrap
+  for (const stageRow of document.querySelectorAll<HTMLElement>(".nodes")) {
+    const stageNodes = [...stageRow.children] as HTMLElement[];
+    for (let nodeIndex = 0; nodeIndex + 1 < stageNodes.length; nodeIndex++) {
+      const fromBounds = relativeBounds(stageNodes[nodeIndex].getBoundingClientRect());
+      const toBounds = relativeBounds(stageNodes[nodeIndex + 1].getBoundingClientRect());
+      const isLit = stageNodes[nodeIndex].classList.contains("lit") ? " lit" : "";
+      const fromCenterY = (fromBounds.top + fromBounds.bottom) / 2;
+      const toCenterY = (toBounds.top + toBounds.bottom) / 2;
+      const wrapsBelow = toBounds.top > fromBounds.bottom;
+      const wireRoute: readonly [Point, ...Point[]] = wrapsBelow
         ? [
-            [a.r, y1],
-            [a.r + 28, y1],
-            [a.r + 28, (a.b + b.t) / 2],
-            [b.l - 28, (a.b + b.t) / 2],
-            [b.l - 28, y2],
-            [b.l, y2],
+            [fromBounds.right, fromCenterY],
+            [fromBounds.right + 28, fromCenterY],
+            [fromBounds.right + 28, (fromBounds.bottom + toBounds.top) / 2],
+            [toBounds.left - 28, (fromBounds.bottom + toBounds.top) / 2],
+            [toBounds.left - 28, toCenterY],
+            [toBounds.left, toCenterY],
           ]
         : [
-            [a.r, y1],
-            [(a.r + b.l) / 2, y1],
-            [(a.r + b.l) / 2, y2],
-            [b.l, y2],
+            [fromBounds.right, fromCenterY],
+            [(fromBounds.right + toBounds.left) / 2, fromCenterY],
+            [(fromBounds.right + toBounds.left) / 2, toCenterY],
+            [toBounds.left, toCenterY],
           ];
-      shapes.push(mk("path", { d: routed(route) }, `wire${lit}`));
-      for (const [cx, cy] of [route[0], route[route.length - 1]])
-        shapes.push(
-          mk(
+      wireShapes.push(createSvgElement("path", { d: routeWithRoundedCorners(wireRoute) }, `wire${isLit}`));
+      for (const [endpointX, endpointY] of [wireRoute[0], wireRoute[wireRoute.length - 1]]) {
+        wireShapes.push(
+          createSvgElement(
             "circle",
-            { cx: String(cx), cy: String(cy), r: "4.5" },
-            `port${lit}`,
+            { cx: String(endpointX), cy: String(endpointY), r: "4.5" },
+            `port${isLit}`,
           ),
         );
+      }
     }
   }
   svg.setAttribute("width", String(base.width / scale));
   svg.setAttribute("height", String(base.height / scale));
-  svg.replaceChildren(...shapes);
+  svg.replaceChildren(...wireShapes);
 }

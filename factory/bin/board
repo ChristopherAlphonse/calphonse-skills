@@ -18,8 +18,28 @@ SKILLS = HERE.parent.parent
 DASH_DIR = HERE.parent / "dashboard"
 DIST_DIR = DASH_DIR / "dist"
 STATE = ROOT / ".planning" / "factory-board"
-STATIC = {"dashboard.css": "text/css", "app.js": "text/javascript", "ask.js": "text/javascript", "dom.js": "text/javascript", "markdown.js": "text/javascript", "editor.js": "text/javascript", "mermaid.js": "text/javascript", "boards.js": "text/javascript", "wires.js": "text/javascript"}
+STATIC_CSS = {"dashboard.css": "text/css"}
+SCRIPT_NAME = re.compile(r"[a-z0-9][a-z0-9-]*\.js")
 ENGINE_FILE = HERE / "job"
+# The Python this process loaded. It reads these once, so an edit afterwards means the running board is out of date.
+OWN_FILES = (HERE / "board", ENGINE_FILE)
+
+
+def own_fingerprint():
+    return tuple((p.stat().st_mtime_ns, p.stat().st_size) for p in OWN_FILES)
+
+
+STARTED_AS = own_fingerprint()
+
+
+def board_is_stale():
+    try:
+        return own_fingerprint() != STARTED_AS
+    except OSError:
+        return True
+
+
+STALE_META = b'<span id="meta">restart the board: its code changed since it started</span>'
 # board id -> (label, which of the engine's jobs it shows)
 BOARD_SPECS = {"build": ("Build", lambda job: not job.get("review")), "review": ("Review", lambda job: bool(job.get("review")))}
 WATCH_FILE = "watch.json"
@@ -200,7 +220,10 @@ class Handler(BaseHTTPRequestHandler):
         if not self.host_ok():
             return self.send(403, "{}")
         if self.session_ok():
-            return self.send(200, (DASH_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
+            page = (DASH_DIR / "index.html").read_bytes()
+            if board_is_stale():
+                page = page.replace(b'<span id="meta">connecting</span>', STALE_META)
+            return self.send(200, page, "text/html; charset=utf-8")
         supplied = q.get("c", [""])[0]
         if supplied and CODE and hmac.compare_digest(supplied.encode(), CODE.encode()):
             cookie = f"{COOKIE}-{self.server.server_port}={SESSION}; HttpOnly; SameSite=Strict; Path=/"
@@ -220,10 +243,15 @@ class Handler(BaseHTTPRequestHandler):
         return self.send(200, (base / name).read_bytes(), ctype, FRAME_HEADERS)
 
     def get_static(self, name):
-        if not (self.host_ok() and self.session_ok()) or name not in STATIC:
+        """Any script in dist/ (the one folder the build writes to), plus the stylesheet. The name pattern has no slash or dot-dot."""
+        if not (self.host_ok() and self.session_ok()):
             return self.send(403, "{}")
-        base = DIST_DIR if name.endswith(".js") else DASH_DIR
-        return self.send(200, (base / name).read_bytes(), STATIC[name])
+        if name in STATIC_CSS:
+            return self.send(200, (DASH_DIR / name).read_bytes(), STATIC_CSS[name])
+        script = DIST_DIR / name
+        if not SCRIPT_NAME.fullmatch(name) or not script.is_file():
+            return self.send(403, "{}")
+        return self.send(200, script.read_bytes(), "text/javascript")
 
     def job_file(self, board, jid, name):
         """The markdown file `name` inside job `jid` on this board, or None. Never leaves the job folder."""

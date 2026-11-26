@@ -1,14 +1,20 @@
-// The /api/<board>/jobs payload: the job.json fields of either engine, plus what its snapshot() adds.
+// Domain types. Server payloads are parsed in payloads.ts; nothing unchecked crosses into these types.
+
+export type GateVerdict = "PASS" | "FAIL";
+export type ReviewVerdict = "PASS" | "CHANGES";
+export type ReportField = "FINDINGS" | "BLOCKERS";
+
 export interface Needs {
   action: string;
-  files: string;
+  // The server sends a short human-readable list such as "pr-body.md and commit.md".
+  fileSummary: string;
   why: string;
   todo: string;
 }
 
 export interface ReviewRange {
-  base_ref: string;
-  head_ref: string;
+  baseRef: string;
+  headRef: string;
   base: string;
   head: string;
 }
@@ -18,15 +24,16 @@ export interface Activity {
   text: string;
 }
 
-export interface Job {
+interface JobFields {
   id: string;
   title: string;
+  // Stage ids include custom stages from pipeline.json, so this stays a string.
   stage: string;
   round?: number;
-  round_limit?: number;
+  roundLimit?: number;
   reviewers: string[];
   stack: string[];
-  skills_off?: string[];
+  skillsOff?: string[];
   briefs?: Record<string, string>;
   skills: string[];
   branch: string | null;
@@ -36,18 +43,29 @@ export interface Job {
   note: string;
   review?: ReviewRange;
   activity?: Activity[];
-  parked_from?: string;
-  progress?: [number, number];
-  report: Record<string, string | undefined>;
-  gate?: string | null;
-  reviews: Record<string, string | null>;
+  parkedFrom?: string;
+  progress?: [completedCount: number, totalCount: number];
+  report: Partial<Record<ReportField, string>>;
+  gate?: GateVerdict;
+  reviews: Record<string, ReviewVerdict | null>;
   files: string[];
-  needs_human: boolean;
-  needs: Needs | null;
-  can_approve?: boolean;
-  can_commit?: boolean;
-  can_unblock?: boolean;
+  canApprove?: boolean;
+  canCommit?: boolean;
+  canUnblock?: boolean;
 }
+
+// The server derives needs_human from needs. Keeping them as one variant makes disagreement unrepresentable.
+export interface WaitingJob extends JobFields {
+  needs: Needs;
+  needsHuman: true;
+}
+
+export interface RunningJob extends JobFields {
+  needs: null;
+  needsHuman: false;
+}
+
+export type Job = WaitingJob | RunningJob;
 
 export interface Stage {
   id: string;
@@ -57,23 +75,23 @@ export interface Stage {
 
 // A change to the custom stages that waits for the user to click Apply.
 export interface Proposal {
-  ops: string[];
-  order: Record<string, string[]>;
-  changed: string[];
-  stale: boolean;
+  operations: string[];
+  stageOrderByBoard: Record<string, string[]>;
+  changedStageIds: string[];
+  isStale: boolean;
 }
 
 // The /api/<board>/stages payload: the stage order for one workflow, the custom stages' labels, and any waiting change.
 export interface StagesPayload {
-  order: string[];
-  custom: Record<string, { label: string; blurb: string }>;
+  stageOrder: string[];
+  customStages: Record<string, { label: string; blurb: string }>;
   proposal: Proposal | null;
 }
 
 export type Filter = "all" | "needs" | "done";
 
 // One engine's board: its stages and how its jobs read in the panel.
-export interface BoardDef {
+export interface BoardDefinition {
   id: string;
   label: string;
   blurb: string;
@@ -85,21 +103,21 @@ export interface BoardDef {
   doneLabel: string;
   intro: string;
   kind: string;
-  stats: (j: Job) => [string | number, string][];
-  place: (j: Job) => string | null;
-  needsPath: (j: Job) => string;
-  statusBits: (j: Job) => { text: string; cls?: string }[][];
+  stats: (job: Job) => [string | number, string][];
+  place: (job: Job) => string | null;
+  humanActionPath: (job: Job) => string;
+  statusBits: (job: Job) => { text: string; cls?: string }[][];
 }
 
-export interface View {
-  def: BoardDef;
+export interface BoardView {
+  definition: BoardDefinition;
   jobs: Job[];
   openId: string | null;
   filter: Filter;
-  userZoom: number | null;
-  sig: string;
+  zoomOverride: number | null;
+  payloadSignature: string;
   session: string;
-  skillsOpen: boolean;
-  baseStages: Stage[];
+  showAllSkills: boolean;
+  builtInStages: Stage[];
   proposal: Proposal | null;
 }

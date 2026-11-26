@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Fail when this repo mentions a work-specific name. The names are not kept here.
+#
+#   scripts/check-private-names
+#
+# The list is one extended regex per line, in a file outside the repo:
+#   $PRIVATE_NAMES_FILE, else ~/.config/calphonse-skills/private-names
+# Blank lines and lines starting with # are ignored. Use \bname\b to skip look-alikes inside longer words.
+# It checks file names and contents of every tracked file and every untracked file git would not ignore,
+# so a leak shows up before `git add`. It prints file:line only, never the matched text.
+# A missing or empty list is an error, not a pass.
+set -euo pipefail
+
+list="${PRIVATE_NAMES_FILE:-$HOME/.config/calphonse-skills/private-names}"
+[ -s "$list" ] || { echo "check-private-names: no list at $list" >&2; exit 2; }
+
+patterns="$(mktemp)"
+trap 'rm -f "$patterns"' EXIT
+grep -Ev '^[[:space:]]*(#|$)' "$list" > "$patterns" || true
+[ -s "$patterns" ] || { echo "check-private-names: $list has no patterns" >&2; exit 2; }
+
+cd "$(git rev-parse --show-toplevel)"
+found=0
+while IFS= read -r -d '' f; do
+  if printf '%s\n' "$f" | grep -qiEf "$patterns"; then echo "$f: file name"; found=1; fi
+  [ -f "$f" ] || continue
+  hits="$(grep -niIEf "$patterns" -- "$f" | cut -d: -f1 || true)"
+  for n in $hits; do echo "$f:$n"; found=1; done
+done < <(git ls-files -z --cached --others --exclude-standard)
+
+[ "$found" -eq 0 ] || { echo "check-private-names: work-specific names found" >&2; exit 1; }
+echo "check-private-names: clean"
