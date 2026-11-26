@@ -131,7 +131,9 @@ You read the paperwork and click **Commit locally**. The factory makes the one a
 
 The job is done. A local commit exists and a pull request text is written. No stage pushes. Pushing and opening the pull request is yours, done your own way, or by telling the orchestrator in chat.
 
-A finished job leaves no worktree folder behind. Its branch stays until git says it is merged, then `bin/job prune` (or `bin/job close`) deletes it. A branch that is not merged, or that another live job still uses, is never deleted.
+A finished job leaves no worktree folder behind. Its branch stays until its work is in main, then `bin/job prune` (or `bin/job close`) deletes it. A squash merge counts: the branch is landed when every file it changed is identical in main. Prune then moves a landed ready job's folder to `.planning/factory/archive/`, so its card leaves the board. A branch that has not landed, or that another live job still uses, is never deleted, and an unlanded ready job keeps its card.
+
+To drop a job you no longer want, run `bin/job retire <id>` from any stage before ready: it moves to rejected, a clean worktree is removed, and the branch stays.
 
 If you committed the work yourself instead of clicking **Commit locally**, run `bin/job close <id>`. It needs the job at ship, a passing gate, a clean worktree and a commit on the job branch. Then it moves the job to ready and removes the worktree.
 
@@ -217,7 +219,7 @@ A **skill** is a packaged set of instructions. Each stage runs one skill. The fa
 | `.py`, `.pyi`, `pyproject.toml`, `uv.lock` | `python` |
 | `.tf`, `cdk.json`, `serverless.yml`, `samconfig.toml` | `aws` |
 
-For a build job it looks at the files the job has changed so far (none at the start, so the hint says to pick by the files you touch), and the suggestion is refreshed when the build ends. For a review job it looks only at the files in the diff. Run `bin/job stack <id>` to look again after the build adds new files.
+For a build job it looks at the files the job has changed so far (none at the start, so the hint says to pick by the files you touch). For a review job it looks only at the files in the diff. The hint names stack skills only at build and at a review job's review stage, as a map such as `*.ts -> typescript-strict-style`; shape, spec, polish, prove and ship get none. Run `bin/job stack <id>` to look again after the build adds new files.
 
 ### 4.3 The skill switch
 

@@ -19,7 +19,8 @@ Reference for every command, setting, file and environment variable. Run command
 | `bin/job skill <id> <name> on\|off` | switch a skill off or on for one job |
 | `bin/job brief <id> <stage> <text>` | set a note the next agent for that stage follows. Empty text clears it |
 | `bin/job close <id>` | finish a job at ship whose work you committed yourself on its branch: moves it to ready, removes its worktree, deletes the branch if merged |
-| `bin/job prune` | remove clean worktrees of finished jobs and delete their branches that git says are merged. Unmerged branches stay |
+| `bin/job prune` | remove clean worktrees of finished jobs, delete their branches whose work is in main (merged, or squash-merged with every changed file identical in main), and move landed ready jobs to `.planning/factory/archive/`. Unlanded branches stay |
+| `bin/job retire <id>` | move a job you no longer want from any stage before ready to rejected; removes a clean worktree, keeps the branch |
 | `bin/job wait [seconds]` | block until a job that waited on you is free. Prints `RESUME: <ids>`, or `STILL WAITING` and exits 3 on timeout. Default 90 seconds, maximum 3600 |
 | `bin/job board` | start the board if none runs and print its link. Adds a `restart the board` line on stderr when the running board's code changed since it started |
 | `bin/job serve [port]` / `bin/job watch [port]` | run the board in the foreground (default ports 8765 / 8766) |
@@ -47,7 +48,7 @@ Reference for every command, setting, file and environment variable. Run command
 | `bin/tick <harness> [--dry-run]` | run one headless pass if the policy is installed |
 | `bin/tick loop [harness] [seconds] [--once]` | run a pass whenever a job can run. Default 15 seconds. `--once` checks a single time |
 | `bin/tick install [harness]` | write the policy for the harness. Replaces only files it stamped, deletes stamped stage agents no stage needs, refuses any other file in the way |
-| `bin/tick check [harness]` | exit non-zero if the policy is missing or stale, including a stale or orphaned Kiro stage agent |
+| `bin/tick check [harness]` | exit non-zero if the policy is missing or stale, including a stale or orphaned stage agent (Kiro and Claude Code files, OpenCode `agent` entries) |
 | `bin/tick print [harness]` | show what `install` would write |
 | `bin/tick list` | list the policies |
 

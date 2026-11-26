@@ -69,7 +69,7 @@ The harness is `harness` in `.planning/factory/config.json` (`claude`, `opencode
 - Each subagent starts fresh. Its prompt gives the job id, the job folder, the worktree and branch, and the stage's one-line brief. It replies with one line.
 - Where the harness lets you pick a model, choose it by stage: the largest for shape, spec, and build (design and code writing); a mid-size one for review (judgment on a diff); the smallest for polish (the comment-sicko pass, a mechanical cleanup), prove and ship (run commands, write the UAT, stage the commit). If a stage proves too hard for its model, rerun it one tier up.
 - A custom stage named `amend` (a one-line change to the plan) runs on the smallest model.
-- In Claude Code, set the `model` of each stage's subagent: `opus` for shape, spec, and build; `sonnet` for review; `haiku` for polish, prove, and ship.
+- In Claude Code, spawn the stage's subagent by name, `factory-<stage>`. `tick install` writes one `.claude/agents/factory-<stage>.md` per stage with its `model` set: `opus` for shape, spec, and build; `sonnet` for review, scope, reconcile and custom stages; `haiku` for polish, prove, ship, verify, report and `amend`. It has no agent-spawning or web tools. In OpenCode, `tick install` writes `agent.factory-<stage>` into `opencode.jsonc` (a subagent with the orchestrator's shell rules and file edits limited to the stage's area).
 - In Kiro, start each stage agent with `kiro-cli chat --model <id>` plus the usual `--v3 --no-interactive` and `--agent factory-<stage>`, choosing the id by task: `claude-opus-5.5` for shape, spec, and build; `claude-sonnet-5.5` for review; `claude-haiku-5.5` for polish, prove, and ship. `tick install` writes one agent per stage in the current pipeline, custom stages included. Each preloads one skill (shape `lets-talk-about-it`, spec `prd-mode`, build `swe`, review `review-blind-spots`, polish `comment-sicko`, prove and verify `prove-it-works`, ship `pr-body-style`, reconcile `reconcile-reviews`, report `simplify`, scope none, a custom stage its own `skill`), cannot spawn agents, and may write only its area: shape and spec under `.planning/`, build and polish the worktrees and the job folders, every other stage only the job folders. Second skills (`simplify`, `spike`, `demo-script`, the reviewer's own skill) and stack skills are loaded on demand. Pass `USER TURNED OFF` in the brief: it wins over a preloaded skill.
 - Spawn stage agents in parallel where the stage allows, then wait for all of them before the pass ends. A headless pass ends the process, so nothing may be left running.
 - A job gets `max_rounds` build rounds (default 3). The next failure moves it to `needs-human` on its own.
@@ -91,7 +91,7 @@ Each stage's agent writes the file named here with the status line first. `JOB a
 | prove | `prove-it-works` | `uat.md` with `STATUS: PASS` or `FAIL` | to `ship` on pass, `build` on fail |
 | ship | `pr-body-style` (+ `demo-script` optional) | `pr-body.md`, and `commit.md` holding the commit message | **user clicks Commit locally on the board**, then to `ready` |
 
-Stack skills are suggested by `bin/job` from the files the task has changed so far, and written to `job.json` and the queue hint (`suggested stack skills: ...`). Treat it as a suggestion: use the skills the files you touch need. `JOB stack <id>` refreshes it, and leaving build does it for you.
+Stack skills are suggested by `bin/job` from the files in the job's diff, only in the build hint and a review job's review hint, as a file-to-skill map (`suggested stack skills (...): *.ts -> typescript-strict-style`). Other stages get none. Treat it as a suggestion: use the skills the files you touch need. `JOB stack <id>` refreshes it, and leaving build does it for you.
 
 | If the files include | Use |
 | --- | --- |
@@ -102,7 +102,7 @@ Stack skills are suggested by `bin/job` from the files the task has changed so f
 | `.py`, `.pyi`, `pyproject.toml`, `uv.lock` | `python` |
 | `.tf`, `cdk.json`, `serverless.yml`, `samconfig.toml` | `aws` |
 
-For a build job the files are the whole repo. Review jobs use only the files in the diff. If `.planning/` has no codebase map, run `whats-going-on` before Shape.
+For a build job the files are what its worktree has changed since it started. Review jobs use only the files in the diff. If `.planning/` has no codebase map, run `whats-going-on` before Shape.
 
 ### Reviewers
 
