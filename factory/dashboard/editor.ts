@@ -278,7 +278,6 @@ class EditorSession {
   }
 
   private createLineButtons(): HTMLButtonElement[] {
-    // Lines that steer the board are locked at the text that was open, even after the file changes on disk.
     const lockedAtOpen = new Set(
       this.savedText.split("\n").flatMap((line, index) => (GUARDED_LINE_START_PATTERN.test(line) ? [index + 1] : [])),
     );
@@ -414,7 +413,6 @@ class EditorSession {
     this.filePollIntervalId = window.setInterval(() => void this.pollFile(), FILE_POLL_INTERVAL_MS);
   }
 
-  // Pick up the agent's changes. Clean text is swapped in; unsaved text is kept and flagged.
   private async pollFile(): Promise<void> {
     if (this.isClosed) return;
     const snapshot = await this.dependencies.load();

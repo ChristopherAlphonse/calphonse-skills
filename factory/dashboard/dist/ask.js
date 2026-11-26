@@ -274,7 +274,6 @@ export async function requestAnswer(question        )                  {
   }
 }
 
-// Chat answers and proposes. Act also applies the pipeline change it prepared, because choosing Act is the click.
 export function showMode()       {
   requireElement("modes").replaceChildren(
     ...(["chat", "act"]                     ).map((mode) => {

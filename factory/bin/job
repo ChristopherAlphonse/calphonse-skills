@@ -73,7 +73,6 @@ def transitions(job):
     comp = pipeline()[workflow_of(job)]
     if workflow_of(job) == "review":
         return comp["transitions"]
-    # The gate follows whichever stage last changed the code, and passes the job to the stage after that one.
     after = comp["next"].get(job.get("gate_for") or "build") or comp["next"]["build"]
     return {**comp["transitions"], "gate": {after, "build", "needs-human"}}
 
@@ -596,9 +595,6 @@ def justify_review(job, cur, to):
 
 
 # ---- pipeline: the order of stages, and custom stages
-# pipeline.json beside SKILL.md holds the order of each workflow's stages and any custom stages. It applies to every project.
-# The order is free, within the rules the checks need: see order_problems. The gate is not in the order: it runs by itself after
-# any stage that changes code (build, polish) and passes the job to the stage after that one.
 PIPELINE_FILE = Path(os.environ.get("FACTORY_PIPELINE") or SELF.parent.parent / "pipeline.json")
 PROPOSAL_FILE = STATE / "pipeline-proposal.json"
 BASE_ORDER = {
@@ -1169,6 +1165,7 @@ def cmd_commit(jid):
 
 
 def drop_merged_branch(job):
+    """Delete a finished job's branch, but only if git agrees it is merged and no live job still uses it."""
     branch, repo = job.get("branch"), repo_of(job)
     if not branch:
         return
@@ -1186,6 +1183,7 @@ def drop_merged_branch(job):
 
 @serialized
 def cmd_close(jid):
+    """Finish a job at ship whose work the user committed on its branch outside the board."""
     job = load(jid)
     need(job["stage"] == "ship", f"{jid} is at {job['stage']}, only a job at ship can be closed")
     need((jobdir(jid) / "pr-body.md").exists(), "pr-body.md missing")
@@ -1207,6 +1205,7 @@ def cmd_close(jid):
 
 @serialized
 def cmd_prune():
+    """Remove what finished jobs left behind: clean worktrees, then branches git says are merged."""
     for job in all_jobs():
         if job["stage"] not in TERMINAL:
             continue
@@ -1396,7 +1395,6 @@ def board_agent_guide():
         return ""
 
 
-# In Act mode the assistant is a bot built only for this board. It does not chat about anything else.
 BOT_PERSONA = ("You are Factory Bot, a bot built only for this factory board. Your name is Factory Bot. You talk about the factory and nothing else: "
                "its jobs, stages (nodes), skills, notes, the board and the chat bar, and how to use them. If asked anything outside that, including general questions, "
                "other software, news, or small talk, reply with one short sentence saying you only handle the factory board, then say what you can do here. "

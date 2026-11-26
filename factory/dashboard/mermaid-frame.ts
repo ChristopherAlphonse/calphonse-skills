@@ -1,4 +1,3 @@
-// Runs inside the sandboxed diagram frame, which has no cookie and no access to the board. The page sends it a diagram; it sends back the drawing.
 // This stays a classic script: mermaid.html loads it without type="module".
 type MermaidLibrary = {
   initialize(config: object): void;

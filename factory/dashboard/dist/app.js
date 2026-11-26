@@ -325,7 +325,6 @@ function focusEditor(key        )       {
   handle.show();
 }
 
-// The tab icon follows the active board; an amber dot and a count in the title mean something waits on you.
 function updateFaviconAndTitle()       {
   const waitingJobCount = [...viewsByBoardId.values()].reduce(
     (total, boardView) => total + needsHumanCount(boardView),
@@ -368,8 +367,6 @@ function repoLabel(job     )         {
   return job.repo?.split("/").pop() ?? "";
 }
 
-// One lane per repo, each a single row of stages, so every repo's agent shows on its own.
-// Jobs with no --repo share one lane, laid out as before.
 function renderCanvas()       {
   const boardView = currentView();
   const repoNames = boardView.jobs.length ? [...new Set(boardView.jobs.map(repoLabel))].sort() : [""];
@@ -423,7 +420,7 @@ function applyScale()       {
   drawWires(requireElement("wires"), lanes, currentScale);
 }
 
-// ---- side panel (Floorplan's structure: header, title, description, stats, titled sections)
+// ---- side panel
 function createSection(...children                        )              {
   const section = createElement("div", "sec");
   section.append(...children.filter((child)                       => child !== null));
@@ -470,7 +467,6 @@ function createListRow(job     )                    {
   return rowButton;
 }
 
-// A change to the custom stages that an agent prepared. Nothing happens until the user clicks Apply.
 function createProposalBox(boardView           , proposal                                    )              {
   const box = createElement("div", "callout");
   const orderStrip = createElement("div", "porder");
@@ -770,7 +766,6 @@ function pollBoard(boardId               )                {
   return pending;
 }
 
-// Built-in stages keep their text from BUILD and REVIEW. A custom stage brings its own label and blurb.
 function applyStages(boardView           , payload               )       {
   const builtInById = new Map(boardView.builtInStages.map((stage) => [stage.id, stage]));
   boardView.definition.stages = payload.stageOrder.flatMap((stageId) => {
@@ -811,7 +806,6 @@ async function fetchJobs(boardView           )                {
   }
 }
 
-// The poll is meant to run for the life of the page; pagehide is its explicit cleanup path.
 let pollTimeoutId = 0;
 let pollingStopped = false;
 

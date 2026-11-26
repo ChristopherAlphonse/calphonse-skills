@@ -1,7 +1,6 @@
 import { createElement } from "/static/dom.js";
 
-// Spans are capped at 2000 characters so an unclosed opener cannot make the scan quadratic.
-// Groups: 1 code, 2 strong, 3 em, 4 link text, 5 link URL. Built from parts to keep each regex under the complexity limit.
+// Groups: 1 code, 2 strong, 3 em, 4 link text, 5 link URL.
 const INLINE_PATTERN = new RegExp(
   [
     /`([^`]{1,2000})`/,
@@ -76,7 +75,6 @@ function readCodeBlock(
   return [pre, lineIndex + 1];
 }
 
-// The depth cap keeps agent-written quote chains from growing the stack without bound.
 function readQuoteBlock(
   lines: string[],
   lineIndex: number,
@@ -158,8 +156,6 @@ function readParagraphBlock(
   return [paragraph, lineIndex];
 }
 
-// Marks a block with the 1-based, inclusive source lines it came from, so a selection can be traced back to the file.
-// `lineOffset` is the index of the first line of `lines` in the whole file, for blocks nested in a quote.
 function markSourceLines(node: Element, first: number, end: number, lineOffset: number): void {
   if (!(node instanceof HTMLElement)) return;
   node.dataset.l1 = String(lineOffset + first + 1);

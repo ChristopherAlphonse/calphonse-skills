@@ -24,8 +24,7 @@ SKILL = "factory"
 POLICY_DIR = Path(__file__).resolve().parent.parent
 POLICY_FILE = POLICY_DIR / "policy.yaml"
 POLICY_EXTRA = ["policy.build.yaml"]  # more rule files this skill loads
-# Flags that make a tool rewrite files. A skill that must not change the code it reads asks before them,
-# and ask beats the broad allow rules such as `eslint *`.
+# ask beats broad allow rules such as `eslint *`.
 REWRITE_ASK = []
 PROMPT = ("Use the factory skill and run one pass (factory run). Wait for every stage agent you spawn. "
           "Never commit, push, merge, or create a PR or MR. Stop after the pass.")
@@ -34,15 +33,14 @@ GIT_WRITES = ["commit", "push", "merge", "cherry-pick", "revert", "rebase", "am"
 GIT_GLOBALS = ["-c", "-C", "--git-dir", "--work-tree", "--namespace"]
 BLOCKED = ([("git", g) for g in GIT_WRITES] + [("git", g) for g in GIT_GLOBALS]
            + [("gh",), ("glab",), ("curl",), ("wget",), ("sh", "-c"), ("bash", "-c"), ("zsh", "-c")])
-# Kiro denies by glob over each command, so wrappers that hide a blocked command need their own entries.
+# Kiro denies by glob per command, so wrappers need their own entries.
 KIRO_WRAPPERS = ["env", "xargs", "eval", "exec", "nohup", "sudo", "command", "builtin"]
 # `git --no-pager commit` and every other global option hide the verb, so match the verb anywhere after `git`.
 KIRO_GIT_ANYWHERE = [m for g in GIT_WRITES for m in (f"git * {g}", f"git * {g} *")]
 KIRO_TOOLS = ["read", "write", "shell", "grep", "glob", "subagent"]
-# 2026-11-16: the user approved agents editing **/.planning/**/config.json, so it is deliberately absent here. Do not re-add it.
+# **/.planning/**/config.json is deliberately absent: agents may edit it.
 NO_WRITE = ["**/.kiro/**", "**/.claude/**", "**/.opencode/**", "**/opencode.json", "**/opencode.jsonc", "**/.git/**", "**/.planning/**/job.json", "**/.planning/**/audit.log"]
 WRITE_ONLY = None
-# The skills each stage agent starts with. Anything else it reads on demand from .kiro/skills/<name>/SKILL.md.
 STAGE_SKILLS = {
     "shape": ["lets-talk-about-it"], "spec": ["prd-mode"], "build": ["swe"],
     "review": ["qa-review", "test-review", "review-blind-spots"], "polish": ["comment-sicko", "simplify"],
@@ -148,7 +146,7 @@ def project_allow():
     checks = cfg.get("checks", "")
     if not isinstance(checks, str):
         die(f"{path}: `checks` must be a string")
-    parts = [c.strip() for c in re.split(r"&&|;", checks) if c.strip()]  # a harness checks each part of a chain
+    parts = [c.strip() for c in re.split(r"&&|;", checks) if c.strip()]  # harness checks each part
     return uniq([x.strip() for x in extra] + ([checks.strip()] if checks.strip() else []) + parts)
 
 
@@ -259,7 +257,7 @@ def guard_files(harness):
 
     Returns ({relative path: text}, hook config for the harness, or None when the harness loads files itself).
     """
-    pol = shell_policy("kiro")  # the strictest list: it also denies command wrappers and `git <option> <verb>`
+    pol = shell_policy("kiro")  # the strictest list
     rules = {**pol, "no_write": NO_WRITE, "write_only": WRITE_ONLY or []}
     base = f"{GUARD_DIR[harness]}/{SKILL}-guard"
     py, js = str(ROOT / f"{base}.py"), str(ROOT / f"{base}.json")
@@ -383,7 +381,7 @@ def cmd_run(harness, dry):
 
 
 PASS_TIMEOUT = 3600  # seconds one agent pass may run before it is killed
-STALL_LIMIT = 2  # passes in a row that change no job file before the loop stops retrying that state
+STALL_LIMIT = 2  # passes in a row with no job-file change
 JOB = POLICY_DIR / "bin" / "job"
 
 

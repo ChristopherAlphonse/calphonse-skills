@@ -55,7 +55,6 @@
                        
  
 
-// The server derives needs_human from needs. Keeping them as one variant makes disagreement unrepresentable.
                                                
                
                    
@@ -82,7 +81,6 @@
                    
  
 
-// The /api/<board>/stages payload: the stage order for one workflow, the custom stages' labels, and any waiting change.
                                 
                        
                                                                  

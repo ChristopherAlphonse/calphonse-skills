@@ -1,4 +1,4 @@
-// Writes dist/<name>.js from each <name>.ts by erasing types. `--check` writes nothing and fails on a stale, missing or orphan dist file.
+// Erases types from each <name>.ts into dist/<name>.js. `--check` fails on a stale, missing or orphan dist file.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 import { dirname, join } from "node:path";

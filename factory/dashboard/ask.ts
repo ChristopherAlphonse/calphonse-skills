@@ -273,7 +273,6 @@ export async function requestAnswer(question: string): Promise<string> {
   }
 }
 
-// Chat answers and proposes. Act also applies the pipeline change it prepared, because choosing Act is the click.
 export function showMode(): void {
   requireElement("modes").replaceChildren(
     ...(["chat", "act"] as InteractionMode[]).map((mode) => {

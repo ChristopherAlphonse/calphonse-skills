@@ -147,7 +147,7 @@ class TestWatchRebuild(Watch):
         shutil.copy2(JOB.parent / "board", self.copy / "bin" / "board")
         shutil.copytree(JOB.parent.parent / "dashboard", self.copy / "dashboard")
         self.dist = self.copy / "dashboard" / "dist"
-        for src in (self.copy / "dashboard").glob("*.ts"):  # fixed clock: every source older than its dist
+        for src in (self.copy / "dashboard").glob("*.ts"):  # fixed clock
             os.utime(src, (1_000_000, 1_000_000))
             os.utime(self.dist / f"{src.stem}.js", (1_000_010, 1_000_010))
 
@@ -188,7 +188,7 @@ class TestWatchRebuild(Watch):
     def test_a_stale_source_rebuilds_dist_without_a_warning(self):
         built = (self.dist / "app.js").read_bytes()
         (self.dist / "app.js").write_bytes(built + b"// edited by hand\n")
-        os.utime(self.dist / "app.js", (1_000_010, 1_000_010))  # the write reset it to the real clock
+        os.utime(self.dist / "app.js", (1_000_010, 1_000_010))  # the write reset the mtime
         os.utime(self.copy / "dashboard" / "app.ts", (1_000_100, 1_000_100))
         p = self.start_copy()
         self.assertEqual(self.http("GET", "/static/app.js"), (200, built))

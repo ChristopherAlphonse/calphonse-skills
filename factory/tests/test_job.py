@@ -37,8 +37,7 @@ class Factory(unittest.TestCase):
             p.write_text(f"#!/bin/sh\necho {tool} >> '{self.cli_marker}'\nexit 1\n")
             p.chmod(0o755)
         env = {k: v for k, v in os.environ.items() if not k.startswith("FACTORY_")}
-        # Keep the developer's own pipeline.json out of behavior tests: they assume the built-in stage order.
-        # A missing file makes bin/job fall back to its default pipeline; test_pipeline.py points this at its own file.
+        # A missing pipeline.json falls back to the built-in stage order, which these tests assume.
         env.update(FACTORY_ROOT=str(self.root), FACTORY_NO_WATCH="1", GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1",
                    FACTORY_PIPELINE=str(self.base / "pipeline.json"),
                    PATH=f"{self.fakebin}:{env.get('PATH', '')}")
@@ -1476,7 +1475,6 @@ class TestServer(Factory):
     def test_post_status_codes(self):
         self.new_spec("a")
         self.assertEqual(self.http("POST", "/api/build/approve", raw=b"not json")[0], 400)
-        # A missing id is an empty job id; the board passes it through and the engine refuses it.
         self.assertEqual(self.http("POST", "/api/build/approve", body={"nope": 1})[0], 409)
         self.assertEqual(self.http("POST", "/api/build/approve", body={"id": "missing"})[0], 409)
         self.assertEqual(self.http("POST", "/api/build/commit", body={"id": "a"})[0], 409)

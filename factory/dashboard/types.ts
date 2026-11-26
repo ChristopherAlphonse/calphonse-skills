@@ -54,7 +54,6 @@ interface JobFields {
   canUnblock?: boolean;
 }
 
-// The server derives needs_human from needs. Keeping them as one variant makes disagreement unrepresentable.
 export interface WaitingJob extends JobFields {
   needs: Needs;
   needsHuman: true;
@@ -81,7 +80,6 @@ export interface Proposal {
   isStale: boolean;
 }
 
-// The /api/<board>/stages payload: the stage order for one workflow, the custom stages' labels, and any waiting change.
 export interface StagesPayload {
   stageOrder: string[];
   customStages: Record<string, { label: string; blurb: string }>;

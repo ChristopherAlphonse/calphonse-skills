@@ -21,7 +21,6 @@ STATE = ROOT / ".planning" / "factory-board"
 STATIC_CSS = {"dashboard.css": "text/css"}
 SCRIPT_NAME = re.compile(r"[a-z0-9][a-z0-9-]*\.js")
 ENGINE_FILE = HERE / "job"
-# The Python this process loaded. It reads these once, so an edit afterwards means the running board is out of date.
 OWN_FILES = (HERE / "board", ENGINE_FILE)
 
 
@@ -53,11 +52,10 @@ ASK_TIMEOUT = 300
 COOKIE = "factory-board"
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; frame-src 'self'; "
        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
-# Diagram frames run in an opaque origin, so they carry no session cookie. They may use inline styles, which Mermaid's SVG needs, and nothing else.
+# Mermaid's SVG needs inline styles.
 FRAME_CSP = ("default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; "
              "base-uri 'none'; form-action 'none'; sandbox allow-scripts")
 MAX_LIBRARY = 20_000_000
-# Tab icons: a rounded square with a board glyph. The amber dot means something waits on the user.
 FAVICON_GLYPH = {
     "factory": ("#e8e8e8", '<path d="M5 18V9l5 3V9l5 3V6h4v12z"/>'),
     "build": ("#7aa7ff", '<path d="M12 5l7 4-7 4-7-4zM5 13l7 4 7-4"/>'),
