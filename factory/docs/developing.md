@@ -46,7 +46,10 @@ The quick subset covers the logic that does not need a git repo or an HTTP serve
 | `test_review_workflow.py` | the review stages |
 | `test_dashboard_build.py` | that `dist/` matches the sources |
 | `test_repo_index.py` | that the docs and the skill index match the files |
+| `test_private_names.py` | that no work-specific name is in the repo (runs `scripts/check-private-names`) |
 | `probe_harness.py` | attack runs against a real harness. Not a unit test |
+
+The private-names list lives outside the repo, in `$PRIVATE_NAMES_FILE` or else `~/.config/calphonse-skills/private-names`, one whole-word pattern per line like `\bname\b`. Without it, `test_private_names.py` skips its repo check.
 
 ## Checking the page for real
 

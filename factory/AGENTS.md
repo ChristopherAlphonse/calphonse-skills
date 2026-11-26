@@ -35,8 +35,8 @@ A board of jobs. Each job moves through fixed stages, one fresh agent per stage,
 ## Changing the board page
 
 - Edit `dashboard/*.ts`, then run `node dashboard/build.mjs` (Node 24 or later). Commit the regenerated `dist/`. `node dashboard/build.mjs --check` must pass, and `tests/test_dashboard_build.py` runs it. Only erasable TypeScript: no `enum`, `namespace`, or constructor parameter properties.
-- **Every script the page imports must be listed in `STATIC` in `bin/board`.** A missing entry returns 403 and the whole page sticks on "connecting". `test_every_script_the_page_imports_is_served` catches it.
-- A running board does not reload. Restart it after editing `bin/board`, `bin/job` or a `.ts` file.
+- The board serves any script in `dist/` whose name matches `[a-z0-9-]+.js`, and nothing outside `dist/`. `test_any_script_in_dist_is_served_and_nothing_outside_it` in `tests/test_watch.py` checks it.
+- A running board does not reload. Restart it after editing `bin/board`, `bin/job` or a `.ts` file. When `bin/board` or `bin/job` changed since the board started, `JOB board` prints the same link plus a `restart the board` line on stderr, and the page says so too.
 - Job files open in editor tabs beside the board tabs (`dashboard/editor.ts`). The panel lists files and never renders them. Board controls (filters, Panel, sidebar) switch back to the board first.
 - Saving (`POST /api/<board>/save`) replaces a whole job file. It needs the file's current hash (`X-Base`), and answers 409 if the file moved on. It answers 422 if the edit changes a `STATUS:`, `VERDICT:` or similar line, because those steer the stages.
 - Chat turns are appended to `.planning/factory-board/chat.jsonl` and restored on load.

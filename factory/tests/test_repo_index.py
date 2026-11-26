@@ -33,6 +33,13 @@ class RepoIndex(unittest.TestCase):
                 self.assertEqual(fm.get("name"), skill)
                 self.assertTrue(fm.get("description", "").strip())
 
+    def test_the_blind_spots_row_counts_its_checks(self):
+        words = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]
+        count = len(re.findall(r"^## \d+\.", (REPO / "review-blind-spots" / "SKILL.md").read_text(), re.M))
+        row = re.search(r"^\| \[review-blind-spots\]\([^)]*\) \| (\w+) ", (REPO / "AGENTS.md").read_text(), re.M)
+        self.assertIsNotNone(row)
+        self.assertEqual(row.group(1).lower(), words[count])
+
     def test_agents_index_lists_every_skill_and_only_real_ones(self):
         index = (REPO / "AGENTS.md").read_text()
         listed = re.findall(r"^\| \[([^\]]+)\]\(([^)]+)/SKILL\.md\)", index, re.M)

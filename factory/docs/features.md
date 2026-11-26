@@ -26,7 +26,9 @@ A web page on your own computer. It shows every job as a little chip sitting on 
 
 ### 1.2 The link with a secret code
 
-The board prints a link that ends in `?c=` and a code. The code is a secret handshake. Open the link once and the board remembers you. The same link works in many browser tabs until the board is switched off.
+The board prints a link that ends in `?c=` and a code. The code is a secret handshake. Open the link once and the board remembers you. The same link works in many browser tabs until the board is switched off. After the board remembers you, it sends you on to a plain address, so the code does not stay in the address bar.
+
+When the board's own code changed after it started, `bin/job board` still prints the same link and adds a line saying to restart the board, and the page keeps saying "restart the board" until you do. It never restarts by itself, because that would log out every open tab.
 
 ### 1.3 Two boards: Build and Review
 
