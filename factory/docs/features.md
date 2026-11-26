@@ -262,7 +262,7 @@ If `.planning/` has no map of the project, the `whats-going-on` skill makes one 
 
 Where your tool lets you pick a model, review, polish, prove and ship agents run on a smaller one. Shape, spec and build keep the model of your session.
 
-In Claude Code each stage's subagent gets `opus` (shape, spec, build), `sonnet` (review) or `haiku` (polish, prove, ship). In Kiro the model is picked per stage with `kiro-cli chat --model <id>`: `claude-opus-5.5` for shape, spec and build, `claude-sonnet-5.5` for review, `claude-haiku-5.5` for polish, prove and ship.
+In Claude Code each stage's agent file sets `opus` (shape, spec, build), `sonnet` (review) or `haiku` (polish, prove, ship). In Kiro the model is picked per stage with `kiro-cli chat --model <id>`: `claude-opus-5.5` for shape, spec and build, `claude-sonnet-5.5` for review, `claude-haiku-5.5` for polish, prove and ship.
 
 ## Part 5: Running by itself
 
@@ -327,6 +327,8 @@ A pass stops when nothing is left to run. Your next click needs a new pass. The 
 ### 5.8 Three tools, one factory
 
 Claude Code, OpenCode and Kiro all work, with the same rules and the same guard. See [Harnesses](harnesses.md).
+
+Each tool also gets one agent per stage, written by `tick install` and checked by `tick check`: `.kiro/agents/factory-<stage>.json`, `.claude/agents/factory-<stage>.md`, or `agent.factory-<stage>` in `opencode.jsonc`. A stage agent cannot start other agents and has the same shell rules as the orchestrator. When the stage list changes, `tick check` fails until you run `tick install` again.
 
 ### 5.9 Starting the board by itself
 
