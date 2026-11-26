@@ -1,6 +1,7 @@
-import json, subprocess, unittest
+import contextlib, importlib.machinery, importlib.util, io, json, os, subprocess, unittest
+from unittest import mock
 
-from test_job import Factory
+from test_job import JOB, Factory
 
 
 class Integrity(Factory):
@@ -46,6 +47,19 @@ class Integrity(Factory):
         self.assertEqual(self.stage("j"), "needs-human")
         self.assertIsNone(self.js("j")["worktree"])
 
+
+    def test_queue_reads_the_audit_log_once_for_all_jobs(self):
+        for jid in ("a", "b", "c"):
+            self.ok("create", jid, "T")
+        with mock.patch.dict(os.environ, {"FACTORY_ROOT": str(self.root), "FACTORY_NO_WATCH": "1"}):
+            loader = importlib.machinery.SourceFileLoader("job_under_test", str(JOB))
+            mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+            loader.exec_module(mod)
+            with mock.patch.object(mod, "audit_lines", wraps=mod.audit_lines) as reads, contextlib.redirect_stdout(io.StringIO()) as out:
+                mod.cmd_queue()
+        self.assertEqual(reads.call_count, 1)
+        self.assertEqual([l.split("\t")[:2] for l in out.getvalue().splitlines()], [["run", "a"], ["wait", "b"], ["wait", "c"]])
+        self.assertEqual({self.stage(j) for j in "abc"}, {"shape"})
 
 if __name__ == "__main__":
     unittest.main()

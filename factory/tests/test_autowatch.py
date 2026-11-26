@@ -51,12 +51,17 @@ class TestAutoStart(AutoWatch):
         self.assertEqual([j["id"] for j in json.loads(self.http("GET", "/api/build/jobs")[1])], ["j"])
         self.assertEqual(self.http("POST", "/api/build/approve", body={"id": "j"})[0], 409)
 
-    def test_queue_reuses_the_running_board(self):
+    def test_board_reuses_the_running_board(self):
         first = self.link(self.ok("create", "j", "T"))
         pid = self.watch_info()["pid"]
         for _ in range(3):
-            self.assertEqual(self.link(self.ok("queue")), first)
+            self.assertEqual(self.ok("board").stdout.strip(), first)
         self.assertEqual(self.watch_info()["pid"], pid)
+
+    def test_queue_prints_no_link_and_create_does(self):
+        self.link(self.ok("create", "j", "T"))
+        r = self.ok("queue")
+        self.assertNotIn("board:", r.stderr + r.stdout)
 
     def test_the_board_outlives_the_command_that_started_it(self):
         self.ok("create", "j", "T")
@@ -74,7 +79,7 @@ class TestAutoStart(AutoWatch):
             if not self.alive(old["pid"]):
                 break
             time.sleep(0.1)
-        url = self.link(self.ok("queue"))
+        url = self.ok("board").stdout.strip()
         self.assertNotEqual(self.watch_info()["pid"], old["pid"])
         self.redeem(url)
         self.assertEqual(self.http("GET", "/api/build/jobs")[0], 200)

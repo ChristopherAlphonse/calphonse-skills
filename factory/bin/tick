@@ -15,7 +15,7 @@ The baseline rules (deny, ask, allow) live in ../policy.yaml. Every harness gets
 denies below. Deny beats ask, and ask beats allow. An unattended pass cannot answer an ask, so an ask
 stops the command until a human runs it.
 """
-import fcntl, hashlib, json, os, re, shlex, shutil, subprocess, sys, time
+import fcntl, hashlib, json, os, re, shlex, shutil, signal, subprocess, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -365,13 +365,43 @@ def run_pass(harness):
     argv = COMMANDS[harness](PROMPT)
     if not shutil.which(argv[0]):
         die(f"{argv[0]} is not on PATH")
+    limit = pass_timeout()
     log(harness, "start")
+    # Its own process group, so a timeout also stops every agent the pass started.
+    p = subprocess.Popen(argv, cwd=ROOT, start_new_session=True)
     try:
-        code = subprocess.run(argv, cwd=ROOT, timeout=PASS_TIMEOUT).returncode
+        code = p.wait(timeout=limit)
     except subprocess.TimeoutExpired:
+        stop_group(p)
         code = 124
+    except KeyboardInterrupt:
+        stop_group(p)
+        raise
     log(harness, f"exit {code}")
     return code
+
+
+def stop_group(p):
+    for sig, grace in ((signal.SIGTERM, 5), (signal.SIGKILL, None)):
+        try:
+            os.killpg(p.pid, sig)
+        except ProcessLookupError:
+            break
+        try:
+            p.wait(timeout=grace)
+        except subprocess.TimeoutExpired:
+            pass
+
+
+def pass_timeout():
+    """Seconds one agent pass may run before it is killed: `pass_timeout` in the project config, default 7200.
+    An unreadable config falls back to the default; a value that is not a positive integer is refused."""
+    path = ROOT / ".planning" / SKILL / "config.json"
+    cfg = read_json(path) if path.exists() else {}
+    value = cfg.get("pass_timeout", 7200) if isinstance(cfg, dict) else 7200
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        die(f"{path}: `pass_timeout` must be a positive number of seconds")
+    return value
 
 
 def cmd_run(harness, dry):
@@ -382,7 +412,6 @@ def cmd_run(harness, dry):
     sys.exit(run_pass(harness))
 
 
-PASS_TIMEOUT = 3600  # seconds one agent pass may run before it is killed
 STALL_LIMIT = 2  # passes in a row that change no job file before the loop stops retrying that state
 JOB = POLICY_DIR / "bin" / "job"
 

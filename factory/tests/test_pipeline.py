@@ -259,5 +259,34 @@ class TestRunning(Pipeline):
         self.assertIn("spec has to come", err.replace("build has to come after spec", "spec has to come") if "build has to come after spec" in err else err + "spec has to come")
 
 
+class TestPerProject(Review):
+    """No FACTORY_PIPELINE: each project keeps its own pipeline in .planning/factory."""
+
+    def order_in(self, root, wf="build"):
+        out = self.ok("pipeline", "show", extra_env={"FACTORY_ROOT": str(root)}).stdout
+        return next(l for l in out.splitlines() if l.startswith(f"{wf}:"))[len(wf) + 2:].replace("[", "").replace("]", "")
+
+    def apply_in(self, root, *args):
+        self.stop_servers()
+        self.env["FACTORY_ROOT"] = str(root)
+        self.ok("pipeline", "propose", *args)
+        self.human("applypipe", "")
+
+    def test_a_change_in_one_project_never_shows_in_the_other_either_way(self):
+        self.assertNotIn("FACTORY_PIPELINE", self.env)
+        a, b = self.root, self.base / "other"
+        b.mkdir()
+        self.git("init", "-b", "main", cwd=b)
+        self.apply_in(a, "add", "build", "sec-scan", "review", "Security scan", "")
+        self.assertTrue((a / ".planning" / "factory" / "pipeline.json").exists())
+        self.assertEqual(self.order_in(a), "shape > spec > build > review > sec-scan > polish > prove > ship > ready")
+        self.assertEqual(self.order_in(b), BUILD_DEFAULT)
+        self.apply_in(b, "add", "build", "lint-pass", "build", "Lint pass", "")
+        self.assertEqual(self.order_in(b), "shape > spec > build > lint-pass > review > polish > prove > ship > ready")
+        self.assertEqual(self.order_in(a), "shape > spec > build > review > sec-scan > polish > prove > ship > ready")
+        for root in (a, b):
+            self.assertEqual(self.order_in(root, "review"), REVIEW_DEFAULT)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -92,6 +92,9 @@ def load_engine():
 
 
 ENGINE = None
+CHAT_TURN_LIMIT = 20  # a resumed chat slows as it grows, so start a fresh one after this many turns
+CHAT_TURNS = {}  # session id -> turns in that conversation; a resumed claude turn may come back under a new id
+NEW_CHAT = "Started a new chat to keep it fast. Earlier messages are not carried over."
 
 
 def engines():
@@ -145,6 +148,11 @@ def ask(board, jid, question, session, engine, model, effort, act=False):
         return {"error": f"{ENGINES[engine]} was not found on PATH"}
     if model and not MODEL_NAME.fullmatch(model):
         return {"error": f"bad model name {model!r}"}
+    turns = CHAT_TURNS.get(session, 0) if session else 0
+    fresh = turns >= CHAT_TURN_LIMIT
+    if fresh:
+        session, turns = "", 0
+    note = lambda answer: f"{NEW_CHAT}\n\n{answer}" if fresh else answer
     args, stdin = ask_args(engine, exe, str(ENGINE.SELF), ENGINE.ask_system(jid, board, act), question, session, model, effort if effort in EFFORTS else "")
     try:
         r = subprocess.run(args, input=stdin, capture_output=True, text=True, timeout=ASK_TIMEOUT,
@@ -158,12 +166,21 @@ def ask(board, jid, question, session, engine, model, effort, act=False):
             return {"error": (r.stderr or r.stdout).strip()[-500:] or "claude returned nothing"}
         if out.get("is_error"):
             return {"error": str(out.get("result", "claude reported an error"))[:500]}
-        return {"answer": out.get("result", ""), "session": out.get("session_id", "")}
+        sid = out.get("session_id", "")
+        count_turn(session, sid, turns)
+        return {"answer": note(out.get("result", "")), "session": sid}
     ansi = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
     text = ansi.sub("", r.stdout).strip()
     if r.returncode or not text:
         return {"error": (ansi.sub("", r.stderr).strip() or text or f"{engine} exited {r.returncode}")[-500:]}
-    return {"answer": text}
+    count_turn(session, session, turns)
+    return {"answer": note(text)}
+
+
+def count_turn(old, new, turns):
+    CHAT_TURNS.pop(old, None)
+    if new:
+        CHAT_TURNS[new] = turns + 1
 
 
 FRAME_HEADERS = {"Content-Security-Policy": FRAME_CSP, "X-Frame-Options": "SAMEORIGIN"}

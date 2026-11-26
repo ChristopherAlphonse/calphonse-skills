@@ -18,7 +18,7 @@ Reference for every command, setting, file and environment variable. Run command
 | `bin/job note <id> "<text>"` | record what the agent is doing now. The card shows the latest note |
 | `bin/job skill <id> <name> on\|off` | switch a skill off or on for one job |
 | `bin/job brief <id> <stage> <text>` | set a note the next agent for that stage follows. Empty text clears it |
-| `bin/job wait [seconds]` | block until a job that waited on you is free. Prints `RESUME: <ids>`, or `STILL WAITING` and exits 3 on timeout. Default 90 seconds, maximum 3600 |
+| `bin/job wait [seconds]` | block until a job that waited on you is free. Prints `RESUME: <ids>`, or `STILL WAITING` on timeout, and exits 0 either way: the agent then ends its turn. Default 90 seconds, maximum 3600 |
 | `bin/job board` | start the board if none runs and print its link |
 | `bin/job serve [port]` / `bin/job watch [port]` | run the board in the foreground (default ports 8765 / 8766) |
 | `bin/job pipeline show` | print the current stage order and where a new stage can go |
@@ -63,6 +63,7 @@ Agents cannot edit this file.
 | `protected_paths` | none | Extra paths that fail the gate when touched |
 | `allow` | none | Extra shell patterns agents may run unattended, such as `make verify*`. Your `checks` command is allowed already |
 | `auto_watch` | on | Set to `false` to stop `bin/job` starting the board by itself. `bin/job board` then fails, and you run `bin/job watch` |
+| `pass_timeout` | 7200 | Seconds one `bin/tick` pass may run. On timeout the pass and every agent it started are stopped, and the log shows `exit 124` |
 
 ## Files
 
@@ -78,8 +79,8 @@ State lives in the project, never in this repo.
 | `.planning/factory/scratch/<id>/<reviewer>/` | where a reviewer works on a copy |
 | `.planning/factory/loop.log` | output of a loop started in the background |
 | `.planning/factory-board/chat.jsonl` | the chat bar's saved conversation |
+| `.planning/factory/pipeline.json` | this project's stage order and custom stages; missing means the default |
 | `.worktrees/<id>/` | the job's branch, `feature/<TICKET>`, checked out locally |
-| `pipeline.json` (in the factory skill folder) | custom stages, for every project |
 | `policy.yaml`, `policy.build.yaml` (in the factory skill folder) | shell rules for all runs, and extra rules only build jobs load |
 
 ### Stage files

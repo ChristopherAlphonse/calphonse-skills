@@ -17,7 +17,7 @@ The board has buttons (Approve spec, Commit locally, Unblock), a skill switch an
 
 ## Waiting on the user
 
-When a job waits on the user (spec approval, **Commit locally**, **Unblock**), say so and point at the board link. Then do not end your turn. Run `JOB wait` (90 seconds by default, `JOB wait 110` to choose). It prints `RESUME: <ids> ...` the moment the user clicks, and then you run `JOB queue` and carry on. It prints `STILL WAITING` and exits 3 on timeout: run it again, and keep going until it prints `RESUME`, the user answers in chat, or the user says to stop.
+When a job waits on the user (spec approval, **Commit locally**, **Unblock**), run `JOB wait` once (90 seconds by default, `JOB wait 110` to choose). If it prints `RESUME: <ids> ...`, run `JOB queue` and carry on. If it prints `STILL WAITING`, end your turn with the board link and one line saying what to click. A long-open turn slows the session down, so never loop on `JOB wait`. If `TICK loop` runs, it picks the job up after the click; if not, the user says "continue".
 
 ## User choices on the board
 
@@ -35,7 +35,7 @@ The sections below say which workflow they belong to. A review job never edits c
 
 ## Stage order and custom stages
 
-The tables below show the default order. `pipeline.json` beside this file can change it: the user can add, remove and move stages, within the rules the checks need (spec before build, build before review, polish and prove, ship last, and for reviews scope first and report last). You never rely on the default order. The queue hint for a job always ends with `on success advance to: <stage>`, so read it and run `JOB advance <id> <that stage>`. The gate is not a stage in the order: it runs after any stage that changes code (build, polish) and passes the job to the stage after that one, or back to build when it fails.
+The tables below show the default order. The project's `.planning/factory/pipeline.json` can change it, for that project only: the user can add, remove and move stages, within the rules the checks need (spec before build, build before review, polish and prove, ship last, and for reviews scope first and report last). You never rely on the default order. The queue hint for a job always ends with `on success advance to: <stage>`, so read it and run `JOB advance <id> <that stage>`. The gate is not a stage in the order: it runs after any stage that changes code (build, polish) and passes the job to the stage after that one, or back to build when it fails.
 
 A custom stage is not special to you: the queue hint names it, the skill to run and the file to write, and you spawn a fresh agent for it like any other stage. It writes `<stage-id>.md` in the job folder with `STATUS: READY` on the first line, or `STATUS: BLOCKED` when it cannot go on. Then `JOB advance` moves the job, and `BLOCKED` parks it on the user, whose Unblock retries that stage. Custom stages never wait on the user themselves.
 

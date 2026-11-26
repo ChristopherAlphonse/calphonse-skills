@@ -18,7 +18,7 @@ A stage on the board is called a node. Their order is free within a few rules th
 - `.planning/factory/audit.log`: one line per state change. Read it to answer "what happened".
 - `.planning/factory/config.json`: the gate's `checks`, `max_rounds`, concurrency, protected paths.
 - `.planning/factory-board/chat.jsonl`: this chat, saved. The page restores it on load.
-- `pipeline.json`, beside `SKILL.md` in the factory skill: the order of the stages and any custom stages. It applies to every project. A pending change waits in `.planning/factory/pipeline-proposal.json`.
+- `.planning/factory/pipeline.json`: this project's order of the stages and any custom stages. With no file the project uses the default order. A pending change waits in `.planning/factory/pipeline-proposal.json`.
 - `.worktrees/`: each build job's local worktree and branch.
 
 A job made with `create <id> <title> --repo <dir>` works in that git repo instead of the project folder, and its `job.json` has a `repo` path. When any job has one, the board draws one lane per repo, each its own row of stages. The branch is `feature/<TICKET>`, where the ticket is the id's leading key and number (`proj-174-data-ui` uses `feature/PROJ-174`).
@@ -49,7 +49,7 @@ Some orders the checks cannot work with, and the command refuses them with a sen
 
 **Do what the user asked.** "Add a workflow", "add a task", "add a step" and "add a node" all mean `pipeline propose add`, in `build` unless the user says review. You add the stage; you never perform it. Your own limits (no git writes, no timers, no network) do not apply to what a stage's agent is asked to do, so they are never a reason to refuse. If the message is cut off or vague, read the earlier turns, pick a label from the user's words and add the closest stage. Do not ask a question first. Only the command may refuse. If `pipeline propose` accepts it, the user gets it. Never decline, never ask "do you want me to", and never swap in a different change, because you think it is a bad idea. Add what you think they should know in one sentence after the change, not instead of it.
 
-A change is only a proposal until it is applied, and it then takes effect for every project. Follow these steps in this order, every time.
+A change is only a proposal until it is applied, and it then takes effect for this project only. Follow these steps in this order, every time.
 
 1. Run `pipeline show`. It prints each workflow's order, then "a stage can go after:" with every place a new stage may go.
 2. Build one command from what the user said:
