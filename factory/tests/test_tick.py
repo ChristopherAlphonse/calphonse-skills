@@ -79,11 +79,12 @@ class TickTests(unittest.TestCase):
 
     def test_opencode_comments_and_legacy_format(self):
         run(self.root, "install", "opencode")
-        rules = json.loads((self.root / "opencode.jsonc").read_text())["permissions"]
+        cfg = json.loads((self.root / "opencode.jsonc").read_text())
+        rules = cfg["permissions"]
         (self.root / "opencode.jsonc").unlink()
         legacy = {"bash": {r["resource"]: r["effect"] for r in rules if r["action"] == "shell"},
                   "edit": {r["resource"]: r["effect"] for r in rules if r["action"] == "edit"}}
-        (self.root / "opencode.jsonc").write_text("// managed\n" + json.dumps({"permission": legacy}))
+        (self.root / "opencode.jsonc").write_text("// managed\n" + json.dumps({"permission": legacy, "agent": cfg["agent"]}))
         self.assertEqual(run(self.root, "check", "opencode").returncode, 0)
 
     def test_install_never_overwrites(self):
@@ -647,7 +648,7 @@ class StageAgentTests(unittest.TestCase):
         self.assertEqual(r.returncode, 2)
         self.assertIn("clash", r.stderr)
 
-    def test_claude_and_opencode_keep_project_wide_settings(self):
+    def test_claude_and_opencode_write_no_kiro_files(self):
         for h in ("claude", "opencode"):
             with self.subTest(h):
                 root = self.root / h
@@ -655,7 +656,6 @@ class StageAgentTests(unittest.TestCase):
                 (root / "pipeline.json").write_text(json.dumps(CUSTOM))
                 self.assertEqual(run(root, "install", h).returncode, 0)
                 self.assertFalse((root / ".kiro").exists())
-                self.assertFalse(list(root.rglob(f"{SKILL}-tidy*")))
 
     def test_agents_cannot_write_config_json(self):
         glob = "**/.planning/**/config.json"
@@ -672,6 +672,188 @@ class StageAgentTests(unittest.TestCase):
                 root.mkdir()
                 self.assertEqual(run(root, "install", h).returncode, 0)
                 self.assertTrue(check(root))
+
+
+def front_matter(text):
+    head = text.split("\n---\n", 1)[0].removeprefix("---\n")
+    return dict(line.split(": ", 1) for line in head.splitlines())
+
+
+class OtherHarnessStageAgentTests(unittest.TestCase):
+    """Claude Code gets .claude/agents/factory-<stage>.md, OpenCode gets agent.factory-<stage> in opencode.jsonc."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(dir=SCRATCH)
+        self.root = Path(self.tmp.name)
+        self.tick = tick_module()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def project(self, h, state=None):
+        root = self.root / h
+        root.mkdir(exist_ok=True)
+        if state is not None:
+            (root / "pipeline.json").write_text(json.dumps(state))
+        return root
+
+    def install(self, root, h):
+        r = run(root, "install", h)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r
+
+    def stages(self, root, h):
+        if h == "claude":
+            return {f.stem for f in (root / ".claude" / "agents").glob(f"{SKILL}-*.md")}
+        return set(json.loads((root / "opencode.jsonc").read_text())["agent"])
+
+    def test_generation_is_byte_identical(self):
+        for h in ("claude", "opencode"):
+            with self.subTest(h):
+                root = self.project(h, CUSTOM)
+                first, second = run(root, "print", h), run(root, "print", h)
+                self.assertEqual(first.returncode, 0, first.stderr)
+                self.assertEqual(first.stdout, second.stdout)
+                self.install(root, h)
+                files = [f for f in root.rglob("*") if f.is_file() and ".planning" not in f.parts and f.name != "pipeline.json"]
+                snap = {f: f.read_bytes() for f in files}
+                for f in files:
+                    f.unlink()
+                self.install(root, h)
+                self.assertEqual({f: f.read_bytes() for f in files}, snap)
+
+    def test_adding_a_stage_adds_exactly_one_agent_per_harness(self):
+        for h in ("claude", "opencode"):
+            with self.subTest(h):
+                root = self.project(h)
+                self.install(root, h)
+                before = self.stages(root, h)
+                (root / "pipeline.json").write_text(json.dumps(CUSTOM))
+                self.assertEqual(run(root, "check", h).returncode, 2)
+                self.install(root, h)
+                self.assertEqual(self.stages(root, h) ^ before, {f"{SKILL}-tidy"})
+                (root / "pipeline.json").write_text(json.dumps(NO_POLISH))
+                self.install(root, h)
+                self.assertNotIn(f"{SKILL}-polish", self.stages(root, h))
+                self.assertNotIn(f"{SKILL}-tidy", self.stages(root, h))
+                self.assertEqual(run(root, "check", h).returncode, 0)
+
+    def test_a_stale_claude_agent_fails_check(self):
+        root = self.project("claude")
+        self.install(root, "claude")
+        path = root / ".claude" / "agents" / f"{SKILL}-build.md"
+        path.write_text(path.read_text().replace("model: opus", "model: haiku"))
+        r = run(root, "check", "claude")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn(f".claude/agents/{SKILL}-build.md is missing or differs", r.stderr)
+        self.install(root, "claude")
+        self.assertIn("model: opus", path.read_text())
+
+    def test_a_stale_opencode_agent_fails_check(self):
+        root = self.project("opencode")
+        self.install(root, "opencode")
+        path = root / "opencode.jsonc"
+        cfg = json.loads(path.read_text())
+        cfg["agent"][f"{SKILL}-review"]["permission"]["edit"]["**"] = "allow"
+        path.write_text(json.dumps(cfg))
+        r = run(root, "check", "opencode")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn(f"agent {SKILL}-review is missing or differs", r.stderr)
+
+    def test_an_orphan_stage_agent_fails_check(self):
+        root = self.project("claude")
+        self.install(root, "claude")
+        agents = root / ".claude" / "agents"
+        (agents / f"{SKILL}-old.md").write_text((agents / f"{SKILL}-build.md").read_text())
+        (agents / f"{SKILL}-mine.md").write_text("---\nname: mine\ndescription: by hand\n---\n\nhi\n")
+        r = run(root, "check", "claude")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn(f"{SKILL}-old.md is a generated stage agent that no stage uses", r.stderr)
+        self.assertNotIn("mine", r.stderr)
+        r = self.install(root, "claude")
+        self.assertIn(f"removed .claude/agents/{SKILL}-old.md", r.stdout)
+        self.assertTrue((agents / f"{SKILL}-mine.md").exists())
+        root = self.project("opencode")
+        self.install(root, "opencode")
+        cfg = json.loads((root / "opencode.jsonc").read_text())
+        cfg["agent"][f"{SKILL}-old"] = cfg["agent"][f"{SKILL}-build"]
+        (root / "opencode.jsonc").write_text(json.dumps(cfg))
+        r = run(root, "check", "opencode")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn(f"agent {SKILL}-old is a generated stage agent that no stage uses", r.stderr)
+
+    def test_an_unstamped_clash_is_refused_and_kept(self):
+        root = self.project("claude")
+        mine = root / ".claude" / "agents" / f"{SKILL}-build.md"
+        mine.parent.mkdir(parents=True)
+        mine.write_text("---\nname: factory-build\ndescription: mine\n---\n\nmine\n")
+        self.assertEqual(run(root, "install", "claude").returncode, 2)
+        self.assertIn("description: mine", mine.read_text())
+        other = self.project("opencode-generated")
+        self.install(other, "opencode")
+        root = self.project("opencode")
+        for text in ('{"model": "keep-me"}', "// mine\n" + (other / "opencode.jsonc").read_text()):
+            with self.subTest(text[:12]):
+                (root / "opencode.jsonc").write_text(text)
+                self.assertEqual(run(root, "install", "opencode").returncode, 2)
+                self.assertEqual((root / "opencode.jsonc").read_text(), text)
+
+    def test_a_generated_opencode_jsonc_without_agents_is_upgraded(self):
+        root = self.project("opencode")
+        self.install(root, "opencode")
+        cfg = json.loads((root / "opencode.jsonc").read_text())
+        (root / "opencode.jsonc").write_text(json.dumps({"permissions": cfg["permissions"]}, indent=2) + "\n")
+        self.assertEqual(run(root, "check", "opencode").returncode, 2)
+        self.install(root, "opencode")
+        self.assertEqual(json.loads((root / "opencode.jsonc").read_text()), cfg)
+
+    def test_every_stage_agent_has_the_orchestrators_shell_policy(self):
+        root = self.project("opencode", CUSTOM)
+        self.install(root, "opencode")
+        cfg = json.loads((root / "opencode.jsonc").read_text())
+        main = {r["resource"]: r["effect"] for r in cfg["permissions"] if r["action"] == "shell"}
+        for n, a in cfg["agent"].items():
+            with self.subTest(n):
+                self.assertEqual(json.dumps(a["permission"]["bash"]), json.dumps(main))
+                edit = a["permission"]["edit"]
+                self.assertEqual(next(iter(edit.items())), ("*", "deny"))
+                for g in self.tick.NO_WRITE:
+                    self.assertEqual(edit[g], "deny")
+        self.assertEqual(cfg["agent"][f"{SKILL}-review"]["permission"]["edit"]["**/.planning/factory/jobs/**"], "allow")
+        self.assertNotIn("**/.worktrees/**", cfg["agent"][f"{SKILL}-review"]["permission"]["edit"])
+        self.assertEqual(cfg["agent"][f"{SKILL}-build"]["permission"]["edit"]["**/.worktrees/**"], "allow")
+        root = self.project("claude", CUSTOM)
+        self.install(root, "claude")
+        for f in (root / ".claude" / "agents").glob("*.md"):
+            with self.subTest(f.name):
+                self.assertEqual(list(front_matter(f.read_text())), ["name", "description", "tools", "model"])
+
+    def test_only_the_dropped_tools_differ(self):
+        root = self.project("claude", CUSTOM)
+        self.install(root, "claude")
+        for f in (root / ".claude" / "agents").glob("*.md"):
+            with self.subTest(f.name):
+                tools = front_matter(f.read_text())["tools"].split(", ")
+                self.assertEqual(tools, self.tick.CLAUDE_TOOLS)
+                self.assertFalse(set(tools) & set(self.tick.CLAUDE_DROPPED))
+                self.assertTrue({"Bash", "Read", "Write", "Edit"} <= set(tools))
+        root = self.project("opencode", CUSTOM)
+        self.install(root, "opencode")
+        for n, a in json.loads((root / "opencode.jsonc").read_text())["agent"].items():
+            with self.subTest(n):
+                self.assertEqual(a["tools"], {t: False for t in ("task", "webfetch", "websearch", "codesearch")})
+                self.assertEqual(a["mode"], "subagent")
+
+    def test_model_per_stage(self):
+        root = self.project("claude", CUSTOM)
+        self.install(root, "claude")
+        model = lambda sid: front_matter((root / ".claude" / "agents" / f"{SKILL}-{sid}.md").read_text())["model"]
+        want = {"shape": "opus", "spec": "opus", "build": "opus", "review": "sonnet", "polish": "haiku",
+                "prove": "haiku", "ship": "haiku", "tidy": "sonnet"}
+        self.assertEqual({sid: model(sid) for sid in want}, want)
+        body = (root / ".claude" / "agents" / f"{SKILL}-tidy.md").read_text()
+        self.assertIn("Load the documentation-writer skill", body)
+        self.assertIn("USER TURNED OFF", body)
 
 
 if __name__ == "__main__":

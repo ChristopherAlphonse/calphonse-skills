@@ -1048,6 +1048,8 @@ class TestPolicy(Factory):
         self.human("commit", "k")
         self.adv("k", "ready")
         self.git("merge", "--no-edit", "feature/J")
+        (self.root / "feature.py").write_text("x = 2\n")
+        self.git("commit", "-am", "main moved on")
         self.ok("prune")
         out = self.branches()
         self.assertNotIn("feature/J", out)

@@ -69,6 +69,17 @@ ON_DEMAND = {
     "polish": "Load simplify for prose you touched.",
     "ship": "Load demo-script only if the brief asks for a demo.",
 }
+# Claude Code narrows a subagent by tool name only, never by folder, so a stage agent loses only the tools no stage
+# needs. Folder limits stay with the project-wide settings and guard hook.
+CLAUDE_TOOLS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "NotebookEdit", "TodoWrite", "Skill"]
+CLAUDE_DROPPED = ["Agent", "Task", "WebFetch", "WebSearch"]
+OPENCODE_DROPPED = ["task", "webfetch", "websearch", "codesearch"]
+# SKILL.md picks the model by stage. Review-workflow and custom stages follow the same tiers: judgment on a diff is
+# sonnet, running commands and writing a short file is haiku. A custom stage not listed here gets sonnet.
+CLAUDE_MODEL = {"shape": "opus", "spec": "opus", "build": "opus", "review": "sonnet", "scope": "sonnet",
+                "reconcile": "sonnet", "polish": "haiku", "prove": "haiku", "ship": "haiku", "verify": "haiku",
+                "report": "haiku", "amend": "haiku"}
+CLAUDE_DEFAULT_MODEL = "sonnet"
 GEN_VERSION = "factory-gen v1"
 STAMP = re.compile(r"factory-gen v\d+ sha256:[0-9a-f]{64}")
 HARNESS_SOURCE = "set harness in config.json"
@@ -215,7 +226,7 @@ def claude_gaps(pol):
     gaps += [p for p in pol["ask"] if f"Bash({p})" not in deny | ask]
     gaps += [f"write {g}" for g in NO_WRITE if f"Edit({g})" not in deny]
     hooks_now = read_json(ROOT / ".claude" / "settings.json").get("hooks")
-    return gaps + guard_gaps("claude", hooks_now)
+    return gaps + guard_gaps("claude", hooks_now) + stage_gaps("claude")
 
 
 def opencode_gaps(pol):
@@ -234,6 +245,12 @@ def opencode_gaps(pol):
     gaps = [p for p in pol["deny"] if "deny" not in effect(p)]
     gaps += [p for p in pol["ask"] if not effect(p)]
     gaps += [f"write {g}" for g in NO_WRITE if ("edit", g, "deny") not in rules and legacy_edit.get(g) != "deny"]
+    agents = dict_at(cfg, "agent")
+    expected = opencode_stage_agents()
+    gaps += [f"opencode.jsonc agent {n} is missing or differs from `tick print opencode`"
+             for n, a in expected.items() if agents.get(n) != a]
+    gaps += [f"opencode.jsonc agent {n} is a generated stage agent that no stage uses"
+             for n, a in agents.items() if n not in expected and is_generated_agent(n, a)]
     return gaps + guard_gaps("opencode", None)
 
 
@@ -250,15 +267,20 @@ def kiro_gaps(pol):
     gaps += guard_gaps("kiro", cfg.get("hooks"))
     if cfg.get("allowedTools"):
         gaps.append("agent must not carry allowedTools, which widen the rules")
-    for rel, text in kiro_stage_files().items():
+    return gaps + stage_gaps("kiro")
+
+
+def stage_gaps(harness):
+    """Every generated stage file must match `tick print` byte for byte, and no stamped one may be left over."""
+    gaps = []
+    for rel, text in stage_files(harness).items():
         try:
             current = (ROOT / rel).read_text()
         except OSError:
             current = None
         if current != text:
-            gaps.append(f"{rel} is missing or differs from `tick print kiro`")
-    gaps += [f"{rel} is a generated stage agent that no stage uses" for rel in stamped_orphans()]
-    return gaps
+            gaps.append(f"{rel} is missing or differs from `tick print {harness}`")
+    return gaps + [f"{rel} is a generated stage agent that no stage uses" for rel in stamped_orphans(harness)]
 
 
 def policy_gaps(harness):
@@ -333,9 +355,10 @@ def policy_files(harness):
         perms = {kind: claude_rules(kind) for kind in ("deny", "ask", "allow")}
         files, hooks = guard_files("claude")
         settings = {"permissions": perms, "hooks": hooks}
-        return {".claude/settings.json": json.dumps(settings, indent=2) + "\n", **files}
+        return {".claude/settings.json": json.dumps(settings, indent=2) + "\n", **files, **claude_stage_files()}
     if harness == "opencode":
-        return {"opencode.jsonc": json.dumps({"permissions": opencode_rules()}, indent=2) + "\n", **guard_files("opencode")[0]}
+        cfg = {"permissions": opencode_rules(), "agent": opencode_stage_agents()}
+        return {"opencode.jsonc": json.dumps(cfg, indent=2) + "\n", **guard_files("opencode")[0]}
     if harness == "kiro":
         files, hooks = guard_files("kiro")
         agent = {
@@ -410,12 +433,16 @@ def stamp():
     return f"{GEN_VERSION} sha256:{digest}"
 
 
-def stage_prompt(sid, skill, brief, area):
+def stage_prompt(sid, skill, brief, area, preloaded=True):
+    """Kiro preloads the skill as a resource. Claude Code and OpenCode have no verified preload, so the prompt loads it."""
     parts = [f"You are the factory {sid} stage agent. The orchestrator's message gives the job id, the job folder, "
              "the worktree and branch, and this stage's brief. Do this stage only."]
     if brief:
         parts.append(f"Stage brief: {brief}")
-    parts.append(f"Your preloaded skill is {skill}." if skill else "No skill is preloaded for this stage.")
+    if not skill:
+        parts.append("No skill is preloaded for this stage." if preloaded else "This stage has no skill of its own.")
+    else:
+        parts.append(f"Your preloaded skill is {skill}." if preloaded else f"Load the {skill} skill before you start.")
     if sid in ON_DEMAND:
         parts.append(ON_DEMAND[sid])
     parts += [
@@ -449,19 +476,89 @@ def kiro_stage_files():
     return files
 
 
+def claude_stage_files():
+    """One `.claude/agents/factory-<stage>.md` per stage: name, description (with the stamp), tools, model, prompt.
+
+    Only the fields the probe ran are used. Claude Code narrows by tool name, not by folder, and review, prove and
+    ship still write their own notes, so every stage keeps the file tools and loses only CLAUDE_DROPPED.
+    """
+    mark, files = stamp(), {}
+    for sid, skill, brief in pipeline_stages():
+        head = [f"name: {SKILL}-{sid}", f"description: Factory {sid} stage agent. {mark}",
+                f"tools: {', '.join(CLAUDE_TOOLS)}", f"model: {CLAUDE_MODEL.get(sid, CLAUDE_DEFAULT_MODEL)}"]
+        body = stage_prompt(sid, skill, brief, STAGE_AREA.get(sid, "notes"), preloaded=False)
+        files[f".claude/agents/{SKILL}-{sid}.md"] = "---\n" + "\n".join(head) + "\n---\n\n" + body + "\n"
+    return files
+
+
+def opencode_stage_agents():
+    """`agent.factory-<stage>` entries for opencode.jsonc: a subagent with the orchestrator's shell rules unchanged
+    and file edits denied outside its write area."""
+    mark, agents = stamp(), {}
+    shell = {r["resource"]: r["effect"] for r in opencode_rules() if r["action"] == "shell"}
+    for sid, skill, brief in pipeline_stages():
+        area = STAGE_AREA.get(sid, "notes")
+        edit = {"*": "deny", **{g: "allow" for g in WRITE_AREAS[area]}, **{g: "deny" for g in NO_WRITE}}
+        agents[f"{SKILL}-{sid}"] = {
+            "description": f"Factory {sid} stage agent. {mark}",
+            "mode": "subagent",
+            "prompt": stage_prompt(sid, skill, brief, area, preloaded=False),
+            "tools": {t: False for t in OPENCODE_DROPPED},
+            "permission": {"edit": edit, "bash": shell},
+        }
+    return agents
+
+
+def stage_files(harness):
+    return {"kiro": kiro_stage_files, "claude": claude_stage_files}.get(harness, dict)()
+
+
+def is_generated_agent(name, agent):
+    desc = agent.get("description") if isinstance(agent, dict) else None
+    return name.startswith(f"{SKILL}-") and isinstance(desc, str) and bool(STAMP.search(desc))
+
+
 def is_stamped(path):
+    """A file this tool generated and may replace. A Claude agent carries the stamp in its front matter; opencode.jsonc
+    counts only when it holds nothing but the current orchestrator rules and stamped stage agents, no comments."""
     try:
-        desc = json.loads(path.read_text()).get("description", "")
-    except (OSError, ValueError, AttributeError):
+        text = path.read_text()
+    except OSError:
+        return False
+    if path.suffix == ".md":
+        head = text.split("\n---\n", 1)[0] if text.startswith("---\n") else ""
+        return any(line.startswith("description: ") and STAMP.search(line) for line in head.splitlines())
+    if path.name == "opencode.jsonc":
+        return opencode_is_ours(text)
+    try:
+        desc = json.loads(text).get("description", "")
+    except (ValueError, AttributeError):
         return False
     return isinstance(desc, str) and bool(STAMP.search(desc))
 
 
-def stamped_orphans(expected=None):
+def opencode_is_ours(text):
+    try:
+        cfg = json.loads(text)  # plain JSON only: a file with comments was edited by hand
+    except ValueError:
+        return False
+    if not isinstance(cfg, dict) or set(cfg) - {"permissions", "agent"} or cfg.get("permissions") != opencode_rules():
+        return False
+    agents = cfg.get("agent", {})
+    return isinstance(agents, dict) and all(is_generated_agent(n, a) for n, a in agents.items())
+
+
+AGENT_GLOB = {"kiro": (".kiro/agents", "json"), "claude": (".claude/agents", "md")}
+
+
+def stamped_orphans(harness, expected=None):
     """Stage agent files this tool made that no stage produces any more."""
-    expected = set(kiro_stage_files() if expected is None else expected)
-    folder = ROOT / ".kiro" / "agents"
-    found = sorted(folder.glob(f"{SKILL}-*.json")) if folder.is_dir() else []
+    if harness not in AGENT_GLOB:
+        return []
+    expected = set(stage_files(harness) if expected is None else expected)
+    rel_dir, ext = AGENT_GLOB[harness]
+    folder = ROOT / rel_dir
+    found = sorted(folder.glob(f"{SKILL}-*.{ext}")) if folder.is_dir() else []
     return [str(p.relative_to(ROOT)) for p in found if str(p.relative_to(ROOT)) not in expected and is_stamped(p)]
 
 
@@ -490,7 +587,7 @@ def cmd_install(harness):
                if (ROOT / f).exists() and current(f) != text and not is_stamped(ROOT / f)]
     if clashes:
         die(f"already exists, merge the output of `tick print {harness}` by hand: " + ", ".join(clashes))
-    for rel in stamped_orphans(files) if harness == "kiro" else []:
+    for rel in stamped_orphans(harness, files):
         (ROOT / rel).unlink()
         print(f"removed {rel}")
     for rel, text in files.items():

@@ -108,7 +108,9 @@ class TestStackDetection(Review):
 
     def test_the_queue_hint_names_the_stack_skills(self):
         self.new_review("r", {"Api/Program.cs": "x\n"})
-        self.assertIn("stack skills: dotnet", self.run_queue())
+        self.assertNotIn("stack skills", self.run_queue())
+        self.to_stage("r", "review")
+        self.assertIn("*.cs -> dotnet", self.run_queue())
 
     def test_build_jobs_detect_the_stack_from_changed_files_and_can_refresh_it(self):
         self.to_build("b")
