@@ -1,7 +1,7 @@
 // Generated from boards.ts by build.mjs. Do not edit.
-                                                             
+                                                                    
 
-const BUILD          = [
+const BUILD_STAGES          = [
   { id: "shape", label: "Shape", blurb: "Decide what to build, or reject it." },
   { id: "spec", label: "Spec", blurb: "Write the plan. You approve it here." },
   {
@@ -23,7 +23,8 @@ const BUILD          = [
   },
   { id: "ready", label: "Ready", blurb: "Committed locally." },
 ];
-const REVIEW          = [
+
+const REVIEW_STAGES          = [
   {
     id: "scope",
     label: "Scope",
@@ -51,19 +52,23 @@ const REVIEW          = [
   },
   { id: "ready", label: "Ready", blurb: "Report written. Nothing was posted." },
 ];
-const verdicts = (j     ) =>
-  Object.entries(j.reviews).map(([name, v]) => ({
-    text: v ? `${name} ${v}` : `${name} ...`,
-    cls: v ?? "",
-  }));
-const stack = (j     ) =>
-  j.stack?.length ? [j.stack.map((k) => ({ text: k }))] : [];
 
-export const DEFS                                                 = {
+function reviewVerdictChips(job     )                                   {
+  return Object.entries(job.reviews).map(([reviewerName, verdict]) => ({
+    text: verdict ? `${reviewerName} ${verdict}` : `${reviewerName} ...`,
+    cls: verdict ?? "",
+  }));
+}
+
+function stackChips(job     )                                     {
+  return job.stack.length ? [job.stack.map((stackName) => ({ text: stackName }))] : [];
+}
+
+export const BOARD_DEFINITIONS                                                        = {
   build: {
     blurb: "Take a feature from idea to a local commit.",
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-5 9 5-9 5-9-5z"/><path d="M3 14l9 5 9-5"/></svg>',
-    stages: BUILD,
+    stages: BUILD_STAGES,
     lane: "Build jobs",
     columns: 4,
     homeStage: "build",
@@ -71,66 +76,66 @@ export const DEFS                                                 = {
     intro:
       "Local only. Nothing is pushed, and nothing is committed until you click.",
     kind: "Build job",
-    stats: (j) => [
-      [!j.round ? "-" : `${j.round}/${j.round_limit}`, "round"],
-      [j.progress?.[1] ? `${j.progress[0]}/${j.progress[1]}` : "-", "tasks"],
-      [j.files.length, "files"],
+    stats: (job) => [
+      [!job.round ? "-" : `${job.round}/${job.roundLimit}`, "round"],
+      [job.progress?.[1] ? `${job.progress[0]}/${job.progress[1]}` : "-", "tasks"],
+      [job.files.length, "files"],
     ],
-    place: (j) => j.branch ?? j.worktree,
-    needsPath: (j) =>
-      j.can_approve ? "approve" : j.can_commit ? "commit" : "unblock",
-    statusBits: (j) => [
+    place: (job) => job.branch ?? job.worktree,
+    humanActionPath: (job) =>
+      job.canApprove ? "approve" : job.canCommit ? "commit" : "unblock",
+    statusBits: (job) => [
       [
-        ...(j.stage === "gate" || j.gate
-          ? [{ text: `gate ${j.gate || "pending"}`, cls: j.gate || "" }]
+        ...(job.stage === "gate" || job.gate
+          ? [{ text: `gate ${job.gate || "pending"}`, cls: job.gate || "" }]
           : []),
-        ...(j.commit
-          ? [{ text: `committed locally ${j.commit.slice(0, 7)}`, cls: "PASS" }]
+        ...(job.commit
+          ? [{ text: `committed locally ${job.commit.slice(0, 7)}`, cls: "PASS" }]
           : []),
       ],
-      ...stack(j),
-      ...(j.stage === "review" ? [verdicts(j)] : []),
+      ...stackChips(job),
+      ...(job.stage === "review" ? [reviewVerdictChips(job)] : []),
     ],
   },
   review: {
     blurb: "Review a branch. Read-only, never edits code.",
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>',
-    stages: REVIEW,
+    stages: REVIEW_STAGES,
     lane: "Review jobs",
     columns: 3,
     homeStage: "scope",
     doneLabel: "Reported",
     intro: "Read-only. Nothing is edited, committed, pushed or posted.",
     kind: "Review",
-    stats: (j) => [
-      [j.report?.FINDINGS ?? "-", "findings"],
-      [j.report?.BLOCKERS ?? "-", "blockers"],
-      [j.files.length, "files"],
+    stats: (job) => [
+      [job.report.FINDINGS ?? "-", "findings"],
+      [job.report.BLOCKERS ?? "-", "blockers"],
+      [job.files.length, "files"],
     ],
-    place: (j) =>
-      j.review
-        ? `${j.review.base_ref} .. ${j.review.head_ref}`
-        : (j.branch ?? j.worktree),
-    needsPath: () => "unblock",
-    statusBits: (j) => [
-      ...stack(j),
-      ...(j.report?.FINDINGS !== undefined
+    place: (job) =>
+      job.review
+        ? `${job.review.baseRef} .. ${job.review.headRef}`
+        : (job.branch ?? job.worktree),
+    humanActionPath: () => "unblock",
+    statusBits: (job) => [
+      ...stackChips(job),
+      ...(job.report.FINDINGS !== undefined
         ? [
             [
-              { text: `${j.report.FINDINGS} findings` },
-              ...(j.report.BLOCKERS !== undefined
+              { text: `${job.report.FINDINGS} findings` },
+              ...(job.report.BLOCKERS !== undefined
                 ? [
                     {
-                      text: `${j.report.BLOCKERS} blockers`,
-                      cls: Number(j.report.BLOCKERS) ? "FAIL" : "PASS",
+                      text: `${job.report.BLOCKERS} blockers`,
+                      cls: Number(job.report.BLOCKERS) ? "FAIL" : "PASS",
                     },
                   ]
                 : []),
             ],
           ]
         : []),
-      ...(Object.values(j.reviews).some(Boolean) || j.stage === "review"
-        ? [verdicts(j)]
+      ...(Object.values(job.reviews).some(Boolean) || job.stage === "review"
+        ? [reviewVerdictChips(job)]
         : []),
     ],
   },

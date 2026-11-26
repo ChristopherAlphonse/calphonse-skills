@@ -1,184 +1,207 @@
 // Generated from markdown.ts by build.mjs. Do not edit.
-import { el } from "/static/dom.js";
+import { createElement } from "/static/dom.js";
 
 // Spans are capped at 2000 characters so an unclosed opener cannot make the scan quadratic.
 // Groups: 1 code, 2 strong, 3 em, 4 link text, 5 link URL. Built from parts to keep each regex under the complexity limit.
-const INLINE = new RegExp(
+const INLINE_PATTERN = new RegExp(
   [
     /`([^`]{1,2000})`/,
     /\*\*([^*]{1,2000})\*\*/,
     /\*([^*\s][^*]{0,1999})\*/,
     /\[([^\]]{1,2000})\]\((\S{1,2000}?)\)/,
   ]
-    .map((r) => r.source)
+    .map((part) => part.source)
     .join("|"),
   "g",
 );
-const LIST_ITEM = /^\s*([-*+]|\d+[.)])\s+/;
-const BLOCK_START = /^(#{1,6}\s|`{3}|~{3}|\s*>)/;
-const HTTP_URL = /^https?:\/\//i;
+const LIST_ITEM_PATTERN = /^\s*([-*+]|\d+[.)])\s+/;
+const BLOCK_START_PATTERN = /^(#{1,6}\s|`{3}|~{3}|\s*>)/;
+const HTTP_URL_PATTERN = /^https?:\/\//i;
+const QUOTE_PREFIX_PATTERN = /^\s*>\s?/;
+const MAX_QUOTE_DEPTH = 32;
 
-const cells = (line        )           =>
-  line
+function splitTableCells(line        )           {
+  return line
     .trim()
     .replace(/^\||\|$/g, "")
     .split("|")
-    .map((c) => c.trim());
-const isSeparator = (line        )          =>
-  cells(line).every((c) => /^:?-+:?$/.test(c));
+    .map((cell) => cell.trim());
+}
 
-function wrap(
+function isTableSeparator(line        )          {
+  return splitTableCells(line).every((cell) => /^:?-+:?$/.test(cell));
+}
+
+function appendWrapped(
   tag                             ,
   text        ,
   parent            ,
 )       {
-  const node = el(tag);
-  inline(text, node);
-  parent.append(node);
+  const element = createElement(tag);
+  appendInline(text, element);
+  parent.append(element);
 }
 
-function inline(text        , parent            )       {
-  const re = new RegExp(INLINE);
-  let last = 0;
-  let m                        ;
-  while ((m = re.exec(text))) {
-    if (m.index > last) parent.append(text.slice(last, m.index));
-    if (m[1] != null) parent.append(el("code", "", m[1]));
-    else if (m[2] != null) wrap("strong", m[2], parent);
-    else if (m[3] != null) wrap("em", m[3], parent);
-    else if (HTTP_URL.test(m[5])) {
-      const a = el("a", "", m[4]);
-      a.href = m[5];
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      parent.append(a);
-    } else parent.append(m[4]);
-    last = re.lastIndex;
+function appendInline(text        , parent            )       {
+  const pattern = new RegExp(INLINE_PATTERN);
+  let lastIndex = 0;
+  let match                        ;
+  while ((match = pattern.exec(text))) {
+    if (match.index > lastIndex) parent.append(text.slice(lastIndex, match.index));
+    if (match[1] != null) parent.append(createElement("code", "", match[1]));
+    else if (match[2] != null) appendWrapped("strong", match[2], parent);
+    else if (match[3] != null) appendWrapped("em", match[3], parent);
+    else if (match[5] != null && HTTP_URL_PATTERN.test(match[5])) {
+      const anchor = createElement("a", "", match[4]);
+      anchor.href = match[5];
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      parent.append(anchor);
+    } else parent.append(match[4]);
+    lastIndex = pattern.lastIndex;
   }
-  if (last < text.length) parent.append(text.slice(last));
+  if (lastIndex < text.length) parent.append(text.slice(lastIndex));
 }
 
-function readCode(
+function readCodeBlock(
   lines          ,
-  i        ,
+  lineIndex        ,
   fence        ,
 )                           {
-  const lang = lines[i].slice(fence.length).trim().toLowerCase();
-  const buf           = [];
-  i++;
-  while (i < lines.length && !lines[i].startsWith(fence)) buf.push(lines[i++]);
-  const pre = el("pre", lang === "mermaid" ? "mermaid" : "");
-  pre.append(el("code", "", buf.join("\n")));
-  return [pre, i + 1];
+  const language = lines[lineIndex].slice(fence.length).trim().toLowerCase();
+  const buffer           = [];
+  lineIndex++;
+  while (lineIndex < lines.length && !lines[lineIndex].startsWith(fence)) buffer.push(lines[lineIndex++]);
+  const pre = createElement("pre", language === "mermaid" ? "mermaid" : "");
+  pre.append(createElement("code", "", buffer.join("\n")));
+  return [pre, lineIndex + 1];
 }
 
-function readQuote(
+// The depth cap keeps agent-written quote chains from growing the stack without bound.
+function readQuoteBlock(
   lines          ,
-  i        ,
-  offset        ,
+  lineIndex        ,
+  lineOffset        ,
+  quoteDepth        ,
 )                             {
-  const first = i;
-  const buf           = [];
-  while (i < lines.length && /^\s*>/.test(lines[i]))
-    buf.push(lines[i++].replace(/^\s*>\s?/, ""));
-  const q = el("blockquote");
-  q.append(renderMarkdown(buf.join("\n"), offset + first));
-  return [q, i];
-}
-
-const isTableStart = (lines          , i        )          =>
-  lines[i].includes("|") &&
-  i + 1 < lines.length &&
-  lines[i + 1].includes("-") &&
-  isSeparator(lines[i + 1]);
-
-function readTable(lines          , i        )                           {
-  const rowOf = (line        , tag             )                      => {
-    const tr = el("tr");
-    cells(line).forEach((c) => wrap(tag, c, tr));
-    return tr;
-  };
-  const table = el("table");
-  table.append(rowOf(lines[i], "th"));
-  i += 2;
-  while (i < lines.length && lines[i].includes("|") && lines[i].trim())
-    table.append(rowOf(lines[i++], "td"));
-  const wrapper = el("div", "tw");
-  wrapper.append(table);
-  return [wrapper, i];
-}
-
-function readList(
-  lines          ,
-  i        ,
-  offset        ,
-)                                                {
-  const list = el(/^\s*\d/.test(lines[i]) ? "ol" : "ul");
-  while (i < lines.length && LIST_ITEM.test(lines[i])) {
-    const before = list.childElementCount;
-    wrap("li", lines[i].replace(LIST_ITEM, ""), list);
-    stamp(list.children[before], i, i + 1, offset);
-    i++;
+  const firstLine = lineIndex;
+  const buffer           = [];
+  while (lineIndex < lines.length && QUOTE_PREFIX_PATTERN.test(lines[lineIndex])) {
+    buffer.push(lines[lineIndex++].replace(QUOTE_PREFIX_PATTERN, ""));
   }
-  return [list, i];
+  const blockquote = createElement("blockquote");
+  const innerSource = buffer.join("\n");
+  if (quoteDepth >= MAX_QUOTE_DEPTH) {
+    const paragraph = createElement("p");
+    appendInline(innerSource, paragraph);
+    blockquote.append(paragraph);
+  } else {
+    blockquote.append(renderMarkdown(innerSource, lineOffset + firstLine, quoteDepth + 1));
+  }
+  return [blockquote, lineIndex];
 }
 
-function readParagraph(
+function isTableStart(lines          , lineIndex        )          {
+  return lines[lineIndex].includes("|")
+    && lineIndex + 1 < lines.length
+    && lines[lineIndex + 1].includes("-")
+    && isTableSeparator(lines[lineIndex + 1]);
+}
+
+function readTableBlock(lines          , lineIndex        )                           {
+  const rowOf = (line        , tag             )                      => {
+    const tableRow = createElement("tr");
+    splitTableCells(line).forEach((cell) => appendWrapped(tag, cell, tableRow));
+    return tableRow;
+  };
+  const table = createElement("table");
+  table.append(rowOf(lines[lineIndex], "th"));
+  lineIndex += 2;
+  while (lineIndex < lines.length && lines[lineIndex].includes("|") && lines[lineIndex].trim()) {
+    table.append(rowOf(lines[lineIndex++], "td"));
+  }
+  const wrapper = createElement("div", "tw");
+  wrapper.append(table);
+  return [wrapper, lineIndex];
+}
+
+function readListBlock(
   lines          ,
-  i        ,
+  lineIndex        ,
+  lineOffset        ,
+)                                                {
+  const list = createElement(/^\s*\d/.test(lines[lineIndex]) ? "ol" : "ul");
+  while (lineIndex < lines.length && LIST_ITEM_PATTERN.test(lines[lineIndex])) {
+    const before = list.childElementCount;
+    appendWrapped("li", lines[lineIndex].replace(LIST_ITEM_PATTERN, ""), list);
+    markSourceLines(list.children[before], lineIndex, lineIndex + 1, lineOffset);
+    lineIndex++;
+  }
+  return [list, lineIndex];
+}
+
+function readParagraphBlock(
+  lines          ,
+  lineIndex        ,
 )                                 {
-  const buf           = [];
+  const buffer           = [];
   while (
-    i < lines.length &&
-    lines[i].trim() &&
-    !BLOCK_START.test(lines[i]) &&
-    !LIST_ITEM.test(lines[i])
-  )
-    buf.push(lines[i++]);
-  if (!buf.length) buf.push(lines[i++]);
-  const p = el("p");
-  inline(buf.join(" "), p);
-  return [p, i];
+    lineIndex < lines.length
+    && lines[lineIndex].trim()
+    && !BLOCK_START_PATTERN.test(lines[lineIndex])
+    && !LIST_ITEM_PATTERN.test(lines[lineIndex])
+  ) {
+    buffer.push(lines[lineIndex++]);
+  }
+  if (!buffer.length) buffer.push(lines[lineIndex++]);
+  const paragraph = createElement("p");
+  appendInline(buffer.join(" "), paragraph);
+  return [paragraph, lineIndex];
 }
 
 // Marks a block with the 1-based, inclusive source lines it came from, so a selection can be traced back to the file.
-// `offset` is the index of the first line of `lines` in the whole file, for blocks nested in a quote.
-function stamp(node         , first        , end        , offset        )       {
+// `lineOffset` is the index of the first line of `lines` in the whole file, for blocks nested in a quote.
+function markSourceLines(node         , first        , end        , lineOffset        )       {
   if (!(node instanceof HTMLElement)) return;
-  node.dataset.l1 = String(offset + first + 1);
-  node.dataset.l2 = String(offset + Math.max(first + 1, end));
+  node.dataset.l1 = String(lineOffset + first + 1);
+  node.dataset.l2 = String(lineOffset + Math.max(first + 1, end));
 }
 
-export function renderMarkdown(src        , offset = 0)                   {
+export function renderMarkdown(sourceText        , lineOffset = 0, quoteDepth = 0)                   {
   const root = document.createDocumentFragment();
-  const lines = src.replace(/\r\n?/g, "\n").split("\n");
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
+  const lines = sourceText.replace(/\r\n?/g, "\n").split("\n");
+  let lineIndex = 0;
+  while (lineIndex < lines.length) {
+    const line = lines[lineIndex];
     let node             ;
-    const first = i;
+    const firstLine = lineIndex;
     if (!line.trim()) {
-      i++;
+      lineIndex++;
       continue;
     }
-    const fence = /^(`{3,}|~{3,})/.exec(line);
-    const heading = fence ? null : /^(#{1,6})\s(.*)$/.exec(line);
-    if (fence) [node, i] = readCode(lines, i, fence[1]);
-    else if (heading) {
-      const h = el(
-        `h${Math.min(heading[1].length, 4)}`                             ,
+    const fenceMatch = /^(`{3,}|~{3,})/.exec(line);
+    const headingMatch = fenceMatch ? null : /^(#{1,6})\s(.*)$/.exec(line);
+    if (fenceMatch) [node, lineIndex] = readCodeBlock(lines, lineIndex, fenceMatch[1]);
+    else if (headingMatch) {
+      const heading = createElement(
+        `h${Math.min(headingMatch[1].length, 4)}`                             ,
       );
-      inline(heading[2].trimStart(), h);
-      node = h;
-      i++;
+      appendInline(headingMatch[2].trimStart(), heading);
+      node = heading;
+      lineIndex++;
     } else if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
-      node = el("hr");
-      i++;
-    } else if (/^\s*>/.test(line)) [node, i] = readQuote(lines, i, offset);
-    else if (isTableStart(lines, i)) [node, i] = readTable(lines, i);
-    else if (LIST_ITEM.test(line)) [node, i] = readList(lines, i, offset);
-    else [node, i] = readParagraph(lines, i);
-    stamp(node, first, Math.min(i, lines.length), offset);
+      node = createElement("hr");
+      lineIndex++;
+    } else if (/^\s*>/.test(line)) {
+      [node, lineIndex] = readQuoteBlock(lines, lineIndex, lineOffset, quoteDepth);
+    } else if (isTableStart(lines, lineIndex)) {
+      [node, lineIndex] = readTableBlock(lines, lineIndex);
+    } else if (LIST_ITEM_PATTERN.test(line)) {
+      [node, lineIndex] = readListBlock(lines, lineIndex, lineOffset);
+    } else {
+      [node, lineIndex] = readParagraphBlock(lines, lineIndex);
+    }
+    markSourceLines(node, firstLine, Math.min(lineIndex, lines.length), lineOffset);
     root.append(node);
   }
   return root;

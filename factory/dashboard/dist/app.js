@@ -1,362 +1,394 @@
 // Generated from app.ts by build.mjs. Do not edit.
-import { ask, configureAsk, restoreChat, setEngines, showEngine, showMode } from "/static/ask.js";
-import { DEFS } from "/static/boards.js";
-import { $, button, chip, el, row } from "/static/dom.js";
+import {
+  initializeAsk,
+  requestAnswer,
+  restoreChat,
+  setAvailableEngines,
+  showEngine,
+  showMode,
+} from "/static/ask.js";
+import { BOARD_DEFINITIONS } from "/static/boards.js";
+import { createButton, createChip, createChipRow, createElement, requireElement } from "/static/dom.js";
 import { openEditor,                   } from "/static/editor.js";
+import {
+  isRecord,
+  isStringArray,
+  parseBoards,
+  parseEngines,
+  parseJobs,
+  parseJson,
+  parseStages,
+  request,
+} from "/static/payloads.js";
 import { drawWires } from "/static/wires.js";
              
+            
          
       
         
         
                 
-       
                           
 
-const POLL_MS = 2000;
-const STORE = "factory.board";
-const SIDE_OPEN = 240;
-const SIDE_RAIL = 56;
-
+const POLL_INTERVAL_MS = 2000;
+const LAYOUT_STORAGE_KEY = "factory.board";
+const CANVAS_HORIZONTAL_PADDING = 56;
+const CANVAS_VERTICAL_PADDING = 200;
 
 // ---- state: one View per board, plus which boards are open as tabs
-const views = new Map              ();
-let order           = [];
-let openTabs           = [];
-let active = "";
-// Editors are tabs beside the boards. One stays alive while you look at a board, so nothing is lost.
-const editors = new Map                                         ();
-let activeEditor                = null;
-let scale = 1;
+const viewsByBoardId = new Map                   ();
+let boardOrder           = [];
+let openBoardIds           = [];
+let activeBoardId                = null;
+                                                        
+const editorsByKey = new Map                      ();
+let activeEditorKey                = null;
+let currentScale = 1;
+let sidebarCollapsed = false;
 
-
-let sideCollapsed = false;
-
-const view = ()       => {
-  const v = views.get(active);
-  if (!v) throw new Error("no active board");
-  return v;
-};
-const openJob = ()                  =>
-  view().jobs.find((j) => j.id === view().openId);
-
-function save()       {
-  try {
-    localStorage.setItem(
-      STORE,
-      JSON.stringify({ order, openTabs, active, sideCollapsed }),
-    );
-  } catch {
-    // private window or blocked storage: the layout just is not remembered
-  }
+function currentView()            {
+  if (!activeBoardId) throw new Error("no active board");
+  const boardView = viewsByBoardId.get(activeBoardId);
+  if (!boardView) throw new Error(`unknown active board: ${activeBoardId}`);
+  return boardView;
 }
-function restore()   
+
+function currentJob()                  {
+  const boardView = currentView();
+  return boardView.jobs.find((job) => job.id === boardView.openId);
+}
+
+// The persisted keys stay terse so a layout saved by an older page still loads.
+                        
                   
                      
                  
                          
-         {
+ 
+
+function saveLayout()       {
+  const layout               = {
+    order: boardOrder,
+    openTabs: openBoardIds,
+    active: activeBoardId ?? "",
+    sideCollapsed: sidebarCollapsed,
+  };
   try {
-    return JSON.parse(localStorage.getItem(STORE) ?? "null");
+    localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layout));
+  } catch {
+    // private window or blocked storage: the layout just is not remembered
+  }
+}
+
+function restoreLayout()                      {
+  try {
+    const raw          = JSON.parse(localStorage.getItem(LAYOUT_STORAGE_KEY) ?? "null");
+    if (!isRecord(raw)
+      || !isStringArray(raw.order)
+      || !isStringArray(raw.openTabs)
+      || typeof raw.active !== "string"
+      || typeof raw.sideCollapsed !== "boolean") return null;
+    return {
+      order: raw.order,
+      openTabs: raw.openTabs,
+      active: raw.active,
+      sideCollapsed: raw.sideCollapsed,
+    };
   } catch {
     return null;
   }
 }
 
-const api = (path        , opts                                     = {}) =>
-  fetch(path, {
-    ...opts,
-    credentials: "same-origin",
-    headers: { "X-Factory": "1" },
-  });
-
-async function post(
-  action        ,
-  body                         ,
-)                {
+async function postAction(action        , body                         )                {
   try {
-    const res = await api(`/api/${active}/${action}`, {
+    const response = await request(`/api/${activeBoardId}/${action}`, {
       method: "POST",
       body: JSON.stringify(body),
     });
-    if (!res.ok) $("meta").textContent = `Refused: ${action} (${res.status})`;
+    if (!response.ok) requireElement("meta").textContent = `Refused: ${action} (${response.status})`;
   } catch {
-    $("meta").textContent = "offline";
+    requireElement("meta").textContent = "offline";
   }
-  await pollOne(active);
+  await pollBoard(activeBoardId);
 }
 
-const stageOf = (v      , j     )         =>
-  j.stage === "needs-human"
-    ? (j.parked_from ?? v.def.homeStage)
-    : j.stage === "gate"
-      ? "build"
-      : j.stage === "rejected"
-        ? "ready"
-        : j.stage;
-const finished = (j     )          => ["ready", "rejected"].includes(j.stage);
-const visible = (v      , j     )          =>
-  v.filter === "needs"
-    ? j.needs_human
-    : v.filter === "done"
-      ? finished(j)
-      : true;
-const waitingCount = (v      )         =>
-  v.jobs.filter((j) => j.needs_human).length;
+function stageIdFor(boardView           , job     )         {
+  if (job.stage === "needs-human") return job.parkedFrom ?? boardView.definition.homeStage;
+  if (job.stage === "gate") return "build";
+  if (job.stage === "rejected") return "ready";
+  return job.stage;
+}
 
+function isFinished(job     )          {
+  return job.stage === "ready" || job.stage === "rejected";
+}
+
+function isVisible(boardView           , job     )          {
+  if (boardView.filter === "needs") return job.needs !== null;
+  if (boardView.filter === "done") return isFinished(job);
+  return true;
+}
+
+function needsHumanCount(boardView           )         {
+  return boardView.jobs.filter((job) => job.needs !== null).length;
+}
 
 // ---- left sidebar: every board, draggable into the tab strip
-function boardIcon(id        )              {
-  const i = el("span", "bico");
-  i.innerHTML = DEFS[id]?.icon ?? "";
-  return i;
+function boardIcon(boardId        )              {
+  const icon = createElement("span", "bico");
+  icon.innerHTML = BOARD_DEFINITIONS[boardId]?.icon ?? "";
+  return icon;
 }
 
 function renderSidebar()       {
-  const list = $("boardlist");
+  const list = requireElement("boardlist");
   list.replaceChildren(
-    ...order.map((id) => {
-      const v = views.get(id);
-      if (!v) return el("span");
-      const r = el(
+    ...boardOrder.map((boardId) => {
+      const boardView = viewsByBoardId.get(boardId);
+      if (!boardView) return createElement("span");
+      const rowButton = createElement(
         "button",
-        `boardrow${id === active ? " on" : ""}${openTabs.includes(id) ? " open" : ""}`,
+        `boardrow${boardId === activeBoardId ? " on" : ""}${openBoardIds.includes(boardId) ? " open" : ""}`,
       );
-      r.type = "button";
-      r.draggable = true;
-      r.dataset.board = id;
-      r.title = `${v.def.label}: ${v.def.blurb}`;
-      const text = el("span", "btext");
-      text.append(el("b", "", v.def.label), el("small", "", v.def.blurb));
-      r.append(boardIcon(id), text);
-      const n = waitingCount(v);
-      if (n) r.append(el("span", "badge", String(n)));
-      r.onclick = () => openBoard(id);
-      r.ondragstart = (e) => dragStart(e, id);
-      r.ondragend = dragEnd;
-      r.ondragover = (e) => e.preventDefault();
-      r.ondrop = (e) => {
-        e.preventDefault();
-        const from = e.dataTransfer?.getData("text/plain") ?? "";
-        if (from && from !== id && views.has(from)) {
-          order = order.filter((b) => b !== from);
-          order.splice(order.indexOf(id), 0, from);
-          save();
+      rowButton.type = "button";
+      rowButton.draggable = true;
+      rowButton.dataset.board = boardId;
+      rowButton.title = `${boardView.definition.label}: ${boardView.definition.blurb}`;
+      const labelBox = createElement("span", "btext");
+      labelBox.append(
+        createElement("b", "", boardView.definition.label),
+        createElement("small", "", boardView.definition.blurb),
+      );
+      rowButton.append(boardIcon(boardId), labelBox);
+      const waitingJobCount = needsHumanCount(boardView);
+      if (waitingJobCount) rowButton.append(createElement("span", "badge", String(waitingJobCount)));
+      rowButton.onclick = () => openBoard(boardId);
+      rowButton.ondragstart = (event) => dragStart(event, boardId);
+      rowButton.ondragend = dragEnd;
+      rowButton.ondragover = (event) => event.preventDefault();
+      rowButton.ondrop = (event) => {
+        event.preventDefault();
+        const fromBoardId = event.dataTransfer?.getData("text/plain") ?? "";
+        if (fromBoardId && fromBoardId !== boardId && viewsByBoardId.has(fromBoardId)) {
+          boardOrder = boardOrder.filter((id) => id !== fromBoardId);
+          boardOrder.splice(boardOrder.indexOf(boardId), 0, fromBoardId);
+          saveLayout();
           renderSidebar();
         }
       };
-      return r;
+      return rowButton;
     }),
   );
 }
 
-function setSide(collapsed         )       {
-  sideCollapsed = collapsed;
+function setSidebarCollapsed(collapsed         )       {
+  sidebarCollapsed = collapsed;
   document.body.classList.toggle("side-collapsed", collapsed);
-  $("side-toggle").setAttribute("aria-expanded", String(!collapsed));
-  save();
+  requireElement("side-toggle").setAttribute("aria-expanded", String(!collapsed));
+  saveLayout();
   applyScale();
 }
 
 // ---- drag and drop
-function dragStart(e           , id        )       {
-  e.dataTransfer?.setData("text/plain", id);
-  if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+function dragStart(event           , boardId        )       {
+  event.dataTransfer?.setData("text/plain", boardId);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
   document.body.classList.add("dragging");
-  (e.target               ).classList.add("drag");
+  if (event.target instanceof HTMLElement) event.target.classList.add("drag");
 }
-function dragEnd(e           )       {
+
+function dragEnd(event           )       {
   document.body.classList.remove("dragging");
-  (e.target               ).classList.remove("drag");
-  $("boardtabs").classList.remove("over");
+  if (event.target instanceof HTMLElement) event.target.classList.remove("drag");
+  requireElement("boardtabs").classList.remove("over");
 }
-function dropIndex(x        )         {
-  const tabs = [...$("boardtabs").querySelectorAll             (".btab")];
-  const i = tabs.findIndex(
-    (t) => x < t.getBoundingClientRect().left + t.offsetWidth / 2,
-  );
-  return i < 0 ? tabs.length : i;
+
+function dropTabIndex(clientX        )         {
+  const tabs = [...requireElement("boardtabs").querySelectorAll             (".btab")];
+  const index = tabs.findIndex((tab) => clientX < tab.getBoundingClientRect().left + tab.offsetWidth / 2);
+  return index < 0 ? tabs.length : index;
 }
-function dropOnTabs(e           )       {
-  e.preventDefault();
+
+function dropOnTabs(event           )       {
+  event.preventDefault();
   document.body.classList.remove("dragging");
-  const id = e.dataTransfer?.getData("text/plain") ?? "";
-  if (!views.has(id)) return;
-  const at = dropIndex(e.clientX);
-  const was = openTabs.indexOf(id);
-  openTabs = openTabs.filter((b) => b !== id);
-  openTabs.splice(was >= 0 && was < at ? at - 1 : at, 0, id);
-  active = id;
-  activeEditor = null;
-  save();
+  const boardId = event.dataTransfer?.getData("text/plain") ?? "";
+  if (!viewsByBoardId.has(boardId)) return;
+  const targetIndex = dropTabIndex(event.clientX);
+  const previousIndex = openBoardIds.indexOf(boardId);
+  openBoardIds = openBoardIds.filter((id) => id !== boardId);
+  openBoardIds.splice(previousIndex >= 0 && previousIndex < targetIndex ? targetIndex - 1 : targetIndex, 0, boardId);
+  activeBoardId = boardId;
+  activeEditorKey = null;
+  saveLayout();
   renderAll();
 }
 
 // ---- tabs and filters
-function openBoard(id        )       {
-  if (!views.has(id)) return;
-  if (!openTabs.includes(id)) openTabs.push(id);
-  active = id;
-  activeEditor = null;
-  save();
+function openBoard(boardId        )       {
+  if (!viewsByBoardId.has(boardId)) return;
+  if (!openBoardIds.includes(boardId)) openBoardIds.push(boardId);
+  activeBoardId = boardId;
+  activeEditorKey = null;
+  saveLayout();
   renderAll();
 }
-function closeBoard(id        )       {
-  if (openTabs.length < 2) return;
-  const at = openTabs.indexOf(id);
-  openTabs = openTabs.filter((b) => b !== id);
-  if (active === id) active = openTabs[Math.min(at, openTabs.length - 1)];
-  activeEditor = null;
-  save();
+
+function closeBoard(boardId        )       {
+  if (openBoardIds.length < 2) return;
+  const closedIndex = openBoardIds.indexOf(boardId);
+  openBoardIds = openBoardIds.filter((id) => id !== boardId);
+  if (activeBoardId === boardId) activeBoardId = openBoardIds[Math.min(closedIndex, openBoardIds.length - 1)];
+  activeEditorKey = null;
+  saveLayout();
   renderAll();
+}
+
+function renderEditorTab(key        , handle              )              {
+  const tab = createElement("div", `btab etab${key === activeEditorKey ? " on" : ""}`);
+  tab.title = `Editing ${handle.fileName}`;
+  tab.append(createElement("span", "ename", handle.fileName));
+  if (handle.dirty()) tab.append(createElement("span", "edot"));
+  const closeButton = createButton("×", "tabx", () => handle.requestClose());
+  closeButton.setAttribute("aria-label", `Close ${handle.fileName}`);
+  closeButton.onclick = (event) => {
+    event.stopPropagation();
+    focusEditor(key);
+    handle.requestClose();
+  };
+  tab.append(closeButton);
+  tab.onclick = () => focusEditor(key);
+  return tab;
 }
 
 function renderTabs()       {
-  const strip = $("boardtabs");
+  const strip = requireElement("boardtabs");
   strip.replaceChildren(
-    ...openTabs.map((id) => {
-      const v = views.get(id);
-      if (!v) return el("span");
-      const t = el("div", `btab${id === active && !activeEditor ? " on" : ""}`);
-      t.draggable = true;
-      t.dataset.board = id;
-      t.append(boardIcon(id), el("span", "", v.def.label));
-      const n = waitingCount(v);
-      if (n) t.append(el("span", "badge", String(n)));
-      if (openTabs.length > 1) {
-        const x = button("×", "tabx", () => closeBoard(id));
-        x.setAttribute("aria-label", `Close ${v.def.label}`);
-        x.onclick = (e) => {
-          e.stopPropagation();
-          closeBoard(id);
+    ...openBoardIds.map((boardId) => {
+      const boardView = viewsByBoardId.get(boardId);
+      if (!boardView) return createElement("span");
+      const tab = createElement("div", `btab${boardId === activeBoardId && !activeEditorKey ? " on" : ""}`);
+      tab.draggable = true;
+      tab.dataset.board = boardId;
+      tab.append(boardIcon(boardId), createElement("span", "", boardView.definition.label));
+      const waitingJobCount = needsHumanCount(boardView);
+      if (waitingJobCount) tab.append(createElement("span", "badge", String(waitingJobCount)));
+      if (openBoardIds.length > 1) {
+        const closeButton = createButton("×", "tabx", () => closeBoard(boardId));
+        closeButton.setAttribute("aria-label", `Close ${boardView.definition.label}`);
+        closeButton.onclick = (event) => {
+          event.stopPropagation();
+          closeBoard(boardId);
         };
-        t.append(x);
+        tab.append(closeButton);
       }
-      t.onclick = () => openBoard(id);
-      t.ondragstart = (e) => dragStart(e, id);
-      t.ondragend = dragEnd;
-      return t;
+      tab.onclick = () => openBoard(boardId);
+      tab.ondragstart = (event) => dragStart(event, boardId);
+      tab.ondragend = dragEnd;
+      return tab;
     }),
-    ...[...editors].map(([key, h]) => editorTab(key, h)),
+    ...[...editorsByKey].map(([key, handle]) => renderEditorTab(key, handle)),
   );
-  for (const [key, h] of editors) {
-    if (key === activeEditor) continue;
-    h.hide();
+  for (const [key, handle] of editorsByKey) {
+    if (key === activeEditorKey) continue;
+    handle.hide();
   }
-  const v = view();
-  const done = v.jobs.filter(finished).length;
-  const defs                                     = [
+  const boardView = currentView();
+  const finishedJobCount = boardView.jobs.filter(isFinished).length;
+  const filterDefinitions                                     = [
     ["all", "Pipeline", 0, ""],
-    ["needs", "Needs you", waitingCount(v), ""],
-    ["done", v.def.doneLabel, done, "ok"],
+    ["needs", "Needs you", needsHumanCount(boardView), ""],
+    ["done", boardView.definition.doneLabel, finishedJobCount, "ok"],
   ];
-  $("filters").replaceChildren(
-    ...defs.map(([id, label, n, cls]) => {
-      const b = button(label, `tab${v.filter === id ? " on" : ""}`, () => {
-        activeEditor = null;
-        v.filter = id;
+  requireElement("filters").replaceChildren(
+    ...filterDefinitions.map(([id, label, count, className]) => {
+      const filterButton = createButton(label, `tab${boardView.filter === id ? " on" : ""}`, () => {
+        activeEditorKey = null;
+        boardView.filter = id;
         renderAll();
       });
-      if (n) b.append(el("span", `badge ${cls}`, String(n)));
-      return b;
+      if (count) filterButton.append(createElement("span", `badge ${className}`, String(count)));
+      return filterButton;
     }),
   );
-  $("meta").textContent =
-    `updated ${new Date().toLocaleTimeString()}`;
-  showIcon();
-}
-
-function editorTab(key        , h                                 )              {
-  const t = el("div", `btab etab${key === activeEditor ? " on" : ""}`);
-  t.title = `Editing ${h.name}`;
-  t.append(el("span", "ename", h.name));
-  if (h.dirty()) t.append(el("span", "edot"));
-  const x = button("×", "tabx", () => h.requestClose());
-  x.setAttribute("aria-label", `Close ${h.name}`);
-  x.onclick = (e) => {
-    e.stopPropagation();
-    focusEditor(key);
-    h.requestClose();
-  };
-  t.append(x);
-  t.onclick = () => focusEditor(key);
-  return t;
+  requireElement("meta").textContent = `updated ${new Date().toLocaleTimeString()}`;
+  updateFaviconAndTitle();
 }
 
 function focusEditor(key        )       {
-  const h = editors.get(key);
-  if (!h) return;
-  activeEditor = key;
+  const handle = editorsByKey.get(key);
+  if (!handle) return;
+  activeEditorKey = key;
   renderTabs();
-  h.show();
+  handle.show();
 }
 
 // The tab icon follows the active board; an amber dot and a count in the title mean something waits on you.
-function showIcon()       {
-  const waiting = [...views.values()].reduce((n, v) => n + waitingCount(v), 0);
-  const href = `/favicon-${active || "factory"}.svg?dot=${waiting ? 1 : 0}`;
-  const link = document.getElementById("favicon");
-  if (link && link.getAttribute("href") !== href)
-    link.setAttribute("href", href);
-  document.title = `${waiting ? `(${waiting}) ` : ""}Factory${active ? ` · ${view().def.label}` : ""}`;
+function updateFaviconAndTitle()       {
+  const waitingJobCount = [...viewsByBoardId.values()].reduce(
+    (total, boardView) => total + needsHumanCount(boardView),
+    0,
+  );
+  const faviconHref = `/favicon-${activeBoardId || "factory"}.svg?dot=${waitingJobCount ? 1 : 0}`;
+  const faviconLink = document.getElementById("favicon");
+  if (faviconLink && faviconLink.getAttribute("href") !== faviconHref) faviconLink.setAttribute("href", faviconHref);
+  document.title = `${waitingJobCount ? `(${waitingJobCount}) ` : ""}Factory${activeBoardId ? ` · ${currentView().definition.label}` : ""}`;
 }
 
 // ---- canvas
-function node(v      , s       , jobs       )              {
-  const hold = jobs.some((j) => j.needs_human);
-  const n = el(
-    "section",
-    `node${jobs.length ? " lit" : ""}${hold ? " hold" : ""}`,
-  );
-  n.dataset.stage = s.id;
-  const h = el("h3", "", s.label);
-  h.append(el("span", "", jobs.length ? String(jobs.length) : ""));
-  const list = el("div", "jobs");
-  for (const j of jobs) {
-    const bad = Number(j.report?.BLOCKERS) > 0 || j.gate === "FAIL";
-    const c = el(
+function renderStageNode(boardView           , stage       , jobs       )              {
+  const hasWaitingJob = jobs.some((job) => job.needs !== null);
+  const node = createElement("section", `node${jobs.length ? " lit" : ""}${hasWaitingJob ? " hold" : ""}`);
+  node.dataset.stage = stage.id;
+  const heading = createElement("h3", "", stage.label);
+  heading.append(createElement("span", "", jobs.length ? String(jobs.length) : ""));
+  const jobList = createElement("div", "jobs");
+  for (const job of jobs) {
+    const hasFailure = Number(job.report.BLOCKERS) > 0 || job.gate === "FAIL";
+    const jobButton = createElement(
       "button",
-      `jobchip${j.needs_human ? " hold" : ""}${bad ? " FAIL" : ""}${j.id === v.openId ? " on" : ""}`,
+      `jobchip${job.needs !== null ? " hold" : ""}${hasFailure ? " FAIL" : ""}${job.id === boardView.openId ? " on" : ""}`,
     );
-    c.type = "button";
-    const text = el("div");
-    text.append(el("span", "", j.title));
-    const now = j.activity?.at(-1)?.text;
-    if (now) text.append(el("small", "", now));
-    c.append(el("i"), text);
-    c.onclick = () => openJobPanel(j.id);
-    list.append(c);
+    jobButton.type = "button";
+    const jobText = createElement("div");
+    jobText.append(createElement("span", "", job.title));
+    const latestActivity = job.activity?.at(-1)?.text;
+    if (latestActivity) jobText.append(createElement("small", "", latestActivity));
+    jobButton.append(createElement("i"), jobText);
+    jobButton.onclick = () => selectJob(job.id);
+    jobList.append(jobButton);
   }
-  n.append(h, el("p", "", s.blurb), list);
-  return n;
+  node.append(heading, createElement("p", "", stage.blurb), jobList);
+  return node;
 }
 
-const repoName = (j     )         => j.repo?.split("/").pop() ?? "";
+function repoLabel(job     )         {
+  return job.repo?.split("/").pop() ?? "";
+}
 
 // One lane per repo, each a single row of stages, so every repo's agent shows on its own.
 // Jobs with no --repo share one lane, laid out as before.
 function renderCanvas()       {
-  const v = view();
-  const repos = v.jobs.length ? [...new Set(v.jobs.map(repoName))].sort() : [""];
-  const multi = repos.some(Boolean);
-  const lanes = repos.map((repo) => {
-    const mine = v.jobs.filter((j) => repoName(j) === repo && visible(v, j));
-    const nodes = el("div", multi ? "nodes compact" : `nodes cols${v.def.columns}`);
-    if (multi) nodes.style.gridTemplateColumns = `repeat(${v.def.stages.length}, 180px)`;
-    nodes.append(
-      ...v.def.stages.map((s) =>
-        node(
-          v,
-          s,
-          mine.filter((j) => stageOf(v, j) === s.id),
-        ),
+  const boardView = currentView();
+  const repoNames = boardView.jobs.length ? [...new Set(boardView.jobs.map(repoLabel))].sort() : [""];
+  const showRepoLabels = repoNames.some(Boolean);
+  const lanes = repoNames.map((repoName) => {
+    const repoJobs = boardView.jobs.filter((job) => repoLabel(job) === repoName && isVisible(boardView, job));
+    const stageRow = createElement("div", showRepoLabels ? "nodes compact" : `nodes cols${boardView.definition.columns}`);
+    if (showRepoLabels) stageRow.style.gridTemplateColumns = `repeat(${boardView.definition.stages.length}, 180px)`;
+    stageRow.append(
+      ...boardView.definition.stages.map((stage) =>
+        renderStageNode(boardView, stage, repoJobs.filter((job) => stageIdFor(boardView, job) === stage.id)),
       ),
     );
-    const lane = el("div", "lane");
-    lane.append(el("div", multi ? "rowlabel repo" : "rowlabel", repo || v.def.lane), nodes);
+    const lane = createElement("div", "lane");
+    lane.append(
+      createElement("div", showRepoLabels ? "rowlabel repo" : "rowlabel", repoName || boardView.definition.lane),
+      stageRow,
+    );
     return lane;
   });
-  $("lanes").replaceChildren(...lanes);
+  requireElement("lanes").replaceChildren(...lanes);
   applyScale();
 }
 
@@ -369,493 +401,539 @@ function renderAll()       {
 }
 
 function applyScale()       {
-  if (!active) return;
-  const v = view();
-  const lanes = $("lanes");
-  const canvas = $("canvas");
-  const rowsEl = $("rows");
-  rowsEl.style.transform = "none";
-  const w = lanes.offsetWidth;
-  const h = lanes.offsetHeight;
-  const fit = Math.min(
+  if (!activeBoardId) return;
+  const boardView = currentView();
+  const lanes = requireElement("lanes");
+  const canvas = requireElement("canvas");
+  const rows = requireElement("rows");
+  rows.style.transform = "none";
+  const contentWidth = lanes.offsetWidth;
+  const contentHeight = lanes.offsetHeight;
+  const fitScale = Math.min(
     1,
-    (canvas.clientWidth - 56) / w,
-    (canvas.clientHeight - 200) / h,
+    (canvas.clientWidth - CANVAS_HORIZONTAL_PADDING) / contentWidth,
+    (canvas.clientHeight - CANVAS_VERTICAL_PADDING) / contentHeight,
   );
-  scale = v.userZoom ?? Math.max(0.3, fit);
-  rowsEl.style.transform = `scale(${scale})`;
-  $("stage").style.width = `${w * scale}px`;
-  $("stage").style.height = `${h * scale}px`;
-  drawWires($("wires"), $("lanes"), scale);
+  currentScale = boardView.zoomOverride ?? Math.max(0.3, fitScale);
+  rows.style.transform = `scale(${currentScale})`;
+  requireElement("stage").style.width = `${contentWidth * currentScale}px`;
+  requireElement("stage").style.height = `${contentHeight * currentScale}px`;
+  drawWires(requireElement("wires"), lanes, currentScale);
 }
 
 // ---- side panel (Floorplan's structure: header, title, description, stats, titled sections)
-const sec = (...kids                        )              => {
-  const s = el("div", "sec");
-  s.append(...kids.filter((k)                   => k !== null));
-  return s;
-};
-const heading = (text        , count         )              => {
-  const h = el("h3", "", text);
-  if (count !== undefined) h.append(el("span", "c", String(count)));
-  return h;
-};
-const stats = (...pairs                             )              => {
-  const box = el("div", "stats");
-  for (const [n, label] of pairs) {
-    const d = el("div");
-    d.append(el("b", "", String(n)), el("span", "", label));
-    box.append(d);
+function createSection(...children                        )              {
+  const section = createElement("div", "sec");
+  section.append(...children.filter((child)                       => child !== null));
+  return section;
+}
+
+function createHeading(text        , count         )              {
+  const heading = createElement("h3", "", text);
+  if (count !== undefined) heading.append(createElement("span", "c", String(count)));
+  return heading;
+}
+
+function createStats(...pairs                             )              {
+  const box = createElement("div", "stats");
+  for (const [value, label] of pairs) {
+    const stat = createElement("div");
+    stat.append(createElement("b", "", String(value)), createElement("span", "", label));
+    box.append(stat);
   }
   return box;
-};
-const dotClass = (j     )         =>
-  j.needs_human
-    ? "warn"
-    : j.gate === "FAIL" || Number(j.report?.BLOCKERS) > 0
-      ? "bad"
-      : finished(j)
-        ? "done"
-        : "ok";
+}
 
-function listRow(j     )                    {
-  const r = el("button", "lrow");
-  r.type = "button";
-  const t = el("div", "rt");
-  t.append(
-    el("div", "rn", j.title),
-    el(
-      "div",
-      "rd",
-      `${j.id} at ${j.stage}${j.needs_human ? ", waiting on you" : ""}`,
-    ),
+function stateClass(job     )         {
+  if (job.needs !== null) return "warn";
+  if (job.gate === "FAIL" || Number(job.report.BLOCKERS) > 0) return "bad";
+  if (isFinished(job)) return "done";
+  return "ok";
+}
+
+function createListRow(job     )                    {
+  const rowButton = createElement("button", "lrow");
+  rowButton.type = "button";
+  const text = createElement("div", "rt");
+  text.append(
+    createElement("div", "rn", job.title),
+    createElement("div", "rd", `${job.id} at ${job.stage}${job.needs !== null ? ", waiting on you" : ""}`),
   );
-  r.append(
-    el("span", `dot ${dotClass(j)}`),
-    t,
-    el("span", "rc", `${j.files.length} files`),
+  rowButton.append(
+    createElement("span", `dot ${stateClass(job)}`),
+    text,
+    createElement("span", "rc", `${job.files.length} files`),
   );
-  r.onclick = () => openJobPanel(j.id);
-  return r;
+  rowButton.onclick = () => selectJob(job.id);
+  return rowButton;
 }
 
 // A change to the custom stages that an agent prepared. Nothing happens until the user clicks Apply.
-function proposalBox(v      , p                               )              {
-  const box = el("div", "callout");
-  const order = el("div", "porder");
-  for (const id of p.order[v.def.id] ?? []) {
-    const label = v.baseStages.find((s) => s.id === id)?.label ?? id;
-    order.append(el("span", `pchip${p.changed.includes(id) ? " new" : ""}`, label));
+function createProposalBox(boardView           , proposal                                    )              {
+  const box = createElement("div", "callout");
+  const orderStrip = createElement("div", "porder");
+  for (const stageId of proposal.stageOrderByBoard[boardView.definition.id] ?? []) {
+    const label = boardView.builtInStages.find((stage) => stage.id === stageId)?.label ?? stageId;
+    orderStrip.append(createElement("span", `pchip${proposal.changedStageIds.includes(stageId) ? " new" : ""}`, label));
   }
-  const msg = el("p", "pmsg", p.stale ? "The pipeline changed after this was prepared. Discard it and ask again." : "Nothing changes until you click Apply.");
-  const act = async (action                             )                => {
+  const message = createElement("p", "pmsg", proposal.isStale
+    ? "The pipeline changed after this was prepared. Discard it and ask again."
+    : "Nothing changes until you click Apply.");
+  const runAction = async (action                             )                => {
     try {
-      const res = await api(`/api/${v.def.id}/${action}`, { method: "POST", body: JSON.stringify({ id: "" }) });
-      msg.textContent = res.ok ? "" : "Refused: the pipeline changed, or a job sits in a stage this removes.";
+      const response = await request(`/api/${boardView.definition.id}/${action}`, {
+        method: "POST",
+        body: JSON.stringify({ id: "" }),
+      });
+      message.textContent = response.ok ? "" : "Refused: the pipeline changed, or a job sits in a stage this removes.";
     } catch {
-      msg.textContent = "offline";
+      message.textContent = "offline";
     }
-    await pollOne(v.def.id);
+    await pollBoard(boardView.definition.id);
   };
-  const apply = button("Apply", "btn go", () => void act("applypipe"));
-  apply.disabled = p.stale;
-  box.append(el("b", "", "Waiting for you"), ...p.ops.map((o) => el("p", "", o)), order, msg, row(apply, button("Discard", "btn", () => void act("discardpipe"))));
+  const applyButton = createButton("Apply", "btn go", () => void runAction("applypipe"));
+  applyButton.disabled = proposal.isStale;
+  box.append(
+    createElement("b", "", "Waiting for you"),
+    ...proposal.operations.map((operation) => createElement("p", "", operation)),
+    orderStrip,
+    message,
+    createChipRow(applyButton, createButton("Discard", "btn", () => void runAction("discardpipe"))),
+  );
   return box;
 }
 
-function overview()                {
-  const v = view();
-  const waiting = v.jobs.filter((j) => j.needs_human);
-  const ph = el("div", "ph");
-  ph.append(boardIcon(v.def.id), el("span", "kindlabel", "Board"));
-  const jobList = el("div", "list");
-  const shown = v.jobs.filter((j) => visible(v, j));
-  jobList.append(...shown.map(listRow));
+function renderOverview()                {
+  const boardView = currentView();
+  const waitingJobs = boardView.jobs.filter((job) => job.needs !== null);
+  const header = createElement("div", "ph");
+  header.append(boardIcon(boardView.definition.id), createElement("span", "kindlabel", "Board"));
+  const jobList = createElement("div", "list");
+  const visibleJobs = boardView.jobs.filter((job) => isVisible(boardView, job));
+  jobList.append(...visibleJobs.map(createListRow));
   return [
-    sec(
-      ph,
-      el("h2", "pt", v.def.label),
-      el("p", "pd", v.def.intro),
-      el("div", "gap"),
-      stats(
-        [waiting.length, "need you"],
-        [v.jobs.filter(finished).length, "done"],
+    createSection(
+      header,
+      createElement("h2", "pt", boardView.definition.label),
+      createElement("p", "pd", boardView.definition.intro),
+      createElement("div", "gap"),
+      createStats(
+        [waitingJobs.length, "need you"],
+        [boardView.jobs.filter(isFinished).length, "done"],
       ),
     ),
-    ...(v.proposal ? [sec(heading("Pipeline change"), proposalBox(v, v.proposal))] : []),
-    ...(waiting.length
+    ...(boardView.proposal
+      ? [createSection(createHeading("Pipeline change"), createProposalBox(boardView, boardView.proposal))]
+      : []),
+    ...(waitingJobs.length
       ? [
-          sec(
-            heading("Needs you", waiting.length),
-            ...waiting.map((j) => {
-              const c = el("button", "callout");
-              c.type = "button";
-              c.append(
-                el("b", "", j.title),
-                el("span", "", j.needs?.action ?? "Open"),
+          createSection(
+            createHeading("Needs you", waitingJobs.length),
+            ...waitingJobs.map((job) => {
+              const callout = createElement("button", "callout");
+              callout.type = "button";
+              callout.append(
+                createElement("b", "", job.title),
+                createElement("span", "", job.needs?.action ?? "Open"),
               );
-              c.onclick = () => openJobPanel(j.id);
-              return c;
+              callout.onclick = () => selectJob(job.id);
+              return callout;
             }),
           ),
         ]
       : []),
-    sec(
-      heading("Jobs"),
-      shown.length
+    createSection(
+      createHeading("Jobs"),
+      visibleJobs.length
         ? jobList
-        : el(
-            "p",
-            "pd empty",
-            "No jobs yet. Ask an agent to run it, or type below.",
-          ),
+        : createElement("p", "pd empty", "No jobs yet. Ask an agent to run it, or type below."),
     ),
   ];
 }
 
-function needsBox(n       , j     )              {
-  const box = el("div", "callout amber");
+function createNeedsCallout(needs       , job     )              {
+  const box = createElement("div", "callout amber");
   box.append(
-    el("b", "", `Needs you: ${n.action}`),
-    el("p", "", n.why),
-    el("p", "", n.todo),
+    createElement("b", "", `Needs you: ${needs.action}`),
+    createElement("p", "", needs.why),
+    createElement("p", "", needs.todo),
   );
   box.append(
-    button(n.action, "btn", () => post(view().def.needsPath(j), { id: j.id })),
+    createButton(needs.action, "btn", () => void postAction(currentView().definition.humanActionPath(job), { id: job.id })),
   );
   return box;
 }
 
-function skillsSection(j     )              {
-  const v = view();
-  const off = new Set(j.skills_off ?? []);
-  const tag = (name        ) => {
-    const t = el("button", `tag${off.has(name) ? " off" : ""}`, name);
-    t.type = "button";
-    t.title = off.has(name)
+function renderSkillsSection(job     )              {
+  const boardView = currentView();
+  const disabledSkills = new Set(job.skillsOff ?? []);
+  const createTag = (skillName        )                    => {
+    const tagButton = createElement("button", `tag${disabledSkills.has(skillName) ? " off" : ""}`, skillName);
+    tagButton.type = "button";
+    tagButton.title = disabledSkills.has(skillName)
       ? "Off for this job. Click to use it again."
       : "Click to stop using this skill on this job.";
-    t.onclick = () => post("skill", { id: j.id, name, off: !off.has(name) });
-    return t;
+    tagButton.onclick = () => void postAction("skill", { id: job.id, name: skillName, off: !disabledSkills.has(skillName) });
+    return tagButton;
   };
-  const tagBox = el("div", "tags");
-  tagBox.append(
-    ...(v.skillsOpen ? j.skills : j.skills.filter((n) => off.has(n))).map(tag),
+  const tagContainer = createElement("div", "tags");
+  tagContainer.append(
+    ...(boardView.showAllSkills ? job.skills : job.skills.filter((name) => disabledSkills.has(name))).map(createTag),
   );
-  if (!v.skillsOpen && !off.size)
-    tagBox.append(el("span", "pd empty", "All skills on"));
-  const actions = el("div", "actions");
-  actions.append(
-    button(
-      v.skillsOpen ? "Hide list" : "Choose skills",
+  if (!boardView.showAllSkills && !disabledSkills.size) {
+    tagContainer.append(createElement("span", "pd empty", "All skills on"));
+  }
+  const actionRow = createElement("div", "actions");
+  actionRow.append(
+    createButton(
+      boardView.showAllSkills ? "Hide list" : "Choose skills",
       "btn ghost small",
       () => {
-        v.skillsOpen = !v.skillsOpen;
+        boardView.showAllSkills = !boardView.showAllSkills;
         renderPanel();
       },
     ),
   );
-  return sec(heading("Skills", off.size), tagBox, actions);
+  return createSection(createHeading("Skills", disabledSkills.size), tagContainer, actionRow);
 }
 
-function noteSection(j     )              {
-  const note = el("textarea");
-  note.rows = 2;
-  note.placeholder = `Note for the ${j.stage} stage. The next agent follows it.`;
-  note.value = j.briefs?.[j.stage] ?? "";
-  const actions = el("div", "actions");
-  actions.append(
-    button("Save note", "btn ghost", () =>
-      post("brief", { id: j.id, stage: j.stage, text: note.value }),
+function renderStageNote(job     )              {
+  const noteInput = createElement("textarea");
+  noteInput.rows = 2;
+  noteInput.placeholder = `Note for the ${job.stage} stage. The next agent follows it.`;
+  noteInput.value = job.briefs?.[job.stage] ?? "";
+  const actionRow = createElement("div", "actions");
+  actionRow.append(
+    createButton("Save note", "btn ghost", () =>
+      void postAction("brief", { id: job.id, stage: job.stage, text: noteInput.value }),
     ),
   );
-  return sec(heading("Stage note"), note, actions);
+  return createSection(createHeading("Stage note"), noteInput, actionRow);
 }
 
 const GIT_ICON =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10"/><path d="M18 9c0 5-12 3-12 8"/></svg>';
 
-function placeBox(where        )              {
-  const box = el("div", "pp");
-  const icon = el("span");
+function createPlaceBox(where        )              {
+  const box = createElement("div", "pp");
+  const icon = createElement("span");
   icon.innerHTML = GIT_ICON;
-  box.append(icon, el("span", "", where));
+  box.append(icon, createElement("span", "", where));
   return box;
 }
 
-function jobView(j     )                {
-  const v = view();
-  const ph = el("div", "ph");
-  ph.append(
-    button("←", "iconbtn", closeJob),
-    el("span", "kindlabel", v.def.kind),
+function renderJobView(job     )                {
+  const boardView = currentView();
+  const header = createElement("div", "ph");
+  header.append(
+    createButton("←", "iconbtn", closeJob),
+    createElement("span", "kindlabel", boardView.definition.kind),
   );
-  const last = j.activity?.at(-1);
-  const where = v.def.place(j);
-  const bits = v.def.statusBits(j).filter((r) => r.length);
-  const files = j.files.map((f) => {
-    const r = el("button", `lrow${editors.has(editorKey(v.def.id, j.id, f)) ? " on" : ""}`);
-    r.type = "button";
-    r.title = "Open in the editor";
-    const t = el("div", "rt");
-    t.append(el("div", "rn", f));
-    r.append(el("span", "dot file"), t);
-    r.onclick = () => void openFileEditor(f);
-    return r;
+  const latestActivity = job.activity?.at(-1);
+  const placeText = boardView.definition.place(job);
+  const statusRows = boardView.definition.statusBits(job).filter((bits) => bits.length);
+  const fileButtons = job.files.map((fileName) => {
+    const fileButton = createElement("button", `lrow${editorsByKey.has(editorKeyFor(boardView.definition.id, job.id, fileName)) ? " on" : ""}`);
+    fileButton.type = "button";
+    fileButton.title = "Open in the editor";
+    const fileText = createElement("div", "rt");
+    fileText.append(createElement("div", "rn", fileName));
+    fileButton.append(createElement("span", "dot file"), fileText);
+    fileButton.onclick = () => void openFileEditor(fileName);
+    return fileButton;
   });
-  const fileList = el("div", "list");
-  fileList.append(...files);
+  const fileList = createElement("div", "list");
+  fileList.append(...fileButtons);
   return [
-    sec(
-      ph,
-      el("h2", "pt", j.title),
-      el("p", `pd${last ? "" : " empty"}`, last ? `now: ${last.text}` : j.id),
-      where ? placeBox(where) : null,
-      el("div", "gap"),
-      stats(...v.def.stats(j)),
+    createSection(
+      header,
+      createElement("h2", "pt", job.title),
+      createElement("p", `pd${latestActivity ? "" : " empty"}`, latestActivity ? `now: ${latestActivity.text}` : job.id),
+      placeText ? createPlaceBox(placeText) : null,
+      createElement("div", "gap"),
+      createStats(...boardView.definition.stats(job)),
     ),
-    ...(j.needs ? [sec(needsBox(j.needs, j))] : []),
-    ...(bits.length
+    ...(job.needs ? [createSection(createNeedsCallout(job.needs, job))] : []),
+    ...(statusRows.length
       ? [
-          sec(
-            heading("Status"),
-            ...bits.map((r) => row(...r.map((b) => chip(b.text, b.cls ?? "")))),
+          createSection(
+            createHeading("Status"),
+            ...statusRows.map((bits) => createChipRow(...bits.map((bit) => createChip(bit.text, bit.cls ?? "")))),
           ),
         ]
       : []),
-    skillsSection(j),
-    noteSection(j),
-    sec(heading("Files", j.files.length), fileList),
+    renderSkillsSection(job),
+    renderStageNote(job),
+    createSection(createHeading("Files", job.files.length), fileList),
   ];
 }
 
 function renderPanel()       {
   if (document.activeElement?.tagName === "TEXTAREA") return;
-  const j = openJob();
-  $("panel").replaceChildren(...(j ? jobView(j) : overview()));
+  const job = currentJob();
+  requireElement("panel").replaceChildren(...(job ? renderJobView(job) : renderOverview()));
 }
 
                                                
-async function readFile(board        , job        , name        )                           {
+
+async function readFileSnapshot(boardId        , jobId        , fileName        )                           {
   try {
-    const res = await api(
-      `/api/${board}/file?job=${encodeURIComponent(job)}&name=${encodeURIComponent(name)}`,
+    const response = await request(
+      `/api/${boardId}/file?job=${encodeURIComponent(jobId)}&name=${encodeURIComponent(fileName)}`,
     );
-    return res.ok ? { text: await res.text(), base: res.headers.get("X-Base") ?? "" } : null;
+    return response.ok
+      ? { text: await response.text(), base: response.headers.get("X-Base") ?? "" }
+      : null;
   } catch {
     return null;
   }
 }
 
-const SAVE_ERRORS                         = {
+const SAVE_ERROR_MESSAGES                         = {
   409: "The file changed on disk after you opened it. Reload, then edit again.",
   422: "Lines like STATUS: and VERDICT: steer the board. They cannot be edited here.",
   400: "That edit was refused.",
 };
 
-const editorKey = (board        , job        , name        )         => `${board}/${job}/${name}`;
+const editorKeyFor = (boardId        , jobId        , fileName        )         => `${boardId}/${jobId}/${fileName}`;
 
-async function openFileEditor(name        )                {
-  const v = view();
-  const board = v.def.id;
-  const job = String(v.openId);
-  const key = editorKey(board, job, name);
-  if (editors.has(key)) return focusEditor(key);
-  const file = await readFile(board, job, name);
-  if (!file) return;
-  const handle = openEditor({
-    job,
-    name,
-    ...file,
-    load: () => readFile(board, job, name),
+async function openFileEditor(fileName        )                {
+  const boardView = currentView();
+  if (!boardView.openId) return;
+  const boardId = boardView.definition.id;
+  const jobId = boardView.openId;
+  const key = editorKeyFor(boardId, jobId, fileName);
+  if (editorsByKey.has(key)) return focusEditor(key);
+  const snapshot = await readFileSnapshot(boardId, jobId, fileName);
+  if (!snapshot) return;
+  const editorHandle = openEditor({
+    jobId,
+    fileName,
+    ...snapshot,
+    load: () => readFileSnapshot(boardId, jobId, fileName),
     save: async (text, base) => {
       try {
-        const res = await api(`/api/${board}/save`, {
+        const response = await request(`/api/${boardId}/save`, {
           method: "POST",
-          body: JSON.stringify({ id: job, name, base, text }),
+          body: JSON.stringify({ id: jobId, name: fileName, base, text }),
         });
-        if (!res.ok) return { ok: false, error: SAVE_ERRORS[res.status] ?? `Refused (${res.status}).` };
-        return { ok: true, base: (await readFile(board, job, name))?.base ?? "" };
+        if (!response.ok) {
+          return { ok: false, error: SAVE_ERROR_MESSAGES[response.status] ?? `Refused (${response.status}).` };
+        }
+        const reloaded = await readFileSnapshot(boardId, jobId, fileName);
+        return { ok: true, base: reloaded?.base ?? "" };
       } catch {
         return { ok: false, error: "offline" };
       }
     },
-    comment: (text) => ask(text),
+    comment: (text) => requestAnswer(text),
     back: () => {
-      activeEditor = null;
+      activeEditorKey = null;
       renderAll();
     },
     changed: renderTabs,
     closed: () => {
-      editors.delete(key);
-      if (activeEditor === key) activeEditor = null;
+      editorsByKey.delete(key);
+      if (activeEditorKey === key) activeEditorKey = null;
       renderAll();
     },
   });
-  editors.set(key, { ...handle, name });
+  editorsByKey.set(key, { ...editorHandle, fileName });
   focusEditor(key);
 }
 
-function openJobPanel(id        )       {
-  const v = view();
-  v.openId = id;
+function selectJob(jobId        )       {
+  const boardView = currentView();
+  boardView.openId = jobId;
   document.body.classList.add("with-panel");
   renderAll();
 }
+
 function closeJob()       {
-  view().openId = null;
+  currentView().openId = null;
   renderAll();
 }
 
 // ---- polling: every board, so the sidebar and tab badges stay live
-const inflight = new Map                       ();
-function pollOne(id        )                {
-  const v = views.get(id);
-  if (!v) return Promise.resolve();
-  const p = inflight.get(id) ?? fetchJobs(v).finally(() => inflight.delete(id));
-  inflight.set(id, p);
-  return p;
+const inflightByBoardId = new Map                       ();
+
+function pollBoard(boardId               )                {
+  if (!boardId) return Promise.resolve();
+  const boardView = viewsByBoardId.get(boardId);
+  if (!boardView) return Promise.resolve();
+  const existing = inflightByBoardId.get(boardId);
+  if (existing) return existing;
+  const pending = fetchJobs(boardView).finally(() => inflightByBoardId.delete(boardId));
+  inflightByBoardId.set(boardId, pending);
+  return pending;
 }
 
 // Built-in stages keep their text from BUILD and REVIEW. A custom stage brings its own label and blurb.
-function applyStages(v      , p               )       {
-  const base = new Map(v.baseStages.map((s) => [s.id, s]));
-  v.def.stages = p.order.flatMap((id) => {
-    const custom = p.custom[id];
-    const stage = base.get(id) ?? (custom ? { id, label: custom.label, blurb: custom.blurb } : null);
+function applyStages(boardView           , payload               )       {
+  const builtInById = new Map(boardView.builtInStages.map((stage) => [stage.id, stage]));
+  boardView.definition.stages = payload.stageOrder.flatMap((stageId) => {
+    const custom = payload.customStages[stageId];
+    const stage = builtInById.get(stageId) ?? (custom ? { id: stageId, label: custom.label, blurb: custom.blurb } : null);
     return stage ? [stage] : [];
   });
-  v.proposal = p.proposal;
+  boardView.proposal = payload.proposal;
 }
 
-async function fetchJobs(v      )                {
+async function fetchJobs(boardView           )                {
   try {
-    const [res, sres] = await Promise.all([api(`/api/${v.def.id}/jobs`), api(`/api/${v.def.id}/stages`)]);
-    if (!res.ok || !sres.ok) throw new Error(`status ${res.status}/${sres.status}`);
-    const [text, stagesText] = [await res.text(), await sres.text()];
-    const sig = `${text}\n${stagesText}`;
-    if (sig === v.sig)
-      return v.def.id === active ? renderTabs() : renderSidebar();
-    v.sig = sig;
-    // shortcut: the payloads are trusted, not validated, upgrade if the server stops being ours
-    v.jobs = JSON.parse(text)         ;
-    applyStages(v, JSON.parse(stagesText)                 );
-    if (v.def.id === active) renderAll();
-    else {
+    const [jobsResponse, stagesResponse] = await Promise.all([
+      request(`/api/${boardView.definition.id}/jobs`),
+      request(`/api/${boardView.definition.id}/stages`),
+    ]);
+    if (!jobsResponse.ok || !stagesResponse.ok) {
+      throw new Error(`status ${jobsResponse.status}/${stagesResponse.status}`);
+    }
+    const [jobsText, stagesText] = await Promise.all([jobsResponse.text(), stagesResponse.text()]);
+    const payloadSignature = `${jobsText}\n${stagesText}`;
+    if (payloadSignature === boardView.payloadSignature) {
+      if (boardView.definition.id === activeBoardId) renderTabs();
+      else renderSidebar();
+      return;
+    }
+    boardView.payloadSignature = payloadSignature;
+    boardView.jobs = parseJobs(parseJson(jobsText, "jobs"));
+    applyStages(boardView, parseStages(parseJson(stagesText, "stages")));
+    if (boardView.definition.id === activeBoardId) {
+      renderAll();
+    } else {
       renderSidebar();
       renderTabs();
     }
   } catch {
-    $("meta").textContent = "offline, retrying";
+    requireElement("meta").textContent = "offline, retrying";
   }
 }
-async function pollLoop()                {
-  if (!document.hidden) await Promise.all([...views.keys()].map(pollOne));
-  setTimeout(pollLoop, POLL_MS);
+
+// The poll is meant to run for the life of the page; pagehide is its explicit cleanup path.
+let pollTimeoutId = 0;
+let pollingStopped = false;
+
+function pollLoop()       {
+  if (pollingStopped) return;
+  if (!document.hidden) void Promise.all([...viewsByBoardId.keys()].map(pollBoard));
+  pollTimeoutId = window.setTimeout(pollLoop, POLL_INTERVAL_MS);
 }
 
+function stopPolling()       {
+  pollingStopped = true;
+  window.clearTimeout(pollTimeoutId);
+}
+
+window.addEventListener("pagehide", stopPolling, { once: true });
 
 // ---- chrome: zoom, panel, sidebar, drop zones
-$("zoom-in").onclick = () => {
-  view().userZoom = Math.min(2, scale * 1.2);
+requireElement("zoom-in").onclick = () => {
+  currentView().zoomOverride = Math.min(2, currentScale * 1.2);
   applyScale();
 };
-$("zoom-out").onclick = () => {
-  view().userZoom = Math.max(0.3, scale / 1.2);
+requireElement("zoom-out").onclick = () => {
+  currentView().zoomOverride = Math.max(0.3, currentScale / 1.2);
   applyScale();
 };
-$("zoom-fit").onclick = () => {
-  view().userZoom = null;
+requireElement("zoom-fit").onclick = () => {
+  currentView().zoomOverride = null;
   applyScale();
 };
+
 // The editor covers the board, so a board control first takes you back to the board.
-const leaveEditor = ()          => {
-  if (!activeEditor) return false;
-  activeEditor = null;
+function leaveEditorIfOpen()          {
+  if (!activeEditorKey) return false;
+  activeEditorKey = null;
   renderAll();
   return true;
-};
-$("panel-toggle").onclick = () => {
-  if (leaveEditor()) return;
+}
+
+requireElement("panel-toggle").onclick = () => {
+  if (leaveEditorIfOpen()) return;
   document.body.classList.toggle("with-panel");
   applyScale();
 };
-$("side-toggle").onclick = () => {
-  if (!leaveEditor()) setSide(!sideCollapsed);
+requireElement("side-toggle").onclick = () => {
+  if (!leaveEditorIfOpen()) setSidebarCollapsed(!sidebarCollapsed);
 };
-for (const zone of [$("boardtabs"), $("canvas")]) {
-  zone.ondragover = (e) => {
-    e.preventDefault();
+
+for (const zone of [requireElement("boardtabs"), requireElement("canvas")]) {
+  zone.ondragover = (event) => {
+    event.preventDefault();
     zone.classList.add("over");
   };
   zone.ondragleave = () => zone.classList.remove("over");
-  zone.ondrop = (e) => {
+  zone.ondrop = (event) => {
     zone.classList.remove("over");
     document.body.classList.remove("dragging");
     if (zone.id === "canvas") {
-      e.preventDefault();
-      const id = e.dataTransfer?.getData("text/plain") ?? "";
-      if (views.has(id)) openBoard(id);
-    } else dropOnTabs(e);
+      event.preventDefault();
+      const boardId = event.dataTransfer?.getData("text/plain") ?? "";
+      if (viewsByBoardId.has(boardId)) openBoard(boardId);
+    } else {
+      dropOnTabs(event);
+    }
   };
 }
+
 window.addEventListener("resize", applyScale);
-document.addEventListener("visibilitychange", async () => {
-  if (!document.hidden) await Promise.all([...views.keys()].map(pollOne));
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) void Promise.all([...viewsByBoardId.keys()].map(pollBoard));
 });
 
 // ---- start
 async function start()                {
-  configureAsk({ api, view, views, pollOne });
+  initializeAsk({ request, getView: currentView, viewsByBoardId, pollBoard });
   try {
-    const boards                                  = await (
-      await api("/api/boards")
-    ).json();
-    for (const b of boards) {
-      const def = DEFS[b.id];
-      if (def)
-        views.set(b.id, {
-          def: { ...def, id: b.id, label: b.label },
-          jobs: [],
-          openId: null,
-          filter: "all",
-          userZoom: null,
-          sig: "",
-          session: "",
-          skillsOpen: false,
-          baseStages: def.stages,
-          proposal: null,
-        });
+    const response = await request("/api/boards");
+    if (!response.ok) throw new Error(`status ${response.status}`);
+    const boards = parseBoards(await response.json()           );
+    for (const board of boards) {
+      const definition = BOARD_DEFINITIONS[board.id];
+      if (!definition) continue;
+      viewsByBoardId.set(board.id, {
+        definition: { ...definition, id: board.id, label: board.label },
+        jobs: [],
+        openId: null,
+        filter: "all",
+        zoomOverride: null,
+        payloadSignature: "",
+        session: "",
+        showAllSkills: false,
+        builtInStages: definition.stages,
+        proposal: null,
+      });
     }
   } catch {
-    $("meta").textContent = "offline, retrying";
+    requireElement("meta").textContent = "offline, retrying";
   }
-  const saved = restore();
-  order = [
-    ...(saved?.order ?? []).filter((id) => views.has(id)),
-    ...[...views.keys()].filter((id) => !saved?.order?.includes(id)),
+  const savedLayout = restoreLayout();
+  boardOrder = [
+    ...(savedLayout?.order ?? []).filter((id) => viewsByBoardId.has(id)),
+    ...[...viewsByBoardId.keys()].filter((id) => !savedLayout?.order?.includes(id)),
   ];
-  openTabs = (saved?.openTabs ?? []).filter((id) => views.has(id));
-  if (!openTabs.length && order.length) openTabs = [order[0]];
-  active = openTabs.includes(saved?.active ?? "")
-    ? (saved?.active          )
-    : (openTabs[0] ?? "");
+  openBoardIds = (savedLayout?.openTabs ?? []).filter((id) => viewsByBoardId.has(id));
+  if (!openBoardIds.length && boardOrder.length) openBoardIds = [boardOrder[0]];
+  activeBoardId = savedLayout && openBoardIds.includes(savedLayout.active)
+    ? savedLayout.active
+    : (openBoardIds[0] ?? null);
   document.body.classList.add("with-panel");
-  setSide(saved?.sideCollapsed ?? false);
+  setSidebarCollapsed(savedLayout?.sideCollapsed ?? false);
   showMode();
   void restoreChat();
   try {
-    const choices                           = await (
-      await api("/api/engines")
-    ).json();
-    setEngines(Object.keys(choices), choices);
+    const response = await request("/api/engines");
+    if (!response.ok) throw new Error(`status ${response.status}`);
+    const modelsByEngine = parseEngines(await response.json()           );
+    setAvailableEngines(Object.keys(modelsByEngine), modelsByEngine);
   } catch {
     // keep the claude default
   }
-  if (active) {
-    await Promise.all([...views.keys()].map(pollOne));
+  if (activeBoardId) {
+    await Promise.all([...viewsByBoardId.keys()].map(pollBoard));
     renderAll();
   }
-  await pollLoop();
+  pollLoop();
 }
-await start();
+
+void start();

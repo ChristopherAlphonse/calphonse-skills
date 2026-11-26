@@ -1,15 +1,21 @@
 // Generated from types.ts by build.mjs. Do not edit.
-// The /api/<board>/jobs payload: the job.json fields of either engine, plus what its snapshot() adds.
+// Domain types. Server payloads are parsed in payloads.ts; nothing unchecked crosses into these types.
+
+                                          
+                                               
+                                                  
+
                         
                  
-                
+                                                                                     
+                      
               
                
  
 
                               
-                   
-                   
+                  
+                  
                
                
  
@@ -19,15 +25,16 @@
                
  
 
-                      
+                     
              
                 
+                                                                                
                 
                  
-                       
+                      
                       
                   
-                        
+                       
                                   
                    
                         
@@ -37,18 +44,29 @@
                
                        
                         
-                       
-                              
-                                             
-                       
-                                         
+                      
+                                                          
+                                               
+                     
+                                                
                   
                        
                       
-                        
                        
-                        
  
+
+// The server derives needs_human from needs. Keeping them as one variant makes disagreement unrepresentable.
+                                               
+               
+                   
+ 
+
+                                               
+              
+                    
+ 
+
+                                          
 
                         
              
@@ -58,23 +76,23 @@
 
 // A change to the custom stages that waits for the user to click Apply.
                            
-                
-                                  
-                    
-                 
+                       
+                                              
+                            
+                   
  
 
 // The /api/<board>/stages payload: the stage order for one workflow, the custom stages' labels, and any waiting change.
                                 
-                  
-                                                           
+                       
+                                                                 
                             
  
 
                                               
 
 // One engine's board: its stages and how its jobs read in the panel.
-                           
+                                  
              
                 
                 
@@ -86,21 +104,21 @@
                     
                 
                
-                                                 
-                                   
-                                
-                                                             
+                                                   
+                                     
+                                        
+                                                               
  
 
-                       
-                
+                            
+                              
               
                         
                  
-                          
-              
+                              
+                           
                   
-                      
-                      
+                         
+                         
                             
  

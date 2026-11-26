@@ -27,7 +27,6 @@ import type {
   Needs,
   Stage,
   StagesPayload,
-  WaitingJob,
 } from "/static/types.js";
 
 const POLL_INTERVAL_MS = 2000;
