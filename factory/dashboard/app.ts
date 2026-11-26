@@ -1,8 +1,9 @@
+import { DEFS } from "/static/boards.js";
 import { el, chip } from "/static/dom.js";
 import { openEditor, type EditorHandle } from "/static/editor.js";
 import { renderMarkdown } from "/static/markdown.js";
+import { drawWires } from "/static/wires.js";
 import type {
-  BoardDef,
   Filter,
   Job,
   Needs,
@@ -10,141 +11,6 @@ import type {
   StagesPayload,
   View,
 } from "/static/types.js";
-
-const BUILD: Stage[] = [
-  { id: "shape", label: "Shape", blurb: "Decide what to build, or reject it." },
-  { id: "spec", label: "Spec", blurb: "Write the plan. You approve it here." },
-  {
-    id: "build",
-    label: "Build",
-    blurb: "Write the code, then the checks run.",
-  },
-  {
-    id: "review",
-    label: "Review",
-    blurb: "Independent reviewers read the change.",
-  },
-  { id: "polish", label: "Polish", blurb: "Strip comments and workarounds." },
-  { id: "prove", label: "Prove", blurb: "Run it for real and write the UAT." },
-  {
-    id: "ship",
-    label: "Ship",
-    blurb: "PR body and commit message. You commit.",
-  },
-  { id: "ready", label: "Ready", blurb: "Committed locally." },
-];
-const REVIEW: Stage[] = [
-  {
-    id: "scope",
-    label: "Scope",
-    blurb: "Find the diff and the repo's own checks.",
-  },
-  {
-    id: "review",
-    label: "Review",
-    blurb: "Reviewers read the diff in parallel.",
-  },
-  {
-    id: "reconcile",
-    label: "Reconcile",
-    blurb: "Merge the reviews into one ranked list.",
-  },
-  {
-    id: "verify",
-    label: "Verify",
-    blurb: "Rerun the evidence, drop what fails.",
-  },
-  {
-    id: "report",
-    label: "Report",
-    blurb: "Write the report and paste-ready comments.",
-  },
-  { id: "ready", label: "Ready", blurb: "Report written. Nothing was posted." },
-];
-const verdicts = (j: Job) =>
-  Object.entries(j.reviews).map(([name, v]) => ({
-    text: v ? `${name} ${v}` : `${name} ...`,
-    cls: v ?? "",
-  }));
-const stack = (j: Job) =>
-  j.stack?.length ? [j.stack.map((k) => ({ text: k }))] : [];
-
-const DEFS: Record<string, Omit<BoardDef, "id" | "label">> = {
-  build: {
-    blurb: "Take a feature from idea to a local commit.",
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-5 9 5-9 5-9-5z"/><path d="M3 14l9 5 9-5"/></svg>',
-    stages: BUILD,
-    lane: "Build jobs",
-    columns: 4,
-    homeStage: "build",
-    doneLabel: "Ready to land",
-    intro:
-      "Local only. Nothing is pushed, and nothing is committed until you click.",
-    kind: "Build job",
-    stats: (j) => [
-      [!j.round ? "-" : `${j.round}/${j.round_limit}`, "round"],
-      [j.progress?.[1] ? `${j.progress[0]}/${j.progress[1]}` : "-", "tasks"],
-      [j.files.length, "files"],
-    ],
-    place: (j) => j.branch ?? j.worktree,
-    needsPath: (j) =>
-      j.can_approve ? "approve" : j.can_commit ? "commit" : "unblock",
-    statusBits: (j) => [
-      [
-        ...(j.stage === "gate" || j.gate
-          ? [{ text: `gate ${j.gate || "pending"}`, cls: j.gate || "" }]
-          : []),
-        ...(j.commit
-          ? [{ text: `committed locally ${j.commit.slice(0, 7)}`, cls: "PASS" }]
-          : []),
-      ],
-      ...stack(j),
-      ...(j.stage === "review" ? [verdicts(j)] : []),
-    ],
-  },
-  review: {
-    blurb: "Review a branch. Read-only, never edits code.",
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>',
-    stages: REVIEW,
-    lane: "Review jobs",
-    columns: 3,
-    homeStage: "scope",
-    doneLabel: "Reported",
-    intro: "Read-only. Nothing is edited, committed, pushed or posted.",
-    kind: "Review",
-    stats: (j) => [
-      [j.report?.FINDINGS ?? "-", "findings"],
-      [j.report?.BLOCKERS ?? "-", "blockers"],
-      [j.files.length, "files"],
-    ],
-    place: (j) =>
-      j.review
-        ? `${j.review.base_ref} .. ${j.review.head_ref}`
-        : (j.branch ?? j.worktree),
-    needsPath: () => "unblock",
-    statusBits: (j) => [
-      ...stack(j),
-      ...(j.report?.FINDINGS !== undefined
-        ? [
-            [
-              { text: `${j.report.FINDINGS} findings` },
-              ...(j.report.BLOCKERS !== undefined
-                ? [
-                    {
-                      text: `${j.report.BLOCKERS} blockers`,
-                      cls: Number(j.report.BLOCKERS) ? "FAIL" : "PASS",
-                    },
-                  ]
-                : []),
-            ],
-          ]
-        : []),
-      ...(Object.values(j.reviews).some(Boolean) || j.stage === "review"
-        ? [verdicts(j)]
-        : []),
-    ],
-  },
-};
 
 const POLL_MS = 2000;
 const STORE = "factory.board";
@@ -539,85 +405,7 @@ function applyScale(): void {
   rowsEl.style.transform = `scale(${scale})`;
   $("stage").style.width = `${w * scale}px`;
   $("stage").style.height = `${h * scale}px`;
-  drawWires();
-}
-
-type Pt = [number, number];
-// A right-angle route with rounded corners, like Floorplan's connectors.
-function routed(pts: Pt[], radius = 12): string {
-  let d = `M${pts[0][0]},${pts[0][1]}`;
-  for (let i = 1; i < pts.length - 1; i++) {
-    const [px, py] = pts[i - 1];
-    const [cx, cy] = pts[i];
-    const [nx, ny] = pts[i + 1];
-    const inLen = Math.hypot(cx - px, cy - py) || 1;
-    const outLen = Math.hypot(nx - cx, ny - cy) || 1;
-    const r = Math.min(radius, inLen / 2, outLen / 2);
-    d += ` L${cx - ((cx - px) / inLen) * r},${cy - ((cy - py) / inLen) * r} Q${cx},${cy} ${cx + ((nx - cx) / outLen) * r},${cy + ((ny - cy) / outLen) * r}`;
-  }
-  const last = pts[pts.length - 1];
-  return `${d} L${last[0]},${last[1]}`;
-}
-
-function drawWires(): void {
-  const svg = $("wires");
-  const base = $("lanes").getBoundingClientRect();
-  const ns = "http://www.w3.org/2000/svg";
-  const at = (r: DOMRect) => ({
-    l: (r.left - base.left) / scale,
-    r: (r.right - base.left) / scale,
-    t: (r.top - base.top) / scale,
-    b: (r.bottom - base.top) / scale,
-  });
-  const shapes: SVGElement[] = [];
-  const mk = <K extends keyof SVGElementTagNameMap>(
-    tag: K,
-    attrs: Record<string, string>,
-    cls: string,
-  ): SVGElementTagNameMap[K] => {
-    const e = document.createElementNS(ns, tag);
-    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
-    e.setAttribute("class", cls);
-    return e;
-  };
-  for (const nodes of document.querySelectorAll<HTMLElement>(".nodes")) {
-    const cards = [...nodes.children] as HTMLElement[];
-    for (let i = 0; i + 1 < cards.length; i++) {
-      const a = at(cards[i].getBoundingClientRect());
-      const b = at(cards[i + 1].getBoundingClientRect());
-      const lit = cards[i].classList.contains("lit") ? " lit" : "";
-      const y1 = (a.t + a.b) / 2;
-      const y2 = (b.t + b.b) / 2;
-      const wrap = b.t > a.b;
-      const route: Pt[] = wrap
-        ? [
-            [a.r, y1],
-            [a.r + 28, y1],
-            [a.r + 28, (a.b + b.t) / 2],
-            [b.l - 28, (a.b + b.t) / 2],
-            [b.l - 28, y2],
-            [b.l, y2],
-          ]
-        : [
-            [a.r, y1],
-            [(a.r + b.l) / 2, y1],
-            [(a.r + b.l) / 2, y2],
-            [b.l, y2],
-          ];
-      shapes.push(mk("path", { d: routed(route) }, `wire${lit}`));
-      for (const [cx, cy] of [route[0], route[route.length - 1]])
-        shapes.push(
-          mk(
-            "circle",
-            { cx: String(cx), cy: String(cy), r: "4.5" },
-            `port${lit}`,
-          ),
-        );
-    }
-  }
-  svg.setAttribute("width", String(base.width / scale));
-  svg.setAttribute("height", String(base.height / scale));
-  svg.replaceChildren(...shapes);
+  drawWires($("wires"), $("lanes"), scale);
 }
 
 // ---- side panel (Floorplan's structure: header, title, description, stats, titled sections)
