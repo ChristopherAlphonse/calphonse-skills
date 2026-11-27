@@ -383,6 +383,22 @@ class TestShapeSpec(Factory):
         self.assertNotIn("plain push", self.ok("queue").stdout)
         self.assertIn("standing-rm", (self.state / "audit.log").read_text())
 
+    def test_a_quick_build_skips_shape_and_polish_but_keeps_the_spec_approval_and_gate(self):
+        self.git("branch", "feature/Q")
+        self.ok("create", "q", "Fix a typo", "--quick")
+        self.assertEqual(self.stage("q"), "spec")
+        self.wf("q", "spec.md", "# spec\n")
+        self.no("advance", "q", "build")
+        self.human("approve", "q")
+        self.adv("q", "build")
+        (self.wt("q") / "fix.py").write_text("x = 1\n")
+        self.wf("q", "build.md", "STATUS: READY\n")
+        self.adv("q", "gate")
+        self.assertIn("GATE: PASS", self.run_gate("q"))
+        self.no("advance", "q", "polish")
+        self.adv("q", "ship")
+        self.no("create", "r", "R", "--prove", "--quick")
+
     def test_times_adds_up_each_stage_from_the_audit_log(self):
         self.assertIn("no stage moves", self.ok("times").stdout)
         self.state.mkdir(parents=True, exist_ok=True)
