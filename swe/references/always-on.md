@@ -4,6 +4,10 @@ A skill description only loads when the agent decides the task matches. A hook i
 
 `hooks/activate` prints the skill body with the front-matter removed. Claude Code and Kiro add that stdout to the conversation. Replace `SKILLS_DIR` with where the skills live on your machine (for example `~/.agents/skills`). Run `SKILLS_DIR/swe/hooks/activate` once by hand first. It should print the rules.
 
+## One command
+
+`scripts/install-swe-hook` adds all three entries below using this repo's path, and skips any that already exist. Preview first with `--dry-run`. Pass `--kiro-agent NAME` if your Kiro agent is not called `default`. It cannot edit a config that has comments (JSONC). Add those by hand from the sections below.
+
 ## Claude Code
 
 Add to `~/.claude/settings.json` (all projects) or a project's `.claude/settings.json`. `SessionStart` also fires on resume, clear, and compact, so the mode survives a compacted context.

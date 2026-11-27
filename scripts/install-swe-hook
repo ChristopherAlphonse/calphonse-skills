@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""Wire the swe always-on hook into Claude Code, Kiro and OpenCode.
+
+Safe to re-run: an entry that is already present is left alone.
+Use --dry-run to print what would change without writing.
+Details: swe/references/always-on.md
+"""
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+HOOK = str(REPO / "swe" / "hooks" / "activate")
+SKILL = str(REPO / "swe" / "SKILL.md")
+HOME = Path(os.environ.get("HOME", "~")).expanduser()
+
+
+def load(path):
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError as e:
+        sys.exit(f"{path}: not plain JSON ({e}). Add the entry by hand, see swe/references/always-on.md")
+
+
+def save(path, data, dry):
+    print(f"{'would write' if dry else 'wrote'} {path}")
+    if dry:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n")
+
+
+def claude(dry):
+    path = HOME / ".claude" / "settings.json"
+    data = load(path)
+    groups = data.setdefault("hooks", {}).setdefault("SessionStart", [])
+    if any(h.get("command") == HOOK for g in groups for h in g.get("hooks", [])):
+        return print(f"claude: already set in {path}")
+    groups.append({"hooks": [{"type": "command", "command": HOOK}]})
+    save(path, data, dry)
+
+
+def kiro(dry, agent):
+    path = HOME / ".kiro" / "agents" / f"{agent}.json"
+    data = load(path)
+    data.setdefault("name", agent)
+    spawn = data.setdefault("hooks", {}).setdefault("agentSpawn", [])
+    if any(h.get("command") == HOOK for h in spawn):
+        return print(f"kiro: already set in {path}")
+    spawn.append({"command": HOOK})
+    save(path, data, dry)
+
+
+def opencode(dry):
+    cfg = HOME / ".config" / "opencode"
+    path = next((p for p in (cfg / "opencode.jsonc", cfg / "opencode.json") if p.exists()), cfg / "opencode.json")
+    data = load(path)
+    instructions = data.setdefault("instructions", [])
+    if SKILL in instructions:
+        return print(f"opencode: already set in {path}")
+    instructions.append(SKILL)
+    save(path, data, dry)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--dry-run", action="store_true", help="print changes, write nothing")
+    ap.add_argument("--kiro-agent", default="default", help="Kiro agent config name (~/.kiro/agents/NAME.json)")
+    args = ap.parse_args()
+    if not os.access(HOOK, os.X_OK):
+        sys.exit(f"{HOOK} is missing or not executable")
+    claude(args.dry_run)
+    kiro(args.dry_run, args.kiro_agent)
+    opencode(args.dry_run)
+    print("Kiro IDE users: steering files are separate, see swe/references/always-on.md")
+
+
+if __name__ == "__main__":
+    main()

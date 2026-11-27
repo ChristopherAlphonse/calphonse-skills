@@ -294,6 +294,8 @@ done
 
 `~/.config/opencode/skills` is the path OpenCode reads (`skills.paths` in `opencode.json`). Edits to any `SKILL.md` take effect immediately. There is no reinstall step and no copy to keep in sync.
 
+To make `swe` active from the first message in Claude Code, Kiro and OpenCode, run `scripts/install-swe-hook --dry-run`, then run it again without the flag. See [swe/references/always-on.md](swe/references/always-on.md).
+
 Leave `~/.agents/skills` alone: it belongs to the Skills CLI and its lockfile.
 
 ## Notes
