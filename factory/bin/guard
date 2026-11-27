@@ -7,7 +7,7 @@ anything it cannot read, parse, or match is blocked.
 
   guard RULES.json   reads the hook event as JSON on stdin: {tool_name, tool_input, cwd}
 """
-import json, os, re, sys
+import json, os, re, shlex, sys
 
 SHELL_TOOLS = {"execute_bash", "Bash", "bash"}
 WRITE_TOOLS = {"fs_write", "fs_append", "str_replace", "delete_file",  # Kiro
@@ -65,6 +65,20 @@ def check_writes(rules, cwd, args):
         check_write(rules, cwd, raw)
 
 
+def check_push(segment):
+    """Read `git push` as git does: `-uf` and `+ref` force, `:ref` and `--prune` delete. A glob cannot see `-uf`."""
+    try:
+        words = shlex.split(segment)
+    except ValueError:  # a quote split across segments; plain words still show every flag
+        words = segment.split()
+    if "push" not in words or "git" not in words[:words.index("push")]:
+        return
+    for w in words[words.index("push") + 1:]:
+        short_force = w.startswith("-") and not w.startswith("--") and "f" in w
+        if short_force or w.startswith(("+", ":", "--force", "--delete", "--mirror", "--prune")):
+            block(f"`{segment}` force-pushes or deletes a remote ref")
+
+
 def check_shell(rules, cwd, command):
     segments = [s.strip() for s in SPLIT.split(FD_DUP.sub("", command)) if s.strip()]
     if not segments:
@@ -75,6 +89,7 @@ def check_shell(rules, cwd, command):
         if any_match(rules["ask"], text, shell_glob):
             block(f"`{text}` needs a human")
     for s in segments:
+        check_push(s)
         if not any_match(rules["allow"], s, shell_glob):
             block(f"`{s}` is not on the allow list")
     for target in REDIRECT.findall(command):
