@@ -4,9 +4,16 @@ A skill description only loads when the agent decides the task matches. A hook i
 
 `hooks/activate` prints the skill body with the front-matter removed. Claude Code and Kiro add that stdout to the conversation. Replace `SKILLS_DIR` with where the skills live on your machine (for example `~/.agents/skills`). Run `SKILLS_DIR/swe/hooks/activate` once by hand first. It should print the rules.
 
-## One command
+## Automatic
 
-`scripts/install-swe-hook` adds all three entries below using this repo's path, and skips any that already exist. Preview first with `--dry-run`. Pass `--kiro-agent NAME` if your Kiro agent is not called `default`. It cannot edit a config that has comments (JSONC). Add those by hand from the sections below.
+`scripts/install-swe-hook` adds all three entries below using this repo's path and skips any that already exist. It runs by itself:
+
+- **git:** `.githooks/post-merge` and `.githooks/post-checkout` run it after `git pull`, merge and checkout. Git only reads `.githooks` once you run `git config core.hooksPath .githooks` in a clone. Do that once per clone.
+- **Claude Code:** the repo's `.claude/settings.json` runs it at session start whenever you open Claude Code inside this repo.
+
+It also sets Claude Code's `statusLine` to `scripts/statusline` (model, folder, git branch, context used, 5-hour and 7-day usage with what is left and when it resets, and the last skill used in the last 30 minutes; it needs Python 3, and the usage figures only appear for Claude.ai subscribers), but only when `~/.claude/settings.json` has no `statusLine` yet. One you set yourself is never replaced. Kiro and OpenCode have no custom status line command, so they get only the hook. See `factory/docs/harnesses.md` for why.
+
+Run it by hand with `--dry-run` to preview. Pass `--kiro-agent NAME` if your Kiro agent is not called `default`. It cannot edit a config that has comments (JSONC). Add those by hand from the sections below.
 
 ## Claude Code
 

@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""Claude Code status line: model | folder | git branch | context | 5h and 7d usage | last skill.
+
+Reads Claude Code's status line JSON on stdin. Never prints a traceback: a status line that
+fails should be blank, not noisy. Installed by scripts/install-swe-hook.
+"""
+import json
+import re
+import subprocess
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+TAIL_BYTES = 400_000  # the last skill call is near the end; never read a whole transcript
+SKILL_FRESH_SECONDS = 30 * 60  # a skill stays "active" for this long after it was invoked
+SKILL_CALL = re.compile(r'"name":\s*"Skill",\s*"input":\s*\{\s*"skill":\s*"([^"]+)"')
+SLASH_CMD = re.compile(r"<command-name>/?([^<\s]+)</command-name>")
+
+
+def get(d, *keys):
+    for k in keys:
+        d = d.get(k) if isinstance(d, dict) else None
+    return d
+
+
+def git_branch(cwd):
+    def run(*args):
+        return subprocess.run(["git", "-C", cwd, *args], capture_output=True, text=True, timeout=1).stdout.strip()
+    branch = run("symbolic-ref", "--short", "HEAD") or run("rev-parse", "--short", "HEAD")
+    if not branch:
+        return ""
+    return branch + ("*" if run("status", "--porcelain") else "")
+
+
+def known_skills():
+    names = {p.parent.name for p in REPO.glob("*/SKILL.md")}
+    names |= {p.parent.name for p in (Path.home() / ".claude" / "skills").glob("*/SKILL.md")}
+    return names
+
+
+def active_skill(transcript):
+    """Latest skill invoked in this session, or "" if none or older than SKILL_FRESH_SECONDS."""
+    if not transcript:
+        return ""
+    try:
+        with open(transcript, "rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - TAIL_BYTES))
+            lines = f.read().decode("utf-8", "ignore").splitlines()
+    except OSError:
+        return ""
+    known = None
+    for line in reversed(lines):
+        name = None
+        m = SKILL_CALL.search(line)
+        if m:
+            name = m.group(1)
+        else:
+            m = SLASH_CMD.search(line)
+            if m:
+                known = known if known is not None else known_skills()
+                name = m.group(1) if m.group(1) in known else None
+        if not name:
+            continue
+        try:
+            ts = datetime.fromisoformat(json.loads(line)["timestamp"].replace("Z", "+00:00")).timestamp()
+        except (ValueError, KeyError, TypeError):
+            return name  # no readable time: show it rather than hide it
+        return name if time.time() - ts <= SKILL_FRESH_SECONDS else ""
+    return ""
+
+
+def window(label, w, fmt):
+    pct = get(w, "used_percentage")
+    if pct is None:
+        return ""
+    used = round(pct)
+    out = f"{label} {used}% used, {max(0, 100 - used)}% left"
+    reset = get(w, "resets_at")
+    if isinstance(reset, (int, float)):
+        out += f", resets {datetime.fromtimestamp(reset).strftime(fmt).lstrip('0').replace(' 0', ' ').lower()}"
+    return out
+
+
+def main():
+    data = json.load(sys.stdin)
+    cwd = get(data, "workspace", "current_dir") or data.get("cwd") or "."
+    parts = [get(data, "model", "display_name") or "claude", Path(cwd).name]
+    branch = git_branch(cwd)
+    if branch:
+        parts.append(branch)
+    ctx = get(data, "context_window", "used_percentage")
+    if ctx is not None:
+        parts.append(f"ctx {round(ctx)}%")
+    parts.append(window("5h", get(data, "rate_limits", "five_hour"), "%I:%M%p"))
+    parts.append(window("7d", get(data, "rate_limits", "seven_day"), "%a %I%p"))
+    skill = active_skill(data.get("transcript_path"))
+    if skill:
+        parts.append(f"skill: {skill}")
+    sys.stdout.write(" | ".join(p for p in parts if p))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:
+        pass
