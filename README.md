@@ -162,6 +162,15 @@ Skills are small on purpose, and some call others:
 - `code-review-frontend` falls back to `whats-going-on` when a repo has no codebase map.
 - `factory` calls most of the others as stages.
 
+### Routing in code
+
+`scripts/route "<task>"` picks the skills for a task without asking a model. It reads the prompt, the changed files (from git, or `--files`) and git state, then prints `name`, `path`, `reason` per skill. It is plain Python with no dependencies, so it behaves the same in Claude Code, Kiro, OpenCode, Codex, Gemini or a bare shell.
+
+- Rules live in `scripts/route-rules.json`. The file-type table is `STACK_RULES` in `factory/bin/job`, which `route` reads, so there is one copy.
+- Claude Code (this repo's `.claude/settings.json`) and Kiro run it on every prompt through `scripts/route-hook`. For Kiro, add `{"command": "REPO/scripts/route-hook"}` under `userPromptSubmit` in the agent config. Not run against the real Kiro CLI yet.
+- CLIs with no prompt hook (OpenCode, Codex, Gemini) follow the one line in [AGENTS.md](AGENTS.md): run `scripts/route` first.
+- `scripts/route --check` fails when a rule names a missing skill or an `AGENTS.md` skill has no rule. `.githooks/post-merge` runs it. Tests: `python -m unittest discover -s scripts/tests`.
+
 ### Which skill do I use?
 
 | I want to                                                  | Use                                                                                                                                                                                                                                                 | Try saying                                          |

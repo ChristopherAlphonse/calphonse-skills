@@ -1,0 +1,9 @@
+{
+  "id": "shape",
+  "workflow": "build",
+  "skill": "lets-talk-about-it",
+  "model": "large",
+  "writes": "planning",
+  "hint": "lets-talk-about-it then simplify on shape.md (decisions to approve first, below the STATUS line) -> shape.md (STATUS: READY, or reject with rejection.md)",
+  "on_demand": "Load spike only if the shape rests on an unknown, and simplify for the decisions at the top of shape.md."
+}

@@ -1,0 +1,8 @@
+{
+  "id": "verify",
+  "workflow": "review",
+  "skill": "prove-it-works",
+  "model": "small",
+  "writes": "notes",
+  "hint": "prove-it-works: rerun every VERIFIED (ran) command and check every cited line -> verified.md (STATUS: READY), drop what does not reproduce"
+}

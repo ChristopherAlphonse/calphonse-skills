@@ -1,0 +1,8 @@
+{
+  "id": "scope",
+  "workflow": "review",
+  "skill": "",
+  "model": "mid",
+  "writes": "notes",
+  "hint": "find the repo's own lint, type, and test tooling (CI config, Makefile, pyproject, package scripts, whatever it uses) -> scope.md (STATUS: READY, or reject with rejection.md); add an architecture reviewer with `job route`"
+}

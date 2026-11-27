@@ -34,6 +34,10 @@ All skills live at the repository root as `{skill-name}/SKILL.md`. `AGENTS.md` i
 | [vercel-react-best-practices](vercel-react-best-practices/SKILL.md) | React and Next.js performance rules from Vercel Engineering, plus general frontend patterns (components, hooks, state, forms, a11y) |
 | [whats-going-on](whats-going-on/SKILL.md) | One-pass codebase intelligence sweep: produces architecture.md, onboard.md (stack, conventions, concerns, use cases), and simplify-onboarding.md |
 
+## Routing
+
+Skill choice is made in code, not by judgment. Before a task, run `scripts/route "<task text>"`. It reads the prompt, the changed files and git state and prints the skills to load, one per line (`name`, `path`, `reason`). Load every skill it prints. Claude Code and Kiro run it by hook (`scripts/route-hook`). Rules: `scripts/route-rules.json`. `scripts/route --check` fails when the rules and this index drift.
+
 ## Conventions
 
 - Front-matter holds `name` and `description` only (Kiro requires that), and `name` matches the folder name. Exceptions: `qa-review` keeps `disable-model-invocation` so it runs only on request, and `vercel-react-best-practices` keeps its upstream `license` and `metadata`.

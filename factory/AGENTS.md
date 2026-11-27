@@ -14,7 +14,8 @@ A board of jobs. Each job moves through fixed stages, one fresh agent per stage,
 | `README.md` | What the factory is and how to start. Short on purpose. |
 | `docs/` | Everything else for users: `features.md` (every feature in plain words), `commands.md`, `safety.md`, `harnesses.md`, `how-to.md`, `tutorial-first-job.md`, `what-is-factory.md`, `developing.md`. |
 | `board-agent.md` | The chat bar assistant's reference. `ask_system()` in `bin/job` appends it to every chat prompt. |
-| `bin/job` | Only writer of `job.json`. Stage tables (`TRANSITIONS`, `HINT`, `REVIEW_TRANSITIONS`, `HINT_REVIEW`), the checks that justify a move, every command. |
+| `bin/job` | Only writer of `job.json`. Stage order (`BASE_ORDER`), the node loader (`load_nodes`), the checks that justify a move, every command. |
+| `nodes/<id>.json` | One file per built-in stage: `workflow`, `skill`, `model` (`large`, `mid`, `small`), `writes` (`planning`, `code`, `notes`), `hint`, optional `on_demand`. `bin/job` refuses to run if one is missing or malformed; `bin/tick` builds every harness's stage agents from them. |
 | `bin/board` | The board's HTTP server, the chat bar's `/api/ask`, saves, the chat log, the diagram frame. |
 | `bin/tick` | One headless pass per harness, or a loop. Refuses to run until the harness's deny policy is installed. |
 | `bin/guard` | Tool-call hook that blocks what the policy denies. Fails closed. |
@@ -47,11 +48,12 @@ A board of jobs. Each job moves through fixed stages, one fresh agent per stage,
 
 **A built-in stage** needs all of these, in one change:
 
-1. `bin/job`: the transition and hint tables for that workflow, and the check that the stage's file justifies the move.
-2. `SKILL.md`: that workflow's stage table.
-3. `dashboard/app.ts`: the `BUILD` or `REVIEW` list, then rebuild `dist/`.
-4. `board-agent.md`: mention the stage. A test fails if a stage in `bin/job` is missing from it.
-5. `tests/`: the legal and illegal moves.
+1. `nodes/<id>.json`: its skill, model tier, write area and hint. To change one of those for an existing stage, edit only this file.
+2. `bin/job`: `BASE_ORDER` and the transitions for that workflow, and the check that the stage's file justifies the move.
+3. `SKILL.md`: that workflow's stage table.
+4. `dashboard/app.ts`: the `BUILD` or `REVIEW` list, then rebuild `dist/`.
+5. `board-agent.md`: mention the stage. A test fails if a stage in `bin/job` is missing from it.
+6. `tests/`: the legal and illegal moves.
 
 ## Tests
 

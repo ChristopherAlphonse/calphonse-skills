@@ -1,0 +1,9 @@
+{
+  "id": "ship",
+  "workflow": "build",
+  "skill": "pr-body-style",
+  "model": "small",
+  "writes": "notes",
+  "hint": "pr-body-style (+ demo-script) -> pr-body.md and commit.md, then a commit on the branch (yours or the user's click)",
+  "on_demand": "Load demo-script only if the brief asks for a demo."
+}

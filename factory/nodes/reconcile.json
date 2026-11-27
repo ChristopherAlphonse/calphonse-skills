@@ -1,0 +1,8 @@
+{
+  "id": "reconcile",
+  "workflow": "review",
+  "skill": "reconcile-reviews",
+  "model": "mid",
+  "writes": "notes",
+  "hint": "reconcile-reviews -> reconcile.md (STATUS: READY), one ranked list with file and line"
+}

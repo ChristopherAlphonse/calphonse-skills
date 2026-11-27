@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+"""Pick the skills for a task from the prompt, the changed files and git state. Same answer in every CLI.
+
+  route "review this PR"              skills for the task, files read from git
+  route "fix the bug" --files a.py    name the files yourself
+  route "..." --json                  machine-readable
+  route --check                       rules vs. the skills on disk and AGENTS.md
+
+Output, one line per skill:  name<TAB>path/to/SKILL.md<TAB>reason
+No match prints nothing and exits 0. Rules: scripts/route-rules.json, stack table: factory/bin/job.
+"""
+import argparse
+import ast
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+RULES = Path(__file__).with_name("route-rules.json")
+JOB = REPO / "factory" / "bin" / "job"
+TS_SUFFIXES = {".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"}
+
+
+def load_rules():
+    return json.loads(RULES.read_text())
+
+
+def stack_rules():
+    """STACK_RULES read from factory/bin/job without running it (it needs fcntl, so not Windows-safe)."""
+    for node in ast.parse(JOB.read_text()).body:
+        if isinstance(node, ast.Assign) and any(getattr(t, "id", "") == "STACK_RULES" for t in node.targets):
+            return ast.literal_eval(node.value)
+    sys.exit(f"STACK_RULES not found in {JOB}")
+
+
+def detect_stack(files):
+    suffixes = {Path(f).suffix.lower() for f in files}
+    names = {Path(f).name for f in files}
+    return [skill for skill, sufs, ns in stack_rules() if suffixes & sufs or names & ns]
+
+
+def git(*args):
+    r = subprocess.run(["git", *args], capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def git_state():
+    """Changed files (branch vs. its base, plus working tree) and whether the tree is dirty."""
+    base = next((b for b in ("origin/main", "main", "origin/master", "master") if git("rev-parse", "--verify", "-q", b)), "")
+    mb = git("merge-base", "HEAD", base) if base else ""
+    files = set(git("diff", "--name-only", f"{mb}..HEAD").splitlines()) if mb else set()
+    status = git("status", "--porcelain").splitlines()
+    files |= {line[3:].split(" -> ")[-1] for line in status}
+    return sorted(f for f in files if f), bool(status)
+
+
+def route(text, files, dirty, rules=None):
+    rules = rules or load_rules()
+    t = text.lower()
+    picked = {}
+
+    def add(skills, reason):
+        for s in skills:
+            picked.setdefault(s, reason)
+
+    for rule in rules["intent"]:
+        if rule.get("git") == "dirty" and not dirty:
+            continue
+        if re.search(rule["when"], t):
+            add(rule["skills"], rule["reason"])
+
+    rv = rules["review"]
+    if re.search(rv["trigger"], t) and not re.search(rv["unless"], t):
+        named = [n for n in rv["named"] if re.search(n["when"], t)]
+        for n in named:
+            add(n["skills"], n["reason"])
+        if not named:
+            use = rv["frontend"] if {Path(f).suffix.lower() for f in files} & TS_SUFFIXES else rv["default"]
+            add(use["skills"], use["reason"])
+
+    if picked or re.search(rules["work"], t):
+        for s in detect_stack(files):
+            add([s], "stack of the changed files")
+    return [{"skill": s, "path": f"{s}/SKILL.md", "reason": r} for s, r in picked.items()]
+
+
+def check():
+    rules, errors = load_rules(), []
+    on_disk = {p.parent.name for p in REPO.glob("*/SKILL.md")}
+    routed = {s for r in rules["intent"] for s in r["skills"]}
+    routed |= {s for n in rules["review"]["named"] for s in n["skills"]}
+    routed |= set(rules["review"]["frontend"]["skills"]) | set(rules["review"]["default"]["skills"])
+    routed |= {skill for skill, _, _ in stack_rules()}
+    manual = set(rules["manual"])
+    for s in sorted((routed | manual) - on_disk):
+        errors.append(f"names a skill with no {s}/SKILL.md")
+    for rule in rules["intent"] + list(rules["review"]["named"]):
+        try:
+            re.compile(rule["when"])
+        except re.error as e:
+            errors.append(f"bad regex {rule['when']!r}: {e}")
+    indexed = set(re.findall(r"^\| \[([a-z0-9-]+)\]\(", (REPO / "AGENTS.md").read_text(), re.M))
+    for s in sorted(indexed - routed - manual):
+        errors.append(f"{s} is in AGENTS.md but has no route rule and is not marked manual")
+    for s in sorted((routed | manual) & on_disk - indexed):
+        errors.append(f"{s} is routed but missing from AGENTS.md")
+    for e in errors:
+        print(f"route-rules.json: {e}", file=sys.stderr)
+    return 1 if errors else 0
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("task", nargs="?", default="", help="the task text")
+    ap.add_argument("--files", nargs="*", help="changed files; default: read from git")
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--check", action="store_true", help="validate the rules, print nothing on success")
+    args = ap.parse_args()
+    if args.check:
+        sys.exit(check())
+    files, dirty = git_state()
+    if args.files is not None:
+        files = args.files
+    result = route(args.task, files, dirty)
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        for r in result:
+            print(f"{r['skill']}\t{r['path']}\t{r['reason']}")
+
+
+if __name__ == "__main__":
+    main()

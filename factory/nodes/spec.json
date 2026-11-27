@@ -1,0 +1,9 @@
+{
+  "id": "spec",
+  "workflow": "build",
+  "skill": "prd-mode",
+  "model": "large",
+  "writes": "planning",
+  "hint": "prd-mode then simplify on spec.md and the tasks file (decisions to approve first, below the STATUS line) -> spec.md and the tasks file, then wait for the user to approve",
+  "on_demand": "Load simplify for spec.md and the tasks file."
+}
