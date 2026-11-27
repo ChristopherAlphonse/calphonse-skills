@@ -12,7 +12,7 @@ def prefixes():
 
 
 BLOCKED = prefixes()
-CORE = ["git commit", "git push", "gh", "glab"]
+CORE = ["git merge", "gh", "glab"]
 
 
 def set_harness(root, harness):
@@ -59,7 +59,7 @@ class TickTests(unittest.TestCase):
                 self.assertEqual(ok.returncode, 0, ok.stderr)
                 argv = json.loads(ok.stdout)
                 self.assertTrue(argv[0].startswith(("claude", "opencode", "kiro")))
-                self.assertIn("Never commit, push, merge", argv[-1])
+                self.assertIn("never force-push, merge", argv[-1])
                 self.assertFalse([a for a in argv if "trust" in a], argv)
 
     def test_partial_policy_names_only_the_gap(self):
@@ -332,7 +332,7 @@ class BaselinePolicyTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_policy_yaml_is_read_in_full(self):
-        self.assertIn("git push*", self.base["deny"])
+        self.assertIn("git push*--force*", self.base["deny"])
         self.assertIn("curl -X POST*", self.base["deny"])
         self.assertIn("git -C * commit*", self.base["ask"])
         self.assertIn("git worktree*", self.base["ask"])
@@ -383,7 +383,7 @@ class BaselinePolicyTests(unittest.TestCase):
     def test_the_project_cannot_allow_what_the_policy_denies_or_asks_for(self):
         state = self.root / ".planning" / SKILL
         state.mkdir(parents=True)
-        (state / "config.json").write_text(json.dumps({"allow": ["git push*", "git add*", "gh *"]}))
+        (state / "config.json").write_text(json.dumps({"allow": ["git add*", "gh *"]}))
         for h in HARNESSES:
             with self.subTest(h):
                 root = self.root / h
@@ -392,7 +392,7 @@ class BaselinePolicyTests(unittest.TestCase):
                 (root / ".planning" / SKILL / "config.json").write_text((state / "config.json").read_text())
                 run(root, "install", h)
                 got = enforced(root, h)
-                self.assertFalse({"git push*", "git add*", "gh *"} & got["allow"])
+                self.assertFalse({"git add*", "gh *"} & got["allow"])
                 self.assertEqual(run(root, "check", h).returncode, 0)
 
     def test_a_bad_allow_list_is_refused(self):

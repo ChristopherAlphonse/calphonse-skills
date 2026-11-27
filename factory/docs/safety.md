@@ -39,9 +39,9 @@ flowchart TD
 
 | Layer | What it does | Strength |
 | --- | --- | --- |
-| Policy from `bin/tick` (`policy.yaml` plus a stricter deny list, and file-write limits) | stop the agent running commit, push, merge, rebase, cherry-pick, revert, am, commit-tree, update-ref, symbolic-ref, config, fast-import, git global options (`-c`, `-C`), `gh`, `glab`, `curl`, `wget`, and `sh -c`. Any command that skips git hooks (`--no-verify`, `commit -n`, `core.hooksPath`, `SKIP=`, `PRE_COMMIT_ALLOW_NO_CONFIG`) is denied, even when the rest is allowed | Measured on Claude Code: 24 of 24 attack spellings blocked, each succeeding in a no-policy control. A script that shells out is not covered |
-| Integrity checks in `bin/job` | detect a detached HEAD, a worktree on the wrong branch, a reviewer editing a tracked file, or `job.json` that disagrees with the audit log | Detects, does not prevent. Parks the job on you. Your own commits and pushes never park a job |
-| Board key and session | keep approve, commit, and unblock out of the CLI | Stops an agent using the CLI. A process running as you could open its own terminal |
+| Policy from `bin/tick` (`policy.yaml` plus a stricter deny list, and file-write limits) | allow plain `git add`, `git commit` and `git push`; stop force pushes, ref deletions, history rewrites, merge, rebase, cherry-pick, revert, am, commit-tree, update-ref, symbolic-ref, config, fast-import, git global options (`-c`, `-C`), `gh`, `glab`, `curl`, `wget`, and `sh -c`. Any command that skips git hooks (`--no-verify`, `commit -n`, `core.hooksPath`, `SKIP=`, `PRE_COMMIT_ALLOW_NO_CONFIG`) is denied, even when the rest is allowed | Plain commits and pushes reach your project's own hooks. A script that shells out is not covered |
+| Integrity checks in `bin/job` | detect a detached HEAD, a worktree on the wrong branch, a reviewer editing a tracked file, or `job.json` that disagrees with the audit log | Detects, does not prevent. Parks the job on you. Agent and user commits do not park a job |
+| Board key and session | keep the board commands approve, commit, and unblock out of the CLI | Stops an agent using the CLI. A process running as you could open its own terminal |
 | Protected paths | fail the gate when the diff touches CI config, CODEOWNERS, `.env`, hook config, and similar | Hard, for jobs the factory runs |
 | `bin/tick` | refuses a headless pass unless the policy is installed | Hard, for the runs it starts |
 | Branch protection on your remote | the only layer outside the agent's reach | Turn it on for every repo the factory touches |
@@ -56,9 +56,9 @@ The allow list is a set of command patterns. It cannot see what a command does i
 
 ## Limits
 
-- An agent that runs as your user can still edit files and run git. The factory makes that visible and stops the ordinary paths. Branch protection on the remote is the real guarantee.
-- Running tests runs the project's code. The policy sees the test command, not what the tests do inside it. A review of a branch you do not trust is therefore code execution on your machine. The worktree hooks and the integrity checks catch a commit or an edit to tracked files, not a network call or a write outside the worktree.
+- An agent that runs as your user can still edit files and run git. The factory makes that visible and stops the destructive paths. Branch protection on the remote is the real guarantee.
+- Running tests runs the project's code. The policy sees the test command, not what the tests do inside it. A review of a branch you do not trust is therefore code execution on your machine. The worktree hooks and the integrity checks catch a branch or hook change, not a network call or a write outside the worktree.
 - The ask rules are enforced by the harness, and no human is there to answer one in an unattended pass. That is the intent. Only Claude Code's handling is known from its documentation. Kiro refuses an `ask` in a headless run. Under `--trust-all-tools` the `kiro-guard` hook blocks it. OpenCode's handling is unmeasured.
-- A command the allow list permits can still write a file through shell redirection (`echo x > file`). The file-write rules cover the harness's edit tools, not the shell. The integrity checks catch a commit, a moved branch, or changed hooks, and park the job. They detect, they do not prevent.
+- A command the allow list permits can still write a file through shell redirection (`echo x > file`). The file-write rules cover the harness's edit tools, not the shell. The integrity checks catch a moved branch or changed hooks, and park the job. They detect, they do not prevent.
 - The gate is only as good as your `checks` command. Make sure it fails when no tests run.
 - The stage skills run as full skills in real use. Testing so far used shortened versions to check the factory's contract.
