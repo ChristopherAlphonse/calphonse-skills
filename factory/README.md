@@ -4,7 +4,7 @@ The factory takes a feature from idea to a reviewed, committed change on a local
 
 No stage agent pushes or opens a PR or MR, and the job's commit is the one you make by clicking a button on the board. You can tell the orchestrator in chat to commit or push, and it will.
 
-It also reviews an existing branch or diff: a review job scopes the change, runs independent reviewers, reconciles and verifies their findings, and writes a report with paste-ready comments. A review never writes code and never posts unless you say so.
+It also reviews an existing branch or diff: a review job scopes the change, runs independent reviewers, reconciles and verifies their findings, and writes a report with paste-ready comments. A review never writes code and never posts unless you say so. A prove job checks that a finished task works for real and writes a UAT.
 
 Every feature, command, safety layer and setting is explained in [docs/](docs/README.md). `SKILL.md` is the contract an agent follows.
 
@@ -19,15 +19,11 @@ stateDiagram-v2
     shape --> rejected: rejection.md
     spec --> build: you approve the spec
     build --> gate: build.md says READY
-    gate --> review: GATE PASS
+    gate --> polish: GATE PASS
     gate --> build: GATE FAIL
-    review --> polish: all reviews PASS
-    review --> build: any review CHANGES
     polish --> gate: polish.md says DONE
     polish --> build: REWORK
-    gate --> prove: GATE PASS after polish
-    prove --> ship: uat.md says PASS
-    prove --> build: uat.md says FAIL
+    gate --> ship: GATE PASS after polish
     ship --> ready: you click Commit locally
     ready --> [*]
     rejected --> [*]
@@ -52,7 +48,7 @@ stateDiagram-v2
 
 Gitignore `.planning/` and `.worktrees/` in the project.
 
-To review a branch instead: `bin/job create <id> "<title>" --review BASE HEAD`, then `/factory run`. To look into a question with no diff (an audit, "how good is X?"): `bin/job create <id> "<title>" --investigate`. In a new project, `/factory` sets itself up on the first run and Factory Bot can start the job from the board's chat.
+To review a branch instead: `bin/job create <id> "<title>" --review BASE HEAD`, then `/factory run`. To look into a question with no diff (an audit, "how good is X?"): `bin/job create <id> "<title>" --investigate`. To check that something already built works: `bin/job create <id> "<what to check>" --prove`. In a new project, `/factory` sets itself up on the first run and Factory Bot can start the job from the board's chat.
 
 ## Who can do what
 

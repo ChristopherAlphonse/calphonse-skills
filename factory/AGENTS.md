@@ -4,7 +4,7 @@ Read this before you edit anything in `factory/`. It is for an agent working on 
 
 ## What it is
 
-A board of jobs. Each job moves through fixed stages, one fresh agent per stage, and `bin/job` is the only thing that moves it. Two workflows share one engine and one board: **Build** (shape, spec, build, gate, review, polish, prove, ship, ready) and **Review** (scope, review, reconcile, verify, report, ready). State, including each project's own `pipeline.json`, lives in the target project (`.planning/factory/`, `.planning/factory-board/`, `.worktrees/`), never here.
+A board of jobs. Each job moves through fixed stages, one fresh agent per stage, and `bin/job` is the only thing that moves it. Three workflows share one engine and one board: **Build** (shape, spec, build, gate, polish, ship, ready) **Review** (scope, review, reconcile, verify, report, ready) and **Prove** (prove, ready). State, including each project's own `pipeline.json`, lives in the target project (`.planning/factory/`, `.planning/factory-board/`, `.worktrees/`), never here.
 
 ## Files
 

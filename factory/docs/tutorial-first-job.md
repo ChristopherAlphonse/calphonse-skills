@@ -89,7 +89,7 @@ Your next click now starts the next pass by itself. Without the loop, run `/fact
 
 ## 8. Follow build, gate and review
 
-The job moves through build, gate, review, polish, and prove on its own. Watch the chip move across the board. The card shows the agent's latest note.
+The job moves through build, gate, and polish on its own. Watch the chip move across the board. The card shows the agent's latest note.
 
 If the gate fails or a reviewer asks for changes, the job goes back to **build**. That is normal. After three rounds it moves to **Needs you** with the reason, and you click **Unblock** once you have dealt with it.
 

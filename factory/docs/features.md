@@ -102,23 +102,15 @@ An agent writes the code, one small task at a time, using `swe` plus the stack s
 
 A script, not an agent, runs the command you put in `checks`. If the command passes, the job moves on. If it fails, the job goes back to build. The gate also remembers a fingerprint of the files that passed, so later steps can prove nothing changed after. It never believes "I'm done". It believes only what the command printed.
 
-### 2.8 Review: "do other eyes agree?"
-
-Several reviewers look at the change, each on their own, without seeing each other's notes. Each writes `PASS` or `CHANGES`. If any says `CHANGES`, a helper merges the notes into one fix list (`reconcile.md`) and the job goes back to build. Every reviewer must say `PASS` to continue. See [Part 4](#part-4-helpers-skills-and-reviewers) for who they are.
-
 ### 2.9 Polish: "tidy up"
 
 An agent removes pointless comments and workaround code with `comment-sicko`, and rewrites any prose it touched in plain words with `simplify`. If it finds a workaround that needs a real fix, the job goes back to build. After polish, the gate runs again.
 
-### 2.10 Prove: "does it really work?"
-
-An agent runs the real feature and checks the real result, with `prove-it-works`. It writes a user acceptance test document (`uat.md`) so you can check it yourself too. `PASS` moves on. `FAIL` sends the job back to build.
-
-### 2.11 Ship: "write the paperwork"
+### 2.10 Ship: "write the paperwork"
 
 An agent writes the pull request text (`pr-body.md`) and the commit message (`commit.md`) with `pr-body-style`. It may add a short spoken demo script with `demo-script`. Then the belt **stops and waits for you** again.
 
-### 2.12 Commit locally (your button)
+### 2.11 Commit locally (your button)
 
 You read the paperwork and click **Commit locally**. The factory makes the one and only commit, on the job's branch. The click is refused unless all of these are true:
 
@@ -127,7 +119,7 @@ You read the paperwork and click **Commit locally**. The factory makes the one a
 - no protected path was touched (see [Part 7](#part-7-the-safety-guards))
 - your project's own git hooks pass
 
-### 2.13 Ready
+### 2.12 Ready
 
 The job is done. A local commit exists and a pull request text is written. No stage pushes. Pushing and opening the pull request is yours, done your own way, or by telling the orchestrator in chat.
 
@@ -137,11 +129,11 @@ To drop a job you no longer want, run `bin/job retire <id>` from any stage befor
 
 If you committed the work yourself instead of clicking **Commit locally**, run `bin/job close <id>`. It needs the job at ship, a passing gate, a clean worktree and a commit on the job branch. Then it moves the job to ready and removes the worktree.
 
-### 2.14 Rounds
+### 2.13 Rounds
 
 Each trip back to build is a **round**. A job gets three rounds by default (`max_rounds`). After that it stops looping and asks you for help. This keeps a stuck job from running forever.
 
-### 2.15 Needs you and Unblock
+### 2.14 Needs you and Unblock
 
 When a job is blocked, out of rounds, or something looked tampered with, it moves to **Needs you** with the reason. Read the reason, fix what it names, and click **Unblock** (your button). The job tries its stage again.
 
@@ -205,6 +197,10 @@ A reviewer that cannot go on writes `blocked.md` with `STATUS: BLOCKED`. The job
 ### 3.9 Fixing what a review found
 
 A review never fixes. To fix, start a separate build job.
+
+### 3.10 A prove job (does it really work?)
+
+`bin/job create <id> "<what to check>" --prove`. An agent runs the real thing and checks the real result, with `prove-it-works`, and writes `uat.md` with `STATUS: PASS` or `STATUS: FAIL` so you can check it yourself. It has one stage, no worktree, and edits nothing. A FAIL is a result for you to read: it does not loop. The Prove board shows it.
 
 ## Part 4: Helpers (skills and reviewers)
 
@@ -478,11 +474,11 @@ The built-in stages are fixed. You can add **custom stages**, extra boxes on the
 
 ### 9.1 What a custom stage is
 
-Data, not code. It has an id, a workflow (`build` or `review`), the stage it follows, a label, a short brief, and optionally one skill from this repo. It runs like any stage: the agent writes `<id>.md` with `STATUS: READY`, or `STATUS: BLOCKED` to park the job on you. A custom stage runs once per job and never waits on you itself.
+Data, not code. It has an id, a workflow (`build`, `review` or `prove`), the stage it follows, a label, a short brief, and optionally one skill from this repo. It runs like any stage: the agent writes `<id>.md` with `STATUS: READY`, or `STATUS: BLOCKED` to park the job on you. A custom stage runs once per job and never waits on you itself.
 
 ### 9.2 Where one can go
 
-After `shape`, `spec`, `build`, `review`, `polish` or `prove` on the Build board. After `scope`, `review`, `reconcile` or `verify` on the Review board. Or after another custom stage. Never after `gate`, `ship` or `report`, because those hold the safety checks and the commit click.
+After `shape`, `spec`, `build` or `polish` on the Build board. After `scope`, `review`, `reconcile` or `verify` on the Review board. Before or after `prove` on the Prove board. Or after another custom stage. Never after `gate`, `ship` or `report`, because those hold the safety checks and the commit click.
 
 ### 9.3 Ask, then click Apply
 

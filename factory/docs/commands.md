@@ -9,6 +9,7 @@ Reference for every command, setting, file and environment variable. Run command
 | `bin/job create <id> "<title>"` | start a build job at shape |
 | `bin/job create <id> "<title>" --repo DIR` | start a build job that works in the git repo at `DIR` (relative to the project folder). The board shows one lane per repo. `--repo DIR` also goes before `--review BASE HEAD` |
 | `bin/job create <id> "<title>" --review BASE HEAD` | start a review job at scope. It shows on the Review board |
+| `bin/job create <id> "<what to check>" --prove` | start a prove job: one stage, no worktree, writes `uat.md`. It shows on the Prove board. It takes no other option |
 | `bin/job create <id> "<title>" --investigate` | start a read-only review job about a question, with no refs, no diff and no worktree. It shows on the Review board. It takes no other option |
 | `bin/job stack <id>` | recompute the stack skills for a job |
 | `bin/job queue` | list jobs as `action id stage hint` |
@@ -107,7 +108,7 @@ State lives in the project, never in this repo.
 | `round-N/review-<name>.md` | reviewers (`code`, `qa`, `test`, `architecture`) | `VERDICT: PASS` or `VERDICT: CHANGES` |
 | `reconcile.md` | reconcile | `STATUS: READY` in a review job |
 | `polish.md` | polish | `STATUS: DONE` or `STATUS: REWORK` |
-| `uat.md` | prove | `STATUS: PASS` or `STATUS: FAIL` |
+| `uat.md` | prove (prove job) | `STATUS: PASS` or `STATUS: FAIL` |
 | `pr-body.md`, `commit.md` | ship | the PR body and the commit message |
 | `scope.md` | scope (review) | `STATUS: READY`, with a Boundary map |
 | `verified.md` | verify (review) | ends with `CONFIRMED: n, DROPPED: n, UNVERIFIABLE: n, MISREAD: n` |

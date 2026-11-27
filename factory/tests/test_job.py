@@ -1202,7 +1202,7 @@ class TestServer(Factory):
         self.assertEqual(b["stage"], "ship")
         self.assertTrue(b["can_commit"] and not b["can_approve"])
         self.assertEqual(b["gate"], "PASS")
-        self.assertEqual({k: v for k, v in b["reviews"].items()}, {"code": "PASS", "qa": "PASS", "test": "PASS"})
+        self.assertEqual({k: v for k, v in b["reviews"].items()}, {})
         self.human("commit", "b")
         self.assertFalse(self.get_jobs()["b"]["can_commit"])
         self.human("approve", "a")

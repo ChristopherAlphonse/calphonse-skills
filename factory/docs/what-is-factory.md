@@ -48,12 +48,14 @@ A build job runs these stages in order.
 | spec | Writes a spec and a task list. | You approve it on the board |
 | build | Writes the code, one task at a time, uncommitted. | `build.md` says `STATUS: READY` |
 | gate | Runs your `checks` command. | The command passes |
-| review | Several reviewers read the change independently. | Every reviewer says `VERDICT: PASS` |
 | polish | Removes workaround comments and tidies prose. | `polish.md` says `STATUS: DONE`, then the gate reruns |
-| prove | Runs the real feature and writes a user acceptance test (UAT) document. | `uat.md` says `STATUS: PASS` |
 | ship | Writes the PR body and the commit message. | You click **Commit locally** |
 
-A failed gate, a review with changes requested, or a failed UAT sends the job back to build. A job gets three build rounds by default. After that it moves to **Needs you** instead of looping.
+A failed gate sends the job back to build. A job gets three build rounds by default. After that it moves to **Needs you** instead of looping.
+
+### Prove that something works
+
+A prove job runs the real feature and writes a user acceptance test (UAT) document, `uat.md`, with `STATUS: PASS` or `STATUS: FAIL`. Start it with `bin/job create <id> "<what to check>" --prove`. It edits nothing.
 
 ### Review an existing branch or diff
 
@@ -73,7 +75,7 @@ A review job scopes the change, runs independent reviewers, merges their finding
 
 ### Add your own stages
 
-You can add a stage, such as an extra QA pass after review. You ask in the board's chat bar, the agent proposes the change, and you click **Apply**. Stages cannot follow `gate`, `ship` or `report`, because those hold the safety checks.
+You can add a stage, such as an extra QA pass after build. You ask in the board's chat bar, the agent proposes the change, and you click **Apply**. Stages cannot follow `gate`, `ship` or `report`, because those hold the safety checks.
 
 ## How it keeps you in control
 

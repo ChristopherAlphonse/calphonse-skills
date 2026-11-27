@@ -1398,7 +1398,7 @@ def cmd_wait(seconds):
 def snapshot(job):
     d = jobdir(job["id"])
     rd = d / f"round-{job['round']}"
-    reviews = {r: kv(rd / f"review-{r}.md").get("VERDICT") for r in job["reviewers"]}
+    reviews = {r: kv(rd / f"review-{r}.md").get("VERDICT") for r in job["reviewers"]} if job.get("review") else {}
     files = sorted(str(p.relative_to(d)) for p in d.rglob("*.md"))
     return {**job, "kind": workflow_of(job), "report": kv(d / ("uat.md" if job.get("prove") else "report.md")),
             "gate": kv(rd / CHECKS_FILE).get("GATE"), "reviews": reviews,

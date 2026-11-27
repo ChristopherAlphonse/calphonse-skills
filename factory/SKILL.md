@@ -1,6 +1,6 @@
 ---
 name: factory
-description: Take a feature from idea to a reviewed local commit by chaining this repo's skills as stages (shape, spec, build, review, polish, prove, ship) on a board of connected stages. Use when the user wants a whole feature driven end to end, a software factory, a pipeline, or the board. Also runs read-only code reviews of a branch or diff as review jobs, with a verified report and paste-ready comments. Stage agents never commit, push, or open a PR/MR on their own, and the user can tell the orchestrator to; a review never edits code or posts unless the user says so.
+description: Take a feature from idea to a reviewed local commit by chaining this repo's skills as stages (shape, spec, build, polish, ship) on a board of connected stages. Use when the user wants a whole feature driven end to end, a software factory, a pipeline, or the board. Also runs read-only code reviews of a branch or diff as review jobs, with a verified report and paste-ready comments. Stage agents never commit, push, or open a PR/MR on their own, and the user can tell the orchestrator to; a review never edits code or posts unless the user says so.
 ---
 
 # Factory
@@ -29,18 +29,19 @@ When a job waits on the user (spec approval, **Commit locally**, **Unblock**), r
 
 ## Workflows
 
-This skill runs two workflows on one engine and one board, as two tabs:
+This skill runs three workflows on one engine and one board, as three tabs:
 
 - **Build**: a feature idea becomes a local commit and a PR body. `JOB create <id> "<title>"` makes a build job.
 - **Several repos**: when the project folder holds several git repos (a GitLab group), make one build job per repo with `JOB create <id> "<title>" --repo <dir>`. Name it `<ticket>-<repo>` (for example `proj-174-data-ui`): the branch is `feature/<TICKET>` from the id's leading key and number, so every repo works on the same ticket. The board draws one lane per repo, and `concurrency` in `config.json` sets how many repo agents run at once.
 - **Review**: a branch or diff becomes a verified report and paste-ready comments, and no code is written. `JOB create <id> "<title>" --review <base> <head>` makes a review job. The two refs are local, so the user fetches the PR or MR branch first, for example `git fetch origin pull/42/head:pr-42`.
 - **Investigate**: a question about the project (how good is the contrast of the themes, where does the auth flow leak) becomes a verified report with suggested improvements, and no code is written. `JOB create <id> "<title>" --investigate` makes a review job with no refs and no worktree. Put the question and the folders to read in `scope.md`. The reviewers read the project's working tree and never edit it. Use it when the user wants to learn or audit something rather than review a diff.
+- **Prove**: a finished task becomes a UAT that shows whether it works for real. `JOB create <id> "<what to check>" --prove` makes a prove job with one stage, no worktree and no code written. The title says what to check.
 
 The sections below say which workflow they belong to. A review job never edits code, commits, pushes, or posts.
 
 ## Stage order and custom stages
 
-The tables below show the default order. The project's `.planning/factory/pipeline.json` can change it, for that project only: the user can add, remove and move stages, within the rules the checks need (spec before build, build before review, polish and prove, ship last, and for reviews scope first and report last). You never rely on the default order. The queue hint for a job always ends with `on success advance to: <stage>`, so read it and run `JOB advance <id> <that stage>`. The gate is not a stage in the order: it runs after any stage that changes code (build, polish) and passes the job to the stage after that one, or back to build when it fails.
+The tables below show the default order. The project's `.planning/factory/pipeline.json` can change it, for that project only: the user can add, remove and move stages, within the rules the checks need (spec before build, build before polish, ship last, and for reviews scope first and report last). You never rely on the default order. The queue hint for a job always ends with `on success advance to: <stage>`, so read it and run `JOB advance <id> <that stage>`. The gate is not a stage in the order: it runs after any stage that changes code (build, polish) and passes the job to the stage after that one, or back to build when it fails.
 
 A custom stage is not special to you: the queue hint names it, the skill to run and the file to write, and you spawn a fresh agent for it like any other stage. It writes `<stage-id>.md` in the job folder with `STATUS: READY` on the first line, or `STATUS: BLOCKED` when it cannot go on. Then `JOB advance` moves the job, and `BLOCKED` parks it on the user, whose Unblock retries that stage. Custom stages never wait on the user themselves.
 
@@ -69,7 +70,7 @@ The harness is `harness` in `.planning/factory/config.json` (`claude`, `opencode
 ## Rules
 
 - `JOB` is the only writer of `job.json`. Never edit it. `JOB advance` checks the files that justify a move and refuses the rest.
-- Builders write code and leave it uncommitted. Reviewers never edit. Fixes go back to a builder.
+- Builders write code and leave it uncommitted. Reviewers and provers never edit. Fixes go to a builder.
 - A gate passes on a command's output, never on an agent saying "done". `JOB gate` runs `checks` from `.planning/factory/config.json`. If `checks` is empty, stop and ask the user.
 - Each subagent starts fresh. Its prompt gives the job id, the job folder, the worktree and branch, and the stage's one-line brief. It replies with one line.
 - Where the harness lets you pick a model, choose it by stage: the largest for shape, spec, and build (design and code writing); a mid-size one for review (judgment on a diff); the smallest for polish (the comment-sicko pass, a mechanical cleanup), prove and ship (run commands, write the UAT, stage the commit). If a stage proves too hard for its model, rerun it one tier up.
@@ -89,11 +90,9 @@ Each stage's agent writes the file named here with the status line first. `JOB a
 | shape | `lets-talk-about-it`, plus `spike` only if the shape rests on an unknown, then `simplify` on `shape.md` (decisions to approve at the top, below the status line) | `shape.md` with `STATUS: READY`, or `rejection.md` | to `spec`, or `rejected` |
 | spec | `prd-mode`, then its task list, then `simplify` on `spec.md` and the tasks file (decisions to approve at the top, below the status line) | `spec.md`, tasks file under `.planning/tasks/` | **user approves on the board**, then to `build` (this creates the local worktree and branch) |
 | build | `swe` plus stack skills, one task at a time, no commits | `build.md` with `STATUS: READY` or `BLOCKED`. Run `JOB progress <id> <done> <total>` after each task | to `gate`, or `needs-human` when blocked |
-| gate | `JOB gate <id>` (a script, not an agent) | `round-N/checks.md` with `GATE: PASS` or `FAIL` | to `review` on pass, `build` on fail |
-| review | see Reviewers | `round-N/review-<name>.md` with `VERDICT: PASS` or `CHANGES`, then `reconcile.md` from `reconcile-reviews` when anything is CHANGES | to `polish` when all pass, else `build` |
+| gate | `JOB gate <id>` (a script, not an agent) | `round-N/checks.md` with `GATE: PASS` or `FAIL` | to `polish` on pass, `build` on fail |
 | polish | `comment-sicko`, then `simplify` on prose touched | `polish.md` with `STATUS: DONE` or `REWORK`. No commit | to `gate` when done (the gate reruns), `build` when comment-sicko condemns workaround code that needs a real fix |
-| gate again | `JOB gate <id>` | `round-N/checks.md` | to `prove` on pass |
-| prove | `prove-it-works` | `uat.md` with `STATUS: PASS` or `FAIL` | to `ship` on pass, `build` on fail |
+| gate again | `JOB gate <id>` | `round-N/checks.md` | to `ship` on pass |
 | ship | `pr-body-style` (+ `demo-script` optional) | `pr-body.md`, and `commit.md` holding the commit message | **user clicks Commit locally on the board**, then to `ready` |
 
 Stack skills are suggested by `bin/job` from the files in the job's diff, only in the build hint and a review job's review hint, as a file-to-skill map (`suggested stack skills (...): *.ts -> typescript-strict-style`). Other stages get none. Treat it as a suggestion: use the skills the files you touch need. `JOB stack <id>` refreshes it, and leaving build does it for you.
@@ -112,6 +111,14 @@ For a build job the files are what its worktree has changed since it started. Re
 ### Reviewers
 
 `qa-review` and `test-review` always, and a `code` reviewer whose skill follows the files in the diff: `code-review-frontend` for TypeScript, JavaScript, and React only, `python` for Python, `dotnet` for C#, `aws` for Terraform and CDK, and the repo's own tooling for any other language. Never use a frontend skill on backend code. Add `architecture-review` when it crosses service or module boundaries. Register the extra with `JOB route <id> architecture` before spawning. Review names on disk are `code`, `qa`, `test`, `architecture`. `qa-review` runs only when asked (`disable-model-invocation`), so the `qa` agent cannot invoke it: give it the absolute path of `qa-review/SKILL.md`, the sibling of this skill's folder, and have it read that file.
+
+## Prove workflow
+
+| Stage | Skill | Writes | Advance when |
+| --- | --- | --- | --- |
+| prove | `prove-it-works` | `uat.md` with `STATUS: PASS` or `STATUS: FAIL`, and the evidence | to `ready` on either: a FAIL is a result to read, not a loop. `blocked.md` with `STATUS: BLOCKED` parks it on the user |
+
+The agent runs the real thing and checks the real result. It never edits code, commits, pushes or posts. Fixes go to a separate build job.
 
 ## Review workflow
 
@@ -179,7 +186,7 @@ A pass finds nothing to run, or only `hold` rows, and ends. To continue automati
 
 `JOB board` starts the board if needed and prints its link (see First action); `JOB watch [port]` (default 8766) runs it in the foreground, and `JOB serve` is the same. One link serves both workflows: `bin/board` (in this folder) is the server, and Build and Review are two boards on it. It needs no terminal. Its link stays valid until the process stops and can open in several tabs. The board reads `.planning/factory/jobs/*/job.json` every 2 seconds.
 
-The page has a collapsible left sidebar that lists the boards: Build shows build jobs and Review shows review jobs. Click a board, or drag it onto the tab strip, to open it as a tab. Drag tabs to reorder them, drag rows in the sidebar to reorder the list, and close a tab with its ×. Every open board keeps its own state, so switching tabs loses nothing, and the layout is remembered in the browser. Each board is a canvas of connected stage nodes (Build: Shape to Ready, with Spec held for your approval; Review: Scope to Ready), a top bar with Pipeline, Needs you and Ready to land filters, a side panel, and an ask bar at the bottom. Each job is a chip on its stage. A node holding a job that waits on the user is outlined. Click a chip to open the panel: status, the Approve spec, Commit locally or Unblock button, the skill switch, a stage note, and every file in the job folder. Those buttons are the only way those moves happen. The ask bar answers questions and makes the same skill and note changes, through Claude Code, OpenCode or Kiro, with a model and effort you pick. The board looks and behaves the same whichever harness ran the pass.
+The page has a collapsible left sidebar that lists the boards: Build shows build jobs, Review shows review jobs and Prove shows prove jobs. Click a board, or drag it onto the tab strip, to open it as a tab. Drag tabs to reorder them, drag rows in the sidebar to reorder the list, and close a tab with its ×. Every open board keeps its own state, so switching tabs loses nothing, and the layout is remembered in the browser. Each board is a canvas of connected stage nodes (Build: Shape to Ready, with Spec held for your approval; Review: Scope to Ready), a top bar with Pipeline, Needs you and Ready to land filters, a side panel, and an ask bar at the bottom. Each job is a chip on its stage. A node holding a job that waits on the user is outlined. Click a chip to open the panel: status, the Approve spec, Commit locally or Unblock button, the skill switch, a stage note, and every file in the job folder. Those buttons are the only way those moves happen. The ask bar answers questions and makes the same skill and note changes, through Claude Code, OpenCode or Kiro, with a model and effort you pick. The board looks and behaves the same whichever harness ran the pass.
 
 ## Out of scope
 
