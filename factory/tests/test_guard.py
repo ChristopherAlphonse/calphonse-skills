@@ -77,7 +77,7 @@ class Guard:
                 self.assertEqual(self.sh(bad), 2)
 
     def test_file_tools_cannot_touch_policy_or_engine_state(self):
-        for p in (".kiro/agents/x.json", ".claude/settings.json", "opencode.jsonc", ".planning/%s/job.json" % SKILL, ".git/hooks/pre-commit"):
+        for p in (".kiro/agents/x.json", ".claude/settings.json", "opencode.jsonc", ".planning/%s/job.json" % SKILL, ".planning/%s/standing.md" % SKILL, ".git/hooks/pre-commit"):
             with self.subTest(p):
                 self.assertEqual(self.write(p), 2)
 

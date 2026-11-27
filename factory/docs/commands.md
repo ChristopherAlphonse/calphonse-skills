@@ -20,6 +20,7 @@ Reference for every command, setting, file and environment variable. Run command
 | `bin/job note <id> "<text>"` | record what the agent is doing now. The card shows the latest note |
 | `bin/job skill <id> <name> on\|off` | switch a skill off or on for one job |
 | `bin/job brief <id> <stage> <text>` | set a note the next agent for that stage follows. Empty text clears it |
+| `bin/job standing [add <text> \| rm <number>]` | list, add or remove the user's rules for every job, such as "plain push is fine". Changes work only from the board's chat bar |
 | `bin/job close <id>` | finish a job at ship whose work you committed yourself on its branch: moves it to ready, removes its worktree, deletes the branch if merged |
 | `bin/job prune` | remove clean worktrees of finished jobs, delete their branches whose work is in main (merged, or squash-merged with every changed file identical in main), and move landed ready jobs to `.planning/factory/archive/`. Unlanded branches stay |
 | `bin/job retire <id>` | move a job you no longer want from any stage before ready to rejected; removes a clean worktree, keeps the branch |

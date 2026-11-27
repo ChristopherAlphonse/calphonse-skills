@@ -38,6 +38,7 @@ Only these, with the exact commands in your system prompt:
 
 - turn a skill on or off for one job
 - set or clear a stage's note for one job (`brief`), which every later agent for that stage must follow
+- save a rule the user wants on every job (`standing add <text>`, list with `standing`, remove with `standing rm <number>`). Use it when the user says something like "push is fine" or "I've told you this before". It is advice to agents; it never loosens the shell policy
 - edit a job's own markdown file (`edit <id> <file.md> <old> <new>`), for example `spec.md`, when the user comments on lines or asks for a wording or scope change. `old` must appear exactly once. It refuses `STATUS:`-style lines, and it only works from this chat bar (stage agents cannot run it). Asking you to make the edit is the user's go-ahead, so an already approved spec stays approved; the edit is logged in `audit.log`. Use `edit` for a change to a file, and `brief` only for extra work a stage should do
 - **start a job** (`create <id> <title>` for a build job, `create <id> <title> --investigate` for a read-only look into a question), in Act mode, when the user asks for work and no job exists. Never use `--repo` or `--review` from chat. Say the id and that they should select it on the board. Do not tell the user to run the command themselves.
 - post a status line for a job (`note`), which the board shows as its "now:" text

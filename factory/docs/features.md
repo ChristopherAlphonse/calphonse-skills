@@ -231,6 +231,8 @@ Do not want a helper on one job? Switch it off in the job's panel, or with `bin/
 
 Want to tell the next agent something? Type a note in the stage's note box (or `bin/job brief <id> <stage> "text"`). The next agent for that stage must follow it. Empty text clears it.
 
+Want every agent on every job to know something, such as "plain push is fine"? Say it once in the chat bar. The assistant saves it as a standing rule in `.planning/factory/standing.md`, and every stage hint carries it. Ask the chat bar to list or remove them. Standing rules are advice: they never loosen the shell policy, and only the chat bar can change them.
+
 ### 4.5 The reviewers
 
 | Reviewer | Looks at |

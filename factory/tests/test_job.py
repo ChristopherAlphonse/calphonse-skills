@@ -368,6 +368,21 @@ class TestShapeSpec(Factory):
         self.no("edit", "j", "shape.md", "x", "y", extra_env={"FACTORY_CHAT_KEY": "wrong"})
         self.chat("edit", "j", "shape.md", "x", "y")
 
+    def test_standing_rules_change_only_from_the_chat_bar_and_reach_every_job(self):
+        self.ok("create", "a", "A")
+        self.ok("create", "b", "B")
+        self.chat_key()
+        self.no("standing", "add", "plain push is fine")
+        self.chat("standing", "add", "plain push is fine")
+        self.chat("standing", "add", "never touch infra/")
+        self.assertIn("2. never touch infra/", self.ok("standing").stdout)
+        queue = self.ok("queue").stdout
+        self.assertEqual(queue.count("USER STANDING RULES for every job, follow them: plain push is fine; never touch infra/"), 2)
+        self.chat("standing", "rm", "1")
+        self.chat_no("standing", "rm", "5")
+        self.assertNotIn("plain push", self.ok("queue").stdout)
+        self.assertIn("standing-rm", (self.state / "audit.log").read_text())
+
     def test_edit_changes_one_exact_piece_and_keeps_approval(self):
         self.new_spec("j", spec=False)
         self.wf("j", "spec.md", "# s\n- No button.\n- No button.\n")
