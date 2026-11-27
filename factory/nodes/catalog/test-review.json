@@ -1,0 +1,9 @@
+{
+  "id": "test-review",
+  "workflow": "build",
+  "label": "Test review",
+  "skill": "test-review",
+  "model": "mid",
+  "writes": "notes",
+  "hint": "Judge whether the job's diff is tested well enough, with proof. Never edit code."
+}

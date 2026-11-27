@@ -1,0 +1,9 @@
+{
+  "id": "architecture-review",
+  "workflow": "build",
+  "label": "Architecture review",
+  "skill": "architecture-review",
+  "model": "mid",
+  "writes": "notes",
+  "hint": "Review the design behind the job's diff: complexity, bottlenecks, reliability. Never edit code."
+}

@@ -1,0 +1,9 @@
+{
+  "id": "demo-script",
+  "workflow": "build",
+  "label": "Demo script",
+  "skill": "demo-script",
+  "model": "small",
+  "writes": "notes",
+  "hint": "Write a short spoken demo script for what the job changed."
+}

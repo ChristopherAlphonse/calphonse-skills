@@ -44,7 +44,7 @@ A board of jobs. Each job moves through fixed stages, one fresh agent per stage,
 
 ## Adding or changing a stage (a node)
 
-**A custom stage** is data, not code: the project's `.planning/factory/pipeline.json`, changed with `job pipeline propose ...` and applied by the user's click. Do not edit `pipeline.json` by hand to add one for a user, and never add a way to apply without the click. The engine compiles it in `bin/job` (`compile_pipeline`): a custom stage is wired between a built-in stage and that stage's normal next stage, and `ATTACH` lists the only built-in stages one may follow. Keep `gate`, `ship`, `report` and `ready` out of `ATTACH`.
+**A custom stage** is a node from `nodes/catalog/<id>.json` (`id`, `workflow`, `label`, `skill`, `model`, `writes` which must be `notes`, `hint`), placed in the project's `.planning/factory/pipeline.json` with `job pipeline propose add WORKFLOW NODE AFTER` and applied by the user's click. To offer a new kind of node, add a catalog file; `tests/test_nodes.py` checks its skill exists. Do not edit `pipeline.json` by hand to add one for a user, and never add a way to apply without the click. The engine compiles it in `bin/job` (`compile_pipeline`): a custom stage is wired between a built-in stage and that stage's normal next stage, and `ATTACH` lists the only built-in stages one may follow. Keep `gate`, `ship`, `report` and `ready` out of `ATTACH`.
 
 **A built-in stage** needs all of these, in one change:
 

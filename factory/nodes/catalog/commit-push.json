@@ -1,0 +1,9 @@
+{
+  "id": "commit-push",
+  "workflow": "build",
+  "label": "Commit and push",
+  "skill": "",
+  "model": "small",
+  "writes": "notes",
+  "hint": "Commit the worktree with a plain git commit and git push the job's branch. Never force-push."
+}

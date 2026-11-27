@@ -93,7 +93,7 @@ $FACTORY/bin/job route <id> architecture
 
 ## Add a custom stage
 
-1. In the board's chat bar, ask for it: "add a QA pass after review".
+1. In the board's chat bar, ask for it: "add a code review node after build". The chat bar picks from the node catalog (`job pipeline show` lists it) and says so if nothing fits.
 2. The agent runs `job pipeline propose ...`. The board shows the waiting change under **Pipeline change**, with the new stage highlighted.
 3. Click **Apply**, or **Discard**.
 

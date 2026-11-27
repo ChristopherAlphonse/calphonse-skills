@@ -480,7 +480,7 @@ The built-in stages are fixed. You can add **custom stages**, extra boxes on the
 
 ### 9.1 What a custom stage is
 
-Data, not code. It has an id, a workflow (`build`, `review` or `prove`), the stage it follows, a label, a short brief, and optionally one skill from this repo. It runs like any stage: the agent writes `<id>.md` with `STATUS: READY`, or `STATUS: BLOCKED` to park the job on you. A custom stage runs once per job and never waits on you itself.
+A node from the catalog, `factory/nodes/catalog/<id>.json`. Each node fixes its workflow, label, skill, model size and instructions, and writes only notes in the job folder: changing code stays with build and polish. Nobody makes one up from chat. The catalog ships code review, QA review, test review, architecture review, demo script, commit and push, and amend plan. A new kind of node is a reviewed change to that folder. For one job's extra instructions, use the stage's note box. It runs like any stage: the agent writes `<id>.md` with `STATUS: READY`, or `STATUS: BLOCKED` to park the job on you. A custom stage runs once per job and never waits on you itself.
 
 ### 9.2 Where one can go
 
@@ -488,7 +488,7 @@ After `shape`, `spec`, `build` or `polish` on the Feature board. After `scope`, 
 
 ### 9.3 Ask, then click Apply
 
-1. Tell the chat bar, for example "add a QA pass after review". It runs `job pipeline propose` to check everything. The board shows the waiting change under **Pipeline change**, with the new stage highlighted.
+1. Tell the chat bar, for example "add a code review node after build". It runs `job pipeline propose` to check everything. The board shows the waiting change under **Pipeline change**, with the new stage highlighted.
 2. Click **Apply**, or **Discard**. Only then is `.planning/factory/pipeline.json` written.
 
 Apply is refused if a job sits in a stage the change removes, or if the pipeline changed since the proposal. In Act mode the board applies it for you.

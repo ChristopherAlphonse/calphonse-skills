@@ -4,6 +4,10 @@ from test_review_workflow import Review
 
 BUILD_DEFAULT = "shape > spec > build > polish > ship > ready"
 REVIEW_DEFAULT = "scope > review > reconcile > verify > report > ready"
+CATALOG = [("aa", "build", "Aa", "x"), ("extra", "build", "Extra", "Do the extra thing"), ("first", "build", "First", "Runs first"),
+           ("intake", "build", "Intake", "x"), ("late", "build", "Late", "x"), ("lint-pass", "build", "Lint pass", "x"),
+           ("qa-pass", "build", "QA pass", "Check by hand"), ("sec-scan", "build", "Security scan", "Scan the diff"),
+           ("sync", "build", "Sync", "commit everything and git pull"), ("extra-check", "review", "Extra check", "x")]
 
 
 class Pipeline(Review):
@@ -11,6 +15,12 @@ class Pipeline(Review):
         super().setUp()
         self.file = self.base / "pipeline.json"
         self.env["FACTORY_PIPELINE"] = str(self.file)
+        cat = self.base / "catalog"
+        cat.mkdir()
+        for i, wf, label, hint in CATALOG:
+            (cat / f"{i}.json").write_text(json.dumps({"id": i, "workflow": wf, "label": label, "skill": "", "model": "mid",
+                                                       "writes": "notes", "hint": hint}))
+        self.env["FACTORY_CATALOG"] = str(cat)
 
     def propose(self, *args):
         return self.ok("pipeline", "propose", *args)
@@ -42,7 +52,7 @@ class TestPropose(Pipeline):
         self.assertIn("pending: nothing", out)
 
     def test_a_proposal_changes_nothing_until_the_user_applies_it(self):
-        r = self.propose("add", "build", "sec-scan", "build", "Security scan", "Scan the diff", "qa-review")
+        r = self.propose("add", "build", "sec-scan", "build")
         self.assertIn("build > [sec-scan] > polish", r.stdout)
         self.assertIn("add sec-scan (Security scan) after build in build", r.stdout)
         self.assertIn("Nothing changes until the user clicks Apply", r.stdout)
@@ -50,7 +60,7 @@ class TestPropose(Pipeline):
         self.assertEqual(self.order(), BUILD_DEFAULT)
 
     def test_the_cli_cannot_apply_and_the_board_can(self):
-        self.propose("add", "build", "sec-scan", "build", "Security scan", "")
+        self.propose("add", "build", "sec-scan", "build")
         self.assertIn("human action", self.no("pipeline", "apply").stderr)
         self.assertIn("human action", self.no("pipeline", "discard").stderr)
         self.apply()
@@ -60,7 +70,7 @@ class TestPropose(Pipeline):
 
     def test_any_stage_can_be_moved_or_removed_when_the_checks_still_have_what_they_need(self):
         self.propose("remove", "build", "polish")
-        self.propose("add", "build", "first", "start", "First", "Runs first")
+        self.propose("add", "build", "first", "start")
         self.apply()
         self.assertEqual(self.order(), "first > shape > spec > build > ship > ready")
         self.change("remove", "review", "reconcile")
@@ -81,7 +91,7 @@ class TestPropose(Pipeline):
             (("move", "build", "build", "start"), "build has to come after spec"),
             (("move", "build", "polish", "shape"), "polish has to come after build"),
             (("move", "build", "ship", "shape"), "ship has to be the last stage"),
-            (("add", "build", "late", "ship", "Late", ""), "ship has to be the last stage"),
+            (("add", "build", "late", "ship"), "ship has to be the last stage"),
             (("move", "review", "verify", "scope"), "verify has to come after"),
             (("move", "review", "scope", "report"), "review has to come after scope"),
         ):
@@ -90,14 +100,14 @@ class TestPropose(Pipeline):
 
     def test_bad_requests_are_refused_with_the_reason_and_leave_nothing_behind(self):
         for args, why in (
-            (("add", "build", "gate", "shape", "X", ""), "built-in"),
-            (("add", "build", "review", "shape", "X", ""), "built-in stage name"),
-            (("add", "build", "Bad Id", "shape", "X", ""), "not a stage id"),
-            (("add", "build", "ok-id", "nowhere", "X", ""), "is not a stage here"),
-            (("add", "deploy", "ok-id", "shape", "X", ""), "build, review or prove"),
-            (("add", "build", "ok-id", "shape", "", ""), "label"),
-            (("add", "build", "ok-id", "shape", "X", "", "no-such-skill"), "no skill named"),
-            (("add", "build", "ok-id", "shape"), "usage"),
+            (("add", "build", "gate", "shape"), "built-in"),
+            (("add", "build", "review", "shape"), "built-in stage name"),
+            (("add", "build", "made-up", "shape"), "is not in the node catalog. Nodes you can add: aa (build: Aa)"),
+            (("add", "review", "sync", "scope"), "sync is a build node, not a review one"),
+            (("add", "build", "sync", "nowhere"), "is not a stage here"),
+            (("add", "deploy", "sync", "shape"), "build, review or prove"),
+            (("add", "build", "sync", "shape", "Sync", "brief"), "usage"),
+            (("add", "build", "sync"), "usage"),
             (("remove", "build", "nothing"), "is not a build stage"),
             (("move", "build", "nothing", "shape"), "is not a build stage"),
             (("move", "build", "build", "build"), "follow itself"),
@@ -106,19 +116,19 @@ class TestPropose(Pipeline):
             self.refused(why, *args)
         self.assertIn("pending: nothing", self.ok("pipeline", "show").stdout)
 
-    def test_a_stage_may_describe_anything_in_its_brief(self):
-        self.propose("add", "build", "sync", "polish", "Sync", "commit everything and git pull")
+    def test_a_catalog_node_can_carry_any_instruction(self):
+        self.propose("add", "build", "sync", "polish")
         self.apply()
         self.assertIn("sync", self.order())
 
     def test_discard_drops_the_proposal(self):
-        self.propose("add", "build", "aa", "shape", "A", "")
+        self.propose("add", "build", "aa", "shape")
         self.human("discardpipe", "")
         self.assertIn("pending: nothing", self.ok("pipeline", "show").stdout)
         self.assertFalse(self.file.exists())
 
     def test_a_proposal_made_before_the_pipeline_changed_is_refused(self):
-        self.propose("add", "build", "aa", "shape", "A", "")
+        self.propose("add", "build", "aa", "shape")
         self.file.write_text(json.dumps({"stages": [{"id": "zz", "workflow": "build", "label": "Z", "brief": ""}],
                                          "order": {"build": ["shape", "spec", "build", "polish", "zz", "ship"], "review": ["scope", "review", "reconcile", "verify", "report"]}}))
         self.board()
@@ -138,8 +148,8 @@ class TestBoard(Pipeline):
         first = self.stages_payload()
         self.assertEqual(first["order"], ["shape", "spec", "build", "polish", "ship", "ready"])
         self.assertEqual((first["custom"], first["proposal"]), ({}, None))
-        self.propose("add", "build", "qa-pass", "build", "QA pass", "Check by hand")
-        self.propose("add", "build", "extra", "shape", "Extra", "")
+        self.propose("add", "build", "qa-pass", "build")
+        self.propose("add", "build", "extra", "shape")
         waiting = self.stages_payload()["proposal"]
         self.assertEqual(sorted(waiting["changed"]), ["extra", "qa-pass"])
         self.assertEqual(waiting["order"]["build"], ["shape", "extra", "spec", "build", "qa-pass", "polish", "ship", "ready"])
@@ -156,7 +166,7 @@ class TestBoard(Pipeline):
 
 class TestRunning(Pipeline):
     def test_a_job_goes_through_a_custom_stage_and_not_around_it(self):
-        self.change("add", "build", "extra", "shape", "Extra", "Do the extra thing")
+        self.change("add", "build", "extra", "shape")
         self.ok("create", "j", "T")
         self.wf("j", "shape.md", "STATUS: READY\n")
         self.no("advance", "j", "spec")
@@ -169,7 +179,7 @@ class TestRunning(Pipeline):
         self.adv("j", "spec")
 
     def test_a_job_starts_at_whatever_stage_is_first(self):
-        self.change("add", "build", "intake", "start", "Intake", "")
+        self.change("add", "build", "intake", "start")
         self.ok("create", "j", "T")
         self.assertEqual(self.stage("j"), "intake")
         self.ok("queue")
@@ -178,7 +188,7 @@ class TestRunning(Pipeline):
         self.adv("j", "shape")
 
     def test_a_blocked_custom_stage_parks_on_the_user_and_unblock_retries_it(self):
-        self.change("add", "build", "extra", "shape", "Extra", "")
+        self.change("add", "build", "extra", "shape")
         self.ok("create", "j", "T")
         self.wf("j", "shape.md", "STATUS: READY\n")
         self.adv("j", "extra")
@@ -196,7 +206,7 @@ class TestRunning(Pipeline):
         self.adv("j", "ship")
 
     def test_the_gate_runs_after_each_stage_and_goes_on_to_the_next(self):
-        self.change("add", "build", "qa-pass", "build", "QA pass", "")
+        self.change("add", "build", "qa-pass", "build")
         self.to_gate("j")
         self.assertIn("GATE: PASS", self.run_gate("j"))
         self.no("advance", "j", "polish")
@@ -218,12 +228,12 @@ class TestRunning(Pipeline):
 
     def test_a_review_job_follows_a_custom_order_too(self):
         self.change("remove", "review", "reconcile")
-        self.change("add", "review", "extra", "scope", "Extra", "")
+        self.change("add", "review", "extra-check", "scope")
         self.new_review("r")
         self.wf("r", "scope.md", "STATUS: READY\n")
         self.no("advance", "r", "review")
-        self.adv("r", "extra")
-        self.wf("r", "extra.md", "STATUS: READY\n")
+        self.adv("r", "extra-check")
+        self.wf("r", "extra-check.md", "STATUS: READY\n")
         self.adv("r", "review")
         for rv in self.js("r")["reviewers"]:
             self.wf("r", f"round-1/review-{rv}.md", "VERDICT: CHANGES\n")
@@ -231,7 +241,7 @@ class TestRunning(Pipeline):
         self.adv("r", "verify")
 
     def test_removing_a_stage_a_job_sits_in_is_refused(self):
-        self.change("add", "build", "extra", "shape", "Extra", "")
+        self.change("add", "build", "extra", "shape")
         self.ok("create", "j", "T")
         self.wf("j", "shape.md", "STATUS: READY\n")
         self.adv("j", "extra")
@@ -273,13 +283,13 @@ class TestPerProject(Review):
         a, b = self.root, self.base / "other"
         b.mkdir()
         self.git("init", "-b", "main", cwd=b)
-        self.apply_in(a, "add", "build", "sec-scan", "build", "Security scan", "")
+        self.apply_in(a, "add", "build", "code-review", "build")
         self.assertTrue((a / ".planning" / "factory" / "pipeline.json").exists())
-        self.assertEqual(self.order_in(a), "shape > spec > build > sec-scan > polish > ship > ready")
+        self.assertEqual(self.order_in(a), "shape > spec > build > code-review > polish > ship > ready")
         self.assertEqual(self.order_in(b), BUILD_DEFAULT)
-        self.apply_in(b, "add", "build", "lint-pass", "build", "Lint pass", "")
-        self.assertEqual(self.order_in(b), "shape > spec > build > lint-pass > polish > ship > ready")
-        self.assertEqual(self.order_in(a), "shape > spec > build > sec-scan > polish > ship > ready")
+        self.apply_in(b, "add", "build", "qa-review", "build")
+        self.assertEqual(self.order_in(b), "shape > spec > build > qa-review > polish > ship > ready")
+        self.assertEqual(self.order_in(a), "shape > spec > build > code-review > polish > ship > ready")
         for root in (a, b):
             self.assertEqual(self.order_in(root, "review"), REVIEW_DEFAULT)
 

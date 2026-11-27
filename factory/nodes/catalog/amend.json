@@ -1,0 +1,9 @@
+{
+  "id": "amend",
+  "workflow": "build",
+  "label": "Amend plan",
+  "skill": "",
+  "model": "small",
+  "writes": "notes",
+  "hint": "Make only the change the user's note for this stage describes, editing that one file directly."
+}
