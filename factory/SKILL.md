@@ -25,7 +25,7 @@ When a job waits on the user (spec approval, **Commit locally**, **Unblock**), r
 
 ## User choices on the board
 
-`JOB queue` hints can end with `USER TURNED OFF, do not use: ...` and `USER NOTE for this stage, follow it: ...`. Obey both, and pass them to every stage agent. The user sets them in the board or in its chat bar. You can set them too: `JOB skill <id> <name> on|off`, `JOB brief <id> <stage> <text>`.
+`JOB queue` hints can end with `USER TURNED OFF, do not use: ...`, `USER NOTE for this stage, follow it: ...` and `USER STANDING RULES for every job, follow them: ...`. Obey all three, and pass them to every stage agent. The user sets them in the board or in its chat bar. You can set them too: `JOB skill <id> <name> on|off`, `JOB brief <id> <stage> <text>`.
 
 ## Workflows
 
