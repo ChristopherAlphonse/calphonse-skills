@@ -148,27 +148,16 @@ class Factory(unittest.TestCase):
         p = self.jd(jid) / self.rd(jid) / "checks.md"
         return p.read_text() if p.exists() else ""
 
-    def to_review(self, jid):
+    def to_polish(self, jid):
         self.to_gate(jid)
         self.assertIn("GATE: PASS", self.run_gate(jid))
-        self.adv(jid, "review")
-
-    def pass_reviews(self, jid, names=("code", "qa", "test")):
-        for n in names:
-            self.wf(jid, f"{self.rd(jid)}/review-{n}.md", "VERDICT: PASS\n")
-
-    def to_prove(self, jid):
-        self.to_review(jid)
-        self.pass_reviews(jid)
         self.adv(jid, "polish")
+
+    def to_ship(self, jid, commit_md=True):
+        self.to_polish(jid)
         self.wf(jid, "polish.md", "STATUS: DONE\n")
         self.adv(jid, "gate")
         self.assertIn("GATE: PASS", self.run_gate(jid))
-        self.adv(jid, "prove")
-
-    def to_ship(self, jid, commit_md=True):
-        self.to_prove(jid)
-        self.wf(jid, "uat.md", "STATUS: PASS\n")
         self.adv(jid, "ship")
         self.wf(jid, "pr-body.md", "body\n")
         if commit_md:
@@ -482,14 +471,10 @@ class TestRepos(Factory):
         self.wf("proj-1-svc-a", "build.md", "STATUS: READY\n")
         self.adv("proj-1-svc-a", "gate")
         self.assertIn("GATE: PASS", self.run_gate("proj-1-svc-a"))
-        self.adv("proj-1-svc-a", "review")
-        self.pass_reviews("proj-1-svc-a")
         self.adv("proj-1-svc-a", "polish")
         self.wf("proj-1-svc-a", "polish.md", "STATUS: DONE\n")
         self.adv("proj-1-svc-a", "gate")
         self.assertIn("GATE: PASS", self.run_gate("proj-1-svc-a"))
-        self.adv("proj-1-svc-a", "prove")
-        self.wf("proj-1-svc-a", "uat.md", "STATUS: PASS\n")
         self.adv("proj-1-svc-a", "ship")
         self.wf("proj-1-svc-a", "pr-body.md", "body\n")
         self.wf("proj-1-svc-a", "commit.md", "feat: add feature\n")
@@ -586,27 +571,21 @@ class TestBuildGate(Factory):
 
     def test_advance_needs_gate_run(self):
         self.to_gate("j")
-        self.no("advance", "j", "review")
+        self.no("advance", "j", "polish")
         self.run_gate("j")
-        self.adv("j", "review")
+        self.adv("j", "polish")
 
-    def test_gate_fail_cannot_go_review_pass_cannot_go_build(self):
+    def test_gate_fail_cannot_go_on_pass_cannot_go_build(self):
         self.set_config(checks="exit 1")
         self.to_gate("j")
         self.run_gate("j")
-        self.no("advance", "j", "review")
-        self.no("advance", "j", "prove")
+        self.no("advance", "j", "polish")
         self.adv("j", "build")
         self.set_config(checks="true")
         self.adv("j", "gate")
         self.run_gate("j")
         self.no("advance", "j", "build")
-        self.adv("j", "review")
-
-    def test_gate_before_polish_cannot_prove(self):
-        self.to_gate("j")
-        self.run_gate("j")
-        self.no("advance", "j", "prove")
+        self.adv("j", "polish")
 
 
 class TestProtected(Factory):
@@ -680,65 +659,21 @@ class TestProtected(Factory):
         self.to_gate("j")
         (self.wt("j") / "CODEOWNERS").write_text("* @evil\n")
         self.run_gate("j")
-        self.no("advance", "j", "review")
+        self.no("advance", "j", "polish")
         self.adv("j", "build")
 
 
-class TestReview(Factory):
-    def test_all_three_reviews_needed(self):
-        self.to_review("j")
-        self.no("advance", "j", "polish")
-        self.pass_reviews("j", ("code", "qa"))
-        self.no("advance", "j", "polish")
-        self.pass_reviews("j", ("test",))
-        self.adv("j", "polish")
-
-    def test_route_adds_required_reviewers(self):
-        self.to_review("j")
-        self.ok("route", "j", "architecture")
-        self.pass_reviews("j")
-        self.no("advance", "j", "polish")
-        self.pass_reviews("j", ("architecture",))
-        self.adv("j", "polish")
-
+class TestRoute(Factory):
     def test_route_unknown_refused_known_ok(self):
-        self.to_review("j")
+        self.to_build("j")
         self.no("route", "j", "architecture,bogus")
         self.no("route", "j", "code")
         self.ok("route", "j", "architecture")
 
-    def test_changes_block_polish_and_need_reconcile(self):
-        self.to_review("j")
-        self.pass_reviews("j", ("code", "test"))
-        self.wf("j", "round-1/review-qa.md", "VERDICT: CHANGES\n\nfix\n")
-        self.no("advance", "j", "polish")
-        self.no("advance", "j", "build")
-        self.wf("j", "round-1/reconcile.md", "fix list\n")
-        self.adv("j", "build")
-        self.assertEqual(self.js("j")["round"], 2)
 
-    def test_all_pass_cannot_go_build(self):
-        self.to_review("j")
-        self.pass_reviews("j")
-        self.wf("j", "round-1/reconcile.md", "x\n")
-        self.no("advance", "j", "build")
-
-    def test_review_refused_after_polish(self):
-        self.to_review("j")
-        self.pass_reviews("j")
-        self.adv("j", "polish")
-        self.wf("j", "polish.md", "STATUS: DONE\n")
-        self.adv("j", "gate")
-        self.assertRegex(self.run_gate("j"), r"(?m)^GATE: PASS$")
-        self.no("advance", "j", "review")
-        self.adv("j", "prove")
-
-
-class TestPolishProve(Factory):
+class TestPolish(Factory):
     def test_polish_needs_status(self):
-        self.to_review("j")
-        self.pass_reviews("j")
-        self.adv("j", "polish")
+        self.to_polish("j")
         self.no("advance", "j", "gate")
         self.no("advance", "j", "build")
         self.wf("j", "polish.md", "STATUS: DONE\n")
@@ -748,46 +683,25 @@ class TestPolishProve(Factory):
 
     def test_gate_must_pass_again_after_polish(self):
         self.set_config(checks="[ ! -f " + str(self.base / "fail-now") + " ]")
-        self.to_review("j")
-        self.pass_reviews("j")
-        self.adv("j", "polish")
+        self.to_polish("j")
         self.wf("j", "polish.md", "STATUS: DONE\n")
         self.adv("j", "gate")
         # polish changed something; the earlier pass must not be enough
-        self.no("advance", "j", "prove")
+        self.no("advance", "j", "ship")
         (self.base / "fail-now").write_text("")
         self.assertRegex(self.run_gate("j"), r"(?m)^GATE: FAIL$")
-        self.no("advance", "j", "prove")
+        self.no("advance", "j", "ship")
         (self.base / "fail-now").unlink()
         self.run_gate("j")
-        self.adv("j", "prove")
+        self.adv("j", "ship")
 
     def test_polish_rework_bumps_round_and_clears_polished(self):
-        self.to_review("j")
-        self.pass_reviews("j")
-        self.adv("j", "polish")
+        self.to_polish("j")
         self.wf("j", "polish.md", "STATUS: REWORK\n")
         self.no("advance", "j", "gate")
         self.adv("j", "build")
         self.assertEqual(self.js("j")["round"], 2)
         self.assertFalse(self.js("j")["polished"])
-
-    def test_prove_needs_uat(self):
-        self.to_prove("j")
-        self.no("advance", "j", "ship")
-        self.wf("j", "uat.md", "STATUS: FAIL\n")
-        self.no("advance", "j", "ship")
-        self.wf("j", "uat.md", "STATUS: PASS\n")
-        self.adv("j", "ship")
-
-    def test_prove_fail_goes_build_with_round_bump(self):
-        self.to_prove("j")
-        self.wf("j", "uat.md", "STATUS: PASS\n")
-        self.no("advance", "j", "build")
-        self.wf("j", "uat.md", "STATUS: FAIL\n")
-        self.adv("j", "build")
-        self.assertEqual(self.js("j")["round"], 2)
-
 
 class TestRounds(Factory):
     def fail_cycle(self, jid):
@@ -828,27 +742,9 @@ class TestRounds(Factory):
         self.human_refused("unblock", "j")
         self.assertEqual(self.stage("j"), "build")
 
-    def test_review_changes_over_limit(self):
-        self.set_config(max_rounds=1)
-        self.to_review("j")
-        self.pass_reviews("j", ("code", "test"))
-        self.wf("j", "round-1/review-qa.md", "VERDICT: CHANGES\n")
-        self.wf("j", "round-1/reconcile.md", "x\n")
-        self.ok("advance", "j", "build")
-        self.assertEqual(self.stage("j"), "needs-human")
-
-    def test_prove_fail_over_limit(self):
-        self.set_config(max_rounds=1)
-        self.to_prove("j")
-        self.wf("j", "uat.md", "STATUS: FAIL\n")
-        self.ok("advance", "j", "build")
-        self.assertEqual(self.stage("j"), "needs-human")
-
     def test_polish_rework_over_limit(self):
         self.set_config(max_rounds=1)
-        self.to_review("j")
-        self.pass_reviews("j")
-        self.adv("j", "polish")
+        self.to_polish("j")
         self.wf("j", "polish.md", "STATUS: REWORK\n")
         self.ok("advance", "j", "build")
         self.assertEqual(self.stage("j"), "needs-human")
@@ -1433,7 +1329,7 @@ class TestServer(Factory):
         with mock.patch.dict(os.environ, {"FACTORY_ROOT": str(self.root)}):
             spec.loader.exec_module(mod)
         self.assertIn(guide.strip(), mod.ask_system("a"))
-        for stage in mod.BASE_ORDER["build"] + mod.BASE_ORDER["review"] + ["gate"]:
+        for stage in mod.BASE_ORDER["build"] + mod.BASE_ORDER["review"] + mod.BASE_ORDER["prove"] + ["gate"]:
             self.assertIn(stage, guide, f"board-agent.md never mentions the {stage} stage")
         self.assertIn("not possible from chat", guide)
         self.assertIn("Factory Bot", mod.ask_system("a", "build", True))

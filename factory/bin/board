@@ -45,7 +45,8 @@ def board_is_stale():
 
 STALE_META = b'<span id="meta">restart the board: its code changed since it started</span>'
 # board id -> (label, which of the engine's jobs it shows)
-BOARD_SPECS = {"build": ("Build", lambda job: not job.get("review")), "review": ("Review", lambda job: bool(job.get("review")))}
+BOARD_SPECS = {"build": ("Build", lambda job: not job.get("review") and not job.get("prove")), "review": ("Review", lambda job: bool(job.get("review"))),
+               "prove": ("Prove", lambda job: bool(job.get("prove")))}
 WATCH_FILE = "watch.json"
 CHAT_LOG = STATE / "chat.jsonl"
 CHAT_SHOWN = 200
@@ -65,6 +66,7 @@ FAVICON_GLYPH = {
     "factory": ("#e8e8e8", '<path d="M5 18V9l5 3V9l5 3V6h4v12z"/>'),
     "build": ("#7aa7ff", '<path d="M12 5l7 4-7 4-7-4zM5 13l7 4 7-4"/>'),
     "review": ("#6fd7a8", '<circle cx="11" cy="11" r="4.5"/><path d="M14.5 14.5L19 19"/>'),
+    "prove": ("#e6a8ff", '<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
 }
 
 

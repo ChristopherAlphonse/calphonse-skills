@@ -17,7 +17,7 @@
                                                                                       
 
 const REQUEST_TIMEOUT_MS = 10_000;
-const REPORT_FIELDS                = ["FINDINGS", "BLOCKERS"];
+const REPORT_FIELDS                = ["FINDINGS", "BLOCKERS", "STATUS"];
 
                                              
 

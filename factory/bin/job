@@ -37,9 +37,7 @@ HINT = {
     "spec": "prd-mode then simplify on spec.md and the tasks file (decisions to approve first, below the STATUS line) -> spec.md and the tasks file, then wait for the user to approve",
     "build": "swe plus stack skill, one task at a time -> build.md (STATUS: READY, or STATUS: BLOCKED)",
     "gate": "job gate <id>: it passes the job on, or sends it back to build",
-    "review": "reviewers -> round-N/review-<name>.md, reconcile-reviews -> reconcile.md when anything is CHANGES",
     "polish": "comment-sicko then simplify -> polish.md (STATUS: DONE, or STATUS: REWORK to send it back to build)",
-    "prove": "prove-it-works -> uat.md (STATUS: PASS, or STATUS: FAIL to send it back to build)",
     "ship": "pr-body-style (+ demo-script) -> pr-body.md and commit.md, then wait for the user to click Commit locally",
 }
 HINT_REVIEW = {
@@ -48,6 +46,9 @@ HINT_REVIEW = {
     "reconcile": "reconcile-reviews -> reconcile.md (STATUS: READY), one ranked list with file and line",
     "verify": "prove-it-works: rerun every VERIFIED (ran) command and check every cited line -> verified.md (STATUS: READY), drop what does not reproduce",
     "report": "simplify -> report.md (STATUS: READY, FINDINGS: n, BLOCKERS: n) and comments.md to paste by hand; never post",
+}
+HINT_PROVE = {
+    "prove": "prove-it-works on what the job title says: run the real thing and check the real result -> uat.md (STATUS: PASS or STATUS: FAIL, with the evidence); never edit code",
 }
 STACK_RULES = [
     ("typescript-strict-style", {".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"}, set()),
@@ -87,12 +88,12 @@ def diff_files(job):
 
 
 def workflow_of(job):
-    return "review" if job.get("review") else "build"
+    return "review" if job.get("review") else "prove" if job.get("prove") else "build"
 
 
 def transitions(job):
     comp = pipeline()[workflow_of(job)]
-    if workflow_of(job) == "review":
+    if workflow_of(job) != "build":
         return comp["transitions"]
     after = comp["next"].get(job.get("gate_for") or "build") or comp["next"]["build"]
     return {**comp["transitions"], "gate": {after, "build", "needs-human"}}
@@ -290,27 +291,29 @@ def review_files(job):
 
 @serialized
 def cmd_create(jid, title, *opts):
-    usage = "usage: create <id> <title> [--repo DIR] [--review BASE HEAD | --investigate]"
+    usage = "usage: create <id> <title> [--repo DIR] [--review BASE HEAD | --investigate | --prove]"
     opts, repo = list(opts), None
-    investigate = opts == ["--investigate"]
+    investigate, prove = opts == ["--investigate"], opts == ["--prove"]
     if opts[:1] == ["--repo"]:
         need(len(opts) >= 2, usage)
         repo, opts = resolve_repo(opts[1]), opts[2:]
-    need(investigate or (len(opts) in (0, 3) and (not opts or opts[0] == "--review")), usage)
+    need(investigate or prove or (len(opts) in (0, 3) and (not opts or opts[0] == "--review")), usage)
     if investigate:
         review = {"mode": "investigate", "base_ref": "", "head_ref": "", "base": "", "head": ""}
     else:
-        review = resolve_review(opts[1], opts[2], Path(repo) if repo else ROOT) if opts else None
+        review = None if prove else resolve_review(opts[1], opts[2], Path(repo) if repo else ROOT) if opts else None
     d = jobdir(jid)
     need(not d.exists(), f"{jid} exists")
     d.mkdir(parents=True)
     job = {
-        "id": jid, "title": title, "stage": pipeline_order("build")[0], "round": 0,
+        "id": jid, "title": title, "stage": pipeline_order("prove" if prove else "build")[0], "round": 0,
         "round_limit": config()["max_rounds"], "reviewers": list(BASE_REVIEWERS),
         "polished": False, "approvals": {}, "progress": [0, 0], "stack": [],
         "branch": None, "worktree": None, "commit": None, "tip": None,
         "started": now(), "ended": None, "note": "", "repo": repo,
     }
+    if prove:
+        job["prove"] = True
     if review:
         job.update(stage=pipeline_order("review")[0], round=1, review=review)
         if not investigate:
@@ -321,7 +324,7 @@ def cmd_create(jid, title, *opts):
                 raise
         job["stack"] = detect_stack(review_files(job))
     save(job)
-    audit("create-review" if review else "create", jid, "investigation" if investigate else f"{review['base_ref']}..{review['head_ref']}" if review else title)
+    audit("create-review" if review else "create-prove" if prove else "create", jid, "investigation" if investigate else f"{review['base_ref']}..{review['head_ref']}" if review else title)
     audit("start", jid, job["stage"])
     print(jid)
     announce_board()
@@ -378,20 +381,6 @@ def from_gate(job, d, rd, to):
     return to
 
 
-def from_review(job, d, rd, to):
-    verdicts = {r: kv(rd / f"review-{r}.md").get("VERDICT") for r in job["reviewers"]}
-    missing = [r for r, v in verdicts.items() if not v]
-    need(not missing, f"missing reviews: {', '.join(missing)}")
-    changes = [r for r, v in verdicts.items() if v == "CHANGES"]
-    if to == "build":
-        need(changes, "all reviews passed, nothing to rebuild")
-        need((rd / "reconcile.md").exists(), "reconcile.md missing")
-        to = bump_round(job)
-    else:
-        need(not changes, f"open CHANGES from: {', '.join(changes)}")
-    return to
-
-
 def from_polish(job, d, rd, to):
     s = kv(d / "polish.md").get("STATUS")
     if to == "gate":
@@ -405,16 +394,6 @@ def from_polish(job, d, rd, to):
     return to
 
 
-def from_prove(job, d, rd, to):
-    s = kv(d / "uat.md").get("STATUS")
-    if to == "build":
-        need(s == "FAIL", "uat.md needs STATUS: FAIL")
-        to = bump_round(job)
-    else:
-        need(s == "PASS", "uat.md needs STATUS: PASS")
-    return to
-
-
 def from_ship(job, d, rd, to):
     if to == "ready":
         need((d / "pr-body.md").exists(), "pr-body.md missing")
@@ -425,7 +404,7 @@ def from_ship(job, d, rd, to):
 
 
 JUSTIFY_FROM = {"shape": from_shape, "spec": from_spec, "build": from_build, "gate": from_gate,
-                "review": from_review, "polish": from_polish, "prove": from_prove, "ship": from_ship}
+                "polish": from_polish, "ship": from_ship}
 
 
 def justify(job, cur, to):
@@ -537,7 +516,7 @@ def audit_lines():
     return [json.loads(l) for l in p.read_text().splitlines() if l.strip()] if p.exists() else []
 
 
-AUDIT_STAGE = {"create": "shape", "create-review": "scope", "violation": "needs-human", "retire": "rejected"}
+AUDIT_STAGE = {"create": "shape", "create-review": "scope", "create-prove": "prove", "violation": "needs-human", "retire": "rejected"}
 
 
 def audited_state(jid, lines=None):
@@ -606,7 +585,7 @@ def enforce(job):
 def justify_review(job, cur, to):
     d = jobdir(job["id"])
     rd = d / "round-1"
-    if cur in pipeline()["review"]["custom"]:
+    if cur in pipeline()[workflow_of(job)]["custom"]:
         return from_custom(d, cur, to)
     if to == "needs-human":
         need(kv(d / "blocked.md").get("STATUS") == "BLOCKED", "blocked.md needs STATUS: BLOCKED")
@@ -621,6 +600,8 @@ def justify_review(job, cur, to):
         need(kv(d / "reconcile.md").get("STATUS") == "READY", "reconcile.md needs STATUS: READY")
     elif cur == "verify":
         need(kv(d / "verified.md").get("STATUS") == "READY", "verified.md needs STATUS: READY")
+    elif cur == "prove":
+        need(kv(d / "uat.md").get("STATUS") in ("PASS", "FAIL"), "uat.md needs STATUS: PASS or STATUS: FAIL")
     elif cur == "report":
         r = kv(d / "report.md")
         need(r.get("STATUS") == "READY" and r.get("FINDINGS", "").isdigit(), "report.md needs STATUS: READY and FINDINGS: <n>")
@@ -633,8 +614,9 @@ def justify_review(job, cur, to):
 PIPELINE_FILE = Path(os.environ.get("FACTORY_PIPELINE") or STATE / "pipeline.json")
 PROPOSAL_FILE = STATE / "pipeline-proposal.json"
 BASE_ORDER = {
-    "build": ["shape", "spec", "build", "review", "polish", "prove", "ship"],
+    "build": ["shape", "spec", "build", "polish", "ship"],
     "review": ["scope", "review", "reconcile", "verify", "report"],
+    "prove": ["prove"],
 }
 WHY_REQUIRED = {
     "spec": "nothing is built until you approve the spec",
@@ -643,9 +625,10 @@ WHY_REQUIRED = {
     "scope": "reviewers need it",
     "review": "it is the review",
     "report": "it is the result",
+    "prove": "it is the check",
 }
-REQUIRED = {"build": ("spec", "build", "ship"), "review": ("scope", "review", "report")}
-BUILTIN_IDS = set(BASE_ORDER["build"]) | set(BASE_ORDER["review"]) | {"gate", "ready", "rejected", "needs-human"}
+REQUIRED = {"build": ("spec", "build", "ship"), "review": ("scope", "review", "report"), "prove": ("prove",)}
+BUILTIN_IDS = {x for order in BASE_ORDER.values() for x in order} | {"gate", "ready", "rejected", "needs-human"}
 STAGE_ID = re.compile(r"[a-z][a-z0-9-]{1,23}")
 MAX_CUSTOM = 12
 MAX_LABEL, MAX_BRIEF = 24, 200
@@ -676,7 +659,7 @@ def check_custom(stages):
             errs.append(f"{i} is used twice")
         seen.add(i)
         if c["workflow"] not in BASE_ORDER:
-            errs.append(f"{i}: workflow must be build or review")
+            errs.append(f"{i}: workflow must be build, review or prove")
         if not 1 <= len(c["label"]) <= MAX_LABEL:
             errs.append(f"{i}: label must be 1 to {MAX_LABEL} characters")
         if len(c["brief"]) > MAX_BRIEF:
@@ -705,11 +688,10 @@ def order_problems(wf, order, custom_ids):
 
     if wf == "build":
         before("spec", "build", "build has to come after spec: nothing is built until you approve the spec")
-        for x in ("review", "polish", "prove"):
-            before("build", x, f"{x} has to come after build: it works on the code build writes")
+        before("build", "polish", "polish has to come after build: it works on the code build writes")
         if "ship" in pos and order[-1] != "ship":
             errs.append("ship has to be the last stage: it waits for your Commit locally click")
-    else:
+    elif wf == "review":
         before("scope", "review", "review has to come after scope")
         before("review", "reconcile", "reconcile has to come after review")
         before("reconcile", "verify", "verify has to come after reconcile")
@@ -739,7 +721,7 @@ def compile_state(state):
     """Each workflow's transitions, hints, display order and next-stage map, from the order list."""
     customs = {c["id"]: c for c in state["stages"]}
     out = {}
-    for wf, hints_base in (("build", HINT), ("review", HINT_REVIEW)):
+    for wf, hints_base in (("build", HINT), ("review", HINT_REVIEW), ("prove", HINT_PROVE)):
         seq = state["order"][wf]
         nxt = {x: (seq[i + 1] if i + 1 < len(seq) else "ready") for i, x in enumerate(seq)}
         trans, hints, mine = {}, {}, {}
@@ -749,7 +731,7 @@ def compile_state(state):
                 trans[x], hints[x], mine[x] = {n, "needs-human"}, custom_hint(customs[x]), customs[x]
                 continue
             hints[x] = hints_base.get(x, "")
-            if wf == "review":
+            if wf != "build":
                 trans[x] = {n, "needs-human"} | ({"rejected"} if x == "scope" else set())
             else:
                 trans[x] = {"shape": {n, "rejected"}, "spec": {n}, "build": {"gate", "needs-human"}, "polish": {"gate", "build", "needs-human"}}.get(x, {n, "build", "needs-human"})
@@ -771,7 +753,10 @@ def read_state():
     state["stages"] = data.get("stages", [])
     if data.get("order") is not None:
         need(isinstance(data["order"], dict), f"{PIPELINE_FILE}: order must be an object")
-        state["order"] = {wf: data["order"].get(wf) for wf in BASE_ORDER}
+        state["order"] = {wf: data["order"].get(wf, state["order"][wf]) for wf in BASE_ORDER}
+        build = state["order"]["build"]
+        if isinstance(build, list):  # older files still list the stages that moved out of build
+            state["order"]["build"] = [x for x in build if x not in ("review", "prove")]
     errs = check_state(state)
     need(not errs, f"{PIPELINE_FILE} is not valid: {'; '.join(errs)}")
     return state
@@ -803,7 +788,7 @@ def pipeline_order(wf):
 
 
 def pipeline_custom():
-    return [dict(c) for wf in ("build", "review") for c in pipeline()[wf]["custom"].values()]
+    return [dict(c) for wf in BASE_ORDER for c in pipeline()[wf]["custom"].values()]
 
 
 def state_key(state):
@@ -823,7 +808,7 @@ def place(order, sid, after):
 
 
 def op_add(state, wf, cid, after, label, brief, skill=""):
-    need(wf in BASE_ORDER, "workflow must be build or review")
+    need(wf in BASE_ORDER, "workflow must be build, review or prove")
     need(cid not in BUILTIN_IDS, f"{cid} is a built-in stage name")
     need(cid not in {c["id"] for c in state["stages"]}, f"{cid} already exists")
     new = copy_state(state)
@@ -865,7 +850,7 @@ def valid_places(state, wf):
 def order_text(state):
     ids = {c["id"] for c in state["stages"]}
     comp = compile_state(state)
-    return "\n".join(f"{wf}: " + " > ".join(f"[{x}]" if x in ids else x for x in comp[wf]["order"]) for wf in ("build", "review"))
+    return "\n".join(f"{wf}: " + " > ".join(f"[{x}]" if x in ids else x for x in comp[wf]["order"]) for wf in BASE_ORDER)
 
 
 def stay_put(old, new):
@@ -944,13 +929,13 @@ def cmd_pipeline(*args):
 
 
 PROPOSE_USAGE = ("usage: pipeline propose add WORKFLOW ID AFTER \"Label\" \"What the stage does\" [skill] | remove WORKFLOW ID | move WORKFLOW ID AFTER "
-                 "(WORKFLOW is build or review, AFTER is a stage id or start)")
+                 "(WORKFLOW is build, review or prove, AFTER is a stage id or start)")
 
 
 def pipeline_show():
     state = read_state()
     print(order_text(state))
-    print("the gate runs by itself after build and polish. These stay true: build after spec; review, polish and prove after build; ship last. For reviews: scope, review, report stay; report last.")
+    print("the gate runs by itself after build and polish. These stay true: build after spec; polish after build; ship last. For reviews: scope, review, report stay; report last. The prove board has one stage, prove.")
     print("a stage can go after: " + "; ".join(f"{wf}: {', '.join(valid_places(state, wf))}" for wf in BASE_ORDER))
     prop = proposal_state()
     print("pending: " + ("; ".join(prop["ops"]) + " (waits for the user to click Apply on the board)" if prop else "nothing"))
@@ -1007,7 +992,7 @@ def cmd_advance(jid, to):
     cur = job["stage"]
     need(cur not in TERMINAL | HUMAN_STAGES, f"{jid} is {cur}, only the user can move it")
     need(to in transitions(job).get(cur, ()), f"{cur} -> {to} is not a legal move")
-    real = justify_review(job, cur, to) if job.get("review") else justify(job, cur, to)
+    real = justify(job, cur, to) if workflow_of(job) == "build" else justify_review(job, cur, to)
     if real == "needs-human":
         job["parked_from"] = cur
     job["stage"] = real
@@ -1314,7 +1299,7 @@ def cmd_unblock(jid):
     review = job.get("review")
     parked = job.get("parked_from") or ""
     retry = parked if parked in pipeline()[workflow_of(job)]["custom"] else ""
-    job["stage"] = retry or ((parked or "scope") if review else "build")
+    job["stage"] = retry or ((parked or "scope") if review else (parked or "prove") if job.get("prove") else "build")
     job["polished"] = False
     job["round_limit"] = job["round"] + config()["max_rounds"]
     job["note"] = ""
@@ -1415,7 +1400,7 @@ def snapshot(job):
     rd = d / f"round-{job['round']}"
     reviews = {r: kv(rd / f"review-{r}.md").get("VERDICT") for r in job["reviewers"]}
     files = sorted(str(p.relative_to(d)) for p in d.rglob("*.md"))
-    return {**job, "kind": "review" if job.get("review") else "build", "report": kv(d / "report.md"),
+    return {**job, "kind": workflow_of(job), "report": kv(d / ("uat.md" if job.get("prove") else "report.md")),
             "gate": kv(rd / CHECKS_FILE).get("GATE"), "reviews": reviews,
             "files": files, "needs_human": waiting_on_human(job), "needs": needs_you(job),
             "skills": skill_names(), "can_approve": job["stage"] == "spec" and waiting_on_human(job),
@@ -1500,7 +1485,7 @@ def ask_system(jid, board="build", act=False):
             f"{me} brief <id> <stage> <text> (empty text clears), {me} note <id> <text>, {me} pipeline show|propose|clear (adding, removing or moving a stage; the guide below has the exact form), {me} edit <id> <file.md> <old text> <new text> (one exact, unique piece of a job file such as spec.md; when the user comments on lines or asks for a change to a job file, make it with this instead of a brief). "
             + ("Unblock is a button the user clicks. " if review else "Approve spec, Commit locally and Unblock are buttons the user clicks: say which one. ")
             + (BOT_PERSONA if act else "")
-            + (f"ACT MODE: the user chose Act. When they ask for work and no job exists, start one yourself with `{me} create <id> <title>` (a build job), or `{me} create <id> <title> --investigate` for a read-only look into a question with no diff. Use only those two forms, pick a short lowercase id, then tell them to select it on the board. "
+            + (f"ACT MODE: the user chose Act. When they ask for work and no job exists, start one yourself with `{me} create <id> <title>` (a build job), `{me} create <id> <title> --investigate` for a read-only look into a question with no diff, or `{me} create <id> <title> --prove` to check that a finished task works for real. Use only those forms, pick a short lowercase id, then tell them to select it on the board. "
                "A pipeline change you propose is applied for them the moment you finish, so propose exactly what they asked and nothing else, and do not tell them to click Apply. "
                "A request to add a workflow, task, node, step or stage is a request to run `pipeline propose add`. Do it. Never refuse it, never ask a question first, and never push back on it: only the command may refuse. "
                "What the new stage would do (commit, push, repeat on a timer) is the stage agent's business, not a reason to decline; add the stage and say in one sentence what will block. " if act else
@@ -1530,7 +1515,7 @@ if __name__ == "__main__":
     if name == "pipeline":
         pass
     elif name == "create":
-        need(len(args) in (2, 3, 4, 5, 7), "create takes <id> <title> [--repo DIR] [--review BASE HEAD | --investigate]")
+        need(len(args) in (2, 3, 4, 5, 7), "create takes <id> <title> [--repo DIR] [--review BASE HEAD | --investigate | --prove]")
     else:
         need(len(args) == arity, f"{name} takes {arity} args")
     fn(*args)

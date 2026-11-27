@@ -2,7 +2,7 @@
 
 export type GateVerdict = "PASS" | "FAIL";
 export type ReviewVerdict = "PASS" | "CHANGES";
-export type ReportField = "FINDINGS" | "BLOCKERS";
+export type ReportField = "FINDINGS" | "BLOCKERS" | "STATUS";
 
 export interface Needs {
   action: string;

@@ -2,7 +2,7 @@ import json, unittest
 
 from test_review_workflow import Review
 
-BUILD_DEFAULT = "shape > spec > build > review > polish > prove > ship > ready"
+BUILD_DEFAULT = "shape > spec > build > polish > ship > ready"
 REVIEW_DEFAULT = "scope > review > reconcile > verify > report > ready"
 
 
@@ -38,37 +38,36 @@ class TestPropose(Pipeline):
         out = self.ok("pipeline", "show").stdout
         self.assertIn(f"build: {BUILD_DEFAULT}", out)
         self.assertIn(f"review: {REVIEW_DEFAULT}", out)
-        self.assertIn("a stage can go after: build: start, shape, spec, build, review, polish, prove; review: start, scope, review, reconcile, verify", out)
+        self.assertIn("a stage can go after: build: start, shape, spec, build, polish; review: start, scope, review, reconcile, verify; prove: start", out)
         self.assertIn("pending: nothing", out)
 
     def test_a_proposal_changes_nothing_until_the_user_applies_it(self):
-        r = self.propose("add", "build", "sec-scan", "review", "Security scan", "Scan the diff", "qa-review")
-        self.assertIn("review > [sec-scan] > polish", r.stdout)
-        self.assertIn("add sec-scan (Security scan) after review in build", r.stdout)
+        r = self.propose("add", "build", "sec-scan", "build", "Security scan", "Scan the diff", "qa-review")
+        self.assertIn("build > [sec-scan] > polish", r.stdout)
+        self.assertIn("add sec-scan (Security scan) after build in build", r.stdout)
         self.assertIn("Nothing changes until the user clicks Apply", r.stdout)
         self.assertFalse(self.file.exists())
         self.assertEqual(self.order(), BUILD_DEFAULT)
 
     def test_the_cli_cannot_apply_and_the_board_can(self):
-        self.propose("add", "build", "sec-scan", "review", "Security scan", "")
+        self.propose("add", "build", "sec-scan", "build", "Security scan", "")
         self.assertIn("human action", self.no("pipeline", "apply").stderr)
         self.assertIn("human action", self.no("pipeline", "discard").stderr)
         self.apply()
-        self.assertEqual(self.order(), "shape > spec > build > review > sec-scan > polish > prove > ship > ready")
+        self.assertEqual(self.order(), "shape > spec > build > sec-scan > polish > ship > ready")
         self.assertEqual([c["id"] for c in self.saved()["stages"]], ["sec-scan"])
         self.assertIn("pending: nothing", self.ok("pipeline", "show").stdout)
 
     def test_any_stage_can_be_moved_or_removed_when_the_checks_still_have_what_they_need(self):
-        self.propose("remove", "build", "review")
-        self.propose("move", "build", "prove", "build")
+        self.propose("remove", "build", "polish")
         self.propose("add", "build", "first", "start", "First", "Runs first")
         self.apply()
-        self.assertEqual(self.order(), "first > shape > spec > build > prove > polish > ship > ready")
+        self.assertEqual(self.order(), "first > shape > spec > build > ship > ready")
         self.change("remove", "review", "reconcile")
         self.assertEqual(self.order("review"), "scope > review > verify > report > ready")
 
     def test_a_move_is_reported_as_one_move(self):
-        r = self.propose("move", "build", "polish", "prove")
+        r = self.propose("move", "build", "shape", "spec")
         self.assertEqual(r.stdout.count("move "), 1)
         self.assertIn("in build", r.stdout.split("proposed:")[1])
 
@@ -78,8 +77,8 @@ class TestPropose(Pipeline):
             (("remove", "build", "build"), "build cannot be removed"),
             (("remove", "build", "ship"), "ship cannot be removed: it is where you click Commit locally"),
             (("remove", "review", "report"), "report cannot be removed"),
+            (("remove", "prove", "prove"), "prove cannot be removed: it is the check"),
             (("move", "build", "build", "start"), "build has to come after spec"),
-            (("move", "build", "review", "start"), "review has to come after build"),
             (("move", "build", "polish", "shape"), "polish has to come after build"),
             (("move", "build", "ship", "shape"), "ship has to be the last stage"),
             (("add", "build", "late", "ship", "Late", ""), "ship has to be the last stage"),
@@ -95,7 +94,7 @@ class TestPropose(Pipeline):
             (("add", "build", "review", "shape", "X", ""), "built-in stage name"),
             (("add", "build", "Bad Id", "shape", "X", ""), "not a stage id"),
             (("add", "build", "ok-id", "nowhere", "X", ""), "is not a stage here"),
-            (("add", "deploy", "ok-id", "shape", "X", ""), "build or review"),
+            (("add", "deploy", "ok-id", "shape", "X", ""), "build, review or prove"),
             (("add", "build", "ok-id", "shape", "", ""), "label"),
             (("add", "build", "ok-id", "shape", "X", "", "no-such-skill"), "no skill named"),
             (("add", "build", "ok-id", "shape"), "usage"),
@@ -108,7 +107,7 @@ class TestPropose(Pipeline):
         self.assertIn("pending: nothing", self.ok("pipeline", "show").stdout)
 
     def test_a_stage_may_describe_anything_in_its_brief(self):
-        self.propose("add", "build", "sync", "prove", "Sync", "commit everything and git pull")
+        self.propose("add", "build", "sync", "polish", "Sync", "commit everything and git pull")
         self.apply()
         self.assertIn("sync", self.order())
 
@@ -121,7 +120,7 @@ class TestPropose(Pipeline):
     def test_a_proposal_made_before_the_pipeline_changed_is_refused(self):
         self.propose("add", "build", "aa", "shape", "A", "")
         self.file.write_text(json.dumps({"stages": [{"id": "zz", "workflow": "build", "label": "Z", "brief": ""}],
-                                         "order": {"build": ["shape", "spec", "build", "review", "polish", "prove", "zz", "ship"], "review": ["scope", "review", "reconcile", "verify", "report"]}}))
+                                         "order": {"build": ["shape", "spec", "build", "polish", "zz", "ship"], "review": ["scope", "review", "reconcile", "verify", "report"]}}))
         self.board()
         st, _ = self.http("POST", "/api/build/applypipe", body={"id": ""})
         self.assertEqual(st, 409)
@@ -137,18 +136,18 @@ class TestBoard(Pipeline):
 
     def test_the_board_gets_the_order_the_labels_and_the_waiting_change(self):
         first = self.stages_payload()
-        self.assertEqual(first["order"], ["shape", "spec", "build", "review", "polish", "prove", "ship", "ready"])
+        self.assertEqual(first["order"], ["shape", "spec", "build", "polish", "ship", "ready"])
         self.assertEqual((first["custom"], first["proposal"]), ({}, None))
-        self.propose("add", "build", "qa-pass", "review", "QA pass", "Check by hand")
-        self.propose("move", "build", "prove", "build")
+        self.propose("add", "build", "qa-pass", "build", "QA pass", "Check by hand")
+        self.propose("add", "build", "extra", "shape", "Extra", "")
         waiting = self.stages_payload()["proposal"]
-        self.assertEqual(sorted(waiting["changed"]), ["prove", "qa-pass"])
-        self.assertEqual(waiting["order"]["build"], ["shape", "spec", "build", "prove", "review", "qa-pass", "polish", "ship", "ready"])
+        self.assertEqual(sorted(waiting["changed"]), ["extra", "qa-pass"])
+        self.assertEqual(waiting["order"]["build"], ["shape", "extra", "spec", "build", "qa-pass", "polish", "ship", "ready"])
         self.assertEqual(len(waiting["ops"]), 2)
         self.assertFalse(waiting["stale"])
         self.apply()
         done = self.stages_payload()
-        self.assertEqual(done["order"][2:4], ["build", "prove"])
+        self.assertEqual(done["order"][2:4], ["spec", "build"])
         self.assertEqual(done["custom"]["qa-pass"], {"label": "QA pass", "blurb": "Check by hand"})
         self.assertIsNone(done["proposal"])
         self.assertEqual(self.stages_payload("review")["order"], ["scope", "review", "reconcile", "verify", "report", "ready"])
@@ -189,35 +188,28 @@ class TestRunning(Pipeline):
         self.human("unblock", "j")
         self.assertEqual(self.stage("j"), "extra")
 
-    def test_with_review_removed_the_gate_passes_the_job_straight_to_polish(self):
-        self.change("remove", "build", "review")
+    def test_with_polish_removed_the_gate_passes_the_job_straight_to_ship(self):
+        self.change("remove", "build", "polish")
         self.to_gate("j")
         self.assertIn("GATE: PASS", self.run_gate("j"))
-        self.no("advance", "j", "review")
-        self.no("advance", "j", "prove")
-        self.adv("j", "polish")
-        self.wf("j", "polish.md", "STATUS: DONE\n")
-        self.adv("j", "gate")
-        self.assertIn("GATE: PASS", self.run_gate("j"))
-        self.adv("j", "prove")
+        self.no("advance", "j", "polish")
+        self.adv("j", "ship")
 
-    def test_with_polish_before_review_the_gate_runs_after_each_and_goes_on_to_the_next(self):
-        self.change("move", "build", "polish", "build")
-        self.assertEqual(self.order(), "shape > spec > build > polish > review > prove > ship > ready")
+    def test_the_gate_runs_after_each_stage_and_goes_on_to_the_next(self):
+        self.change("add", "build", "qa-pass", "build", "QA pass", "")
         self.to_gate("j")
         self.assertIn("GATE: PASS", self.run_gate("j"))
-        self.no("advance", "j", "review")
+        self.no("advance", "j", "polish")
+        self.adv("j", "qa-pass")
+        self.wf("j", "qa-pass.md", "STATUS: READY\n")
         self.adv("j", "polish")
         self.wf("j", "polish.md", "STATUS: DONE\n")
         self.adv("j", "gate")
         self.assertIn("GATE: PASS", self.run_gate("j"))
-        self.no("advance", "j", "prove")
-        self.adv("j", "review")
-        self.pass_reviews("j")
-        self.adv("j", "prove")
+        self.adv("j", "ship")
 
     def test_a_failed_gate_still_sends_the_job_back_to_build_wherever_it_sits(self):
-        self.change("remove", "build", "review")
+        self.change("remove", "build", "polish")
         self.set_config(checks="false")
         self.to_gate("j", change=False)
         self.assertIn("GATE: FAIL", self.run_gate("j"))
@@ -281,13 +273,13 @@ class TestPerProject(Review):
         a, b = self.root, self.base / "other"
         b.mkdir()
         self.git("init", "-b", "main", cwd=b)
-        self.apply_in(a, "add", "build", "sec-scan", "review", "Security scan", "")
+        self.apply_in(a, "add", "build", "sec-scan", "build", "Security scan", "")
         self.assertTrue((a / ".planning" / "factory" / "pipeline.json").exists())
-        self.assertEqual(self.order_in(a), "shape > spec > build > review > sec-scan > polish > prove > ship > ready")
+        self.assertEqual(self.order_in(a), "shape > spec > build > sec-scan > polish > ship > ready")
         self.assertEqual(self.order_in(b), BUILD_DEFAULT)
         self.apply_in(b, "add", "build", "lint-pass", "build", "Lint pass", "")
-        self.assertEqual(self.order_in(b), "shape > spec > build > lint-pass > review > polish > prove > ship > ready")
-        self.assertEqual(self.order_in(a), "shape > spec > build > review > sec-scan > polish > prove > ship > ready")
+        self.assertEqual(self.order_in(b), "shape > spec > build > lint-pass > polish > ship > ready")
+        self.assertEqual(self.order_in(a), "shape > spec > build > sec-scan > polish > ship > ready")
         for root in (a, b):
             self.assertEqual(self.order_in(root, "review"), REVIEW_DEFAULT)
 

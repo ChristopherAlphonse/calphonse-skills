@@ -8,19 +8,18 @@ const BUILD_STAGES: Stage[] = [
     label: "Build",
     blurb: "Write the code, then the checks run.",
   },
-  {
-    id: "review",
-    label: "Review",
-    blurb: "Independent reviewers read the change.",
-  },
   { id: "polish", label: "Polish", blurb: "Strip comments and workarounds." },
-  { id: "prove", label: "Prove", blurb: "Run it for real and write the UAT." },
   {
     id: "ship",
     label: "Ship",
     blurb: "PR body and commit message. You commit.",
   },
   { id: "ready", label: "Ready", blurb: "Committed locally." },
+];
+
+const PROVE_STAGES: Stage[] = [
+  { id: "prove", label: "Prove", blurb: "Run it for real and write the UAT." },
+  { id: "ready", label: "Ready", blurb: "UAT written. Nothing was edited." },
 ];
 
 const REVIEW_STAGES: Stage[] = [
@@ -98,7 +97,6 @@ export const BOARD_DEFINITIONS: Record<string, Omit<BoardDefinition, "id" | "lab
           : []),
       ],
       ...stackChips(job),
-      ...(job.stage === "review" ? [reviewVerdictChips(job)] : []),
     ],
   },
   review: {
@@ -144,5 +142,26 @@ export const BOARD_DEFINITIONS: Record<string, Omit<BoardDefinition, "id" | "lab
         ? [reviewVerdictChips(job)]
         : []),
     ],
+  },
+  prove: {
+    blurb: "Check a finished task works for real. Never edits code.",
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    stages: PROVE_STAGES,
+    lane: "Prove jobs",
+    columns: 2,
+    homeStage: "prove",
+    doneLabel: "Proved",
+    intro: "Runs the real thing and writes a UAT. Nothing is edited, committed, pushed or posted.",
+    kind: "Prove",
+    stats: (job) => [
+      [job.report.STATUS ?? "-", "result"],
+      [job.files.length, "files"],
+    ],
+    place: (job) => job.title,
+    humanActionPath: () => "unblock",
+    statusBits: (job) =>
+      job.report.STATUS
+        ? [[{ text: `UAT ${job.report.STATUS}`, cls: job.report.STATUS }]]
+        : [],
   },
 };

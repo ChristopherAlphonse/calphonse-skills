@@ -16,7 +16,7 @@ export type RequestOptions = { method?: string; body?: string };
 export type RequestFn = (path: string, options?: RequestOptions) => Promise<Response>;
 
 const REQUEST_TIMEOUT_MS = 10_000;
-const REPORT_FIELDS: ReportField[] = ["FINDINGS", "BLOCKERS"];
+const REPORT_FIELDS: ReportField[] = ["FINDINGS", "BLOCKERS", "STATUS"];
 
 type UnknownRecord = Record<string, unknown>;
 
