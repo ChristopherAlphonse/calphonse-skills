@@ -368,6 +368,38 @@ class TestShapeSpec(Factory):
         self.no("edit", "j", "shape.md", "x", "y", extra_env={"FACTORY_CHAT_KEY": "wrong"})
         self.chat("edit", "j", "shape.md", "x", "y")
 
+    def test_standing_rules_change_only_from_the_chat_bar_and_reach_every_job(self):
+        self.ok("create", "a", "A")
+        self.ok("create", "b", "B")
+        self.chat_key()
+        self.no("standing", "add", "plain push is fine")
+        self.chat("standing", "add", "plain push is fine")
+        self.chat("standing", "add", "never touch infra/")
+        self.assertIn("2. never touch infra/", self.ok("standing").stdout)
+        queue = self.ok("queue").stdout
+        self.assertEqual(queue.count("USER STANDING RULES for every job, follow them: plain push is fine; never touch infra/"), 2)
+        self.chat("standing", "rm", "1")
+        self.chat_no("standing", "rm", "5")
+        self.assertNotIn("plain push", self.ok("queue").stdout)
+        self.assertIn("standing-rm", (self.state / "audit.log").read_text())
+
+    def test_times_adds_up_each_stage_from_the_audit_log(self):
+        self.assertIn("no stage moves", self.ok("times").stdout)
+        self.state.mkdir(parents=True, exist_ok=True)
+        events = [("00:00", "create", "T"), ("00:00", "start", "shape"), ("00:10", "advance", "shape -> spec"),
+                  ("02:10", "approve", "spec"), ("02:40", "advance", "spec -> build"), ("03:00", "advance", "build -> gate"),
+                  ("03:05", "advance", "gate -> build"), ("03:25", "advance", "build -> gate"), ("03:30", "advance", "gate -> ship"),
+                  ("03:31", "advance", "ship -> ready")]
+        with open(self.state / "audit.log", "w") as f:
+            for hm, action, detail in events:
+                f.write(json.dumps({"ts": f"2026-01-01T{hm}:00Z", "actor": "agent", "action": action, "job": "j", "detail": detail}) + "\n")
+        rows = {l.split()[0]: l.split()[1:] for l in self.ok("times").stdout.splitlines()[1:-1]}
+        self.assertEqual(rows["spec"], ["1", "2.5h", "2.5h", "2.5h"])
+        self.assertEqual(rows["build"], ["2", "20m", "20m", "40m"])
+        self.assertEqual(rows["gate"], ["2", "5m", "5m", "10m"])
+        self.assertEqual(list(rows)[0], "spec")
+        self.assertNotIn("ready", rows)
+
     def test_edit_changes_one_exact_piece_and_keeps_approval(self):
         self.new_spec("j", spec=False)
         self.wf("j", "spec.md", "# s\n- No button.\n- No button.\n")

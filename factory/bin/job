@@ -113,7 +113,19 @@ def hint_for(job):
     if hint and off:
         out += f" | USER TURNED OFF, do not use: {', '.join(sorted(off))}"
     note = job.get("briefs", {}).get(job["stage"])
-    return out + (f" | USER NOTE for this stage, follow it: {' '.join(note.split())}" if hint and note else "")
+    out += f" | USER NOTE for this stage, follow it: {' '.join(note.split())}" if hint and note else ""
+    rules = standing_rules()
+    return out + (f" | USER STANDING RULES for every job, follow them: {'; '.join(rules)}" if hint and rules else "")
+
+
+STANDING_FILE = STATE / "standing.md"
+
+
+def standing_rules():
+    try:
+        return [l[2:].strip() for l in STANDING_FILE.read_text().splitlines() if l.startswith("- ")]
+    except OSError:
+        return []
 
 
 def die(msg):
@@ -553,6 +565,44 @@ def audited_state(jid, lines=None):
         elif a == "commit" and human:
             st["commit"] = e["detail"]
     return st
+
+
+def stage_spans(lines):
+    """Each job's (stage, seconds spent in it), walked from the audit log. The stage a job is in now runs to now."""
+    def secs(ts):
+        return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
+    entered, spans = {}, []
+    for e in lines + [{"job": j, "action": "now", "actor": "", "ts": now()} for j in {e.get("job") for e in lines} if j]:
+        jid = e.get("job")
+        if not jid:
+            continue
+        stage = audited_state(jid, [e])["stage"]
+        if stage and e["action"] != "now" and entered.get(jid, ("",))[0] == stage:
+            continue  # `create` then `start` name the same first stage
+        if e["action"] == "now" or stage:
+            if jid in entered:
+                prev, since = entered[jid]
+                spans.append((jid, prev, secs(e["ts"]) - since))
+            if stage and stage not in TERMINAL:
+                entered[jid] = (stage, secs(e["ts"]))
+            else:
+                entered.pop(jid, None)
+    return spans
+
+
+def cmd_times():
+    """Where the time goes: per stage, how many jobs passed through it and how long they stayed."""
+    by = {}
+    for jid, stage, t in stage_spans(audit_lines()):
+        by.setdefault(stage, []).append(t)
+    if not by:
+        return print("no stage moves in the audit log yet")
+    fmt = lambda t: f"{t / 3600:.1f}h" if t >= 3600 else f"{t / 60:.0f}m"
+    print(f"{'stage':<14}{'visits':>7}{'median':>9}{'max':>9}{'total':>9}")
+    for stage, ts in sorted(by.items(), key=lambda kv: -sum(kv[1])):
+        ts.sort()
+        print(f"{stage:<14}{len(ts):>7}{fmt(ts[len(ts) // 2]):>9}{fmt(ts[-1]):>9}{fmt(sum(ts)):>9}")
+    print("needs-human and spec include time waiting on you; a stage visited more than once per job looped back.")
 
 
 def integrity_problems(job, lines=None):
@@ -1154,6 +1204,26 @@ def cmd_edit(jid, name, old, new):
         save(job)
 
 
+@serialized
+def cmd_standing(*args):
+    """The user's rules for every job ("plain push is fine"), said once in the chat bar. Advice only: policy still enforces."""
+    if not args:
+        return print("\n".join(f"{i}. {r}" for i, r in enumerate(standing_rules(), 1)) or "no standing rules")
+    need(from_chat_bar(), "standing rules change only from the board's chat bar")
+    rules, (op, *rest) = standing_rules(), args
+    text = " ".join(" ".join(rest).split())[:300]
+    if op == "add" and text:
+        rules.append(text)
+    elif op == "rm" and text.isdigit() and 1 <= int(text) <= len(rules):
+        text = rules.pop(int(text) - 1)
+    else:
+        die("usage: standing | standing add <text> | standing rm <number>")
+    STATE.mkdir(parents=True, exist_ok=True)
+    STANDING_FILE.write_text("".join(f"- {r}\n" for r in rules))
+    audit(f"standing-{op}", "", text[:200])
+    print(f"standing rules now: {len(rules)}")
+
+
 def human_only():
     need(is_human(), "this is a human action, use the board")
 
@@ -1500,6 +1570,8 @@ def ask_system(jid, board="build", act=False):
             + f"To change the board run only: {me} skill <id> <name> on|off, "
             f"{me} brief <id> <stage> <text> (empty text clears), {me} note <id> <text>, {me} pipeline show|propose|clear (adding, removing or moving a stage; the guide below has the exact form), {me} edit <id> <file.md> <old text> <new text> (one exact, unique piece of a job file such as spec.md; when the user comments on lines or asks for a change to a job file, make it with this instead of a brief). "
             + "Plain git add, commit and push are allowed; force pushes are not. "
+            + f"When the user states a rule for every job (\"plain push is fine\", \"never touch infra/\"), save it with {me} standing add <text>; {me} standing lists them, {me} standing rm <number> removes one. "
+            + (f"Their standing rules now: {'; '.join(standing_rules())}. " if standing_rules() else "")
             + ("Unblock is a button the user clicks. " if review else "Approve spec, Commit locally and Unblock are buttons the user clicks: say which one. ")
             + (BOT_PERSONA if act else "")
             + (f"ACT MODE: the user chose Act. When they ask for work and no job exists, start one yourself with `{me} create <id> <title>` (a build job), `{me} create <id> <title> --investigate` for a read-only look into a question with no diff, or `{me} create <id> <title> --prove` to check that a finished task works for real. Use only those forms, pick a short lowercase id, then tell them to select it on the board. "
@@ -1516,7 +1588,7 @@ HUMAN_ONLY = {"approve", "commit", "unblock"}
 
 COMMANDS = {
     "create": (cmd_create, None), "advance": (cmd_advance, 2), "gate": (cmd_gate, 1), "stack": (cmd_stack, 1), "watch": (cmd_watch, 1), "board": (cmd_board, 0),
-    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_watch, 1), "pipeline": (cmd_pipeline, 0), "skill": (cmd_skill, 3), "brief": (cmd_brief, 3), "edit": (cmd_edit, 4), "wait": (cmd_wait, 1), "close": (cmd_close, 1), "prune": (cmd_prune, 0), "retire": (cmd_retire, 1),
+    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_watch, 1), "pipeline": (cmd_pipeline, 0), "standing": (cmd_standing, 0), "times": (cmd_times, 0), "skill": (cmd_skill, 3), "brief": (cmd_brief, 3), "edit": (cmd_edit, 4), "wait": (cmd_wait, 1), "close": (cmd_close, 1), "prune": (cmd_prune, 0), "retire": (cmd_retire, 1),
 }
 
 if __name__ == "__main__":
@@ -1529,7 +1601,7 @@ if __name__ == "__main__":
     if name in ("serve", "watch", "wait") and not args:
         args = {"serve": "8765", "watch": str(WATCH_FIRST_PORT), "wait": "90"}[name]
         args = [args]
-    if name == "pipeline":
+    if name in ("pipeline", "standing"):
         pass
     elif name == "create":
         need(len(args) in (2, 3, 4, 5, 7), "create takes <id> <title> [--repo DIR] [--review BASE HEAD | --investigate | --prove]")

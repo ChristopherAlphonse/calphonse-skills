@@ -43,7 +43,8 @@ KIRO_TOOLS = ["read", "write", "shell", "grep", "glob", "subagent"]
 STAGE_TOOLS = [t for t in KIRO_TOOLS if t != "subagent"]  # only the orchestrator spawns agents
 # config.json sets the harness, the allow list and the checks, so no agent may write it.
 NO_WRITE = ["**/.kiro/**", "**/.claude/**", "**/.opencode/**", "**/opencode.json", "**/opencode.jsonc", "**/.git/**",
-            "**/.planning/**/job.json", "**/.planning/**/audit.log", "**/.planning/**/config.json"]
+            "**/.planning/**/job.json", "**/.planning/**/audit.log", "**/.planning/**/config.json",
+            "**/.planning/**/standing.md"]
 WRITE_ONLY = None
 WRITE_AREAS = {
     "planning": ["**/.planning/**"],
