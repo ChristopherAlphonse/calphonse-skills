@@ -21,14 +21,14 @@ import {
   request,
 } from "/static/payloads.js";
 import { drawWires } from "/static/wires.js";
-
-
-
-
-
-
-
-
+             
+            
+         
+      
+        
+        
+                
+                          
 
 const POLL_INTERVAL_MS = 2000;
 const LAYOUT_STORAGE_KEY = "factory.board";
@@ -42,7 +42,7 @@ const viewsByBoardId = new Map                   ();
 let boardOrder           = [];
 let openBoardIds           = [];
 let activeBoardId                = null;
-
+                                                        
 const editorsByKey = new Map                      ();
 let activeEditorKey                = null;
 let currentScale = 1;
@@ -64,12 +64,12 @@ function currentJob()                  {
 }
 
 // The persisted keys stay terse so a layout saved by an older page still loads.
-
-
-
-
-
-
+                        
+                  
+                     
+                 
+                         
+ 
 
 function saveLayout()       {
   const layout               = {
@@ -677,7 +677,7 @@ function renderPanel()       {
   requireElement("panel").replaceChildren(...(job ? renderJobView(job) : renderOverview()));
 }
 
-
+                                               
 
 async function readFileSnapshot(boardId        , jobId        , fileName        )                           {
   try {

@@ -29,8 +29,8 @@ POLICY_EXTRA = ["policy.build.yaml"]  # more rule files this skill loads
 # ask beats broad allow rules such as `eslint *`.
 REWRITE_ASK = []
 PROMPT = ("Use the factory skill and run one pass (factory run). Wait for every stage agent you spawn. "
-          "Never commit, push, merge, or create a PR or MR. Stop after the pass.")
-GIT_WRITES = ["commit", "push", "merge", "cherry-pick", "revert", "rebase", "am",
+          "Plain git commit and git push are allowed; never force-push, merge, or create a PR or MR. Stop after the pass.")
+GIT_WRITES = ["merge", "cherry-pick", "revert", "rebase", "am",
               "commit-tree", "update-ref", "symbolic-ref", "config", "fast-import"]
 GIT_GLOBALS = ["-c", "-C", "--git-dir", "--work-tree", "--namespace"]
 BLOCKED = ([("git", g) for g in GIT_WRITES] + [("git", g) for g in GIT_GLOBALS]
@@ -83,8 +83,8 @@ CLAUDE_DEFAULT_MODEL = "sonnet"
 GEN_VERSION = "factory-gen v1"
 STAMP = re.compile(r"factory-gen v\d+ sha256:[0-9a-f]{64}")
 HARNESS_SOURCE = "set harness in config.json"
-KIRO_DESCRIPTION = "Software factory orchestrator. Runs one pass of the factory skill and never commits, pushes, or opens a PR or MR."
-KIRO_PROMPT = "Use the factory skill. Run one pass and stop. Never commit, push, merge, or create a PR or MR."
+KIRO_DESCRIPTION = "Software factory orchestrator. Runs one pass of the factory skill; plain git commit and push are allowed, never force-push or open a PR or MR."
+KIRO_PROMPT = "Use the factory skill. Run one pass and stop. Plain git commit and push are allowed; never force-push, merge, or create a PR or MR."
 COMMANDS = {
     "claude": lambda p: ["claude", "-p", p],
     "opencode": lambda p: ["opencode", "run", p],
@@ -453,7 +453,7 @@ def stage_prompt(sid, skill, brief, area, preloaded=True):
         ".py -> python, and so on).",
         f"You may write only {AREA_TEXT[area]}. Everything else is read-only.",
         "A `USER TURNED OFF, do not use: ...` line in the brief wins over anything preloaded here: never use a skill it names.",
-        "Never commit, push, merge, rebase, or open a PR or MR, and never use the network.",
+        "Plain git commit and git push are allowed; never force-push, merge, rebase, or open a PR or MR, and never use the network beyond a plain push.",
         "Write the stage's file with its status line first, then reply with one line.",
     ]
     return " ".join(parts)

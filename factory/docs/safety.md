@@ -1,26 +1,27 @@
 # Safety
 
-What stops an agent from committing, pushing, or changing things it should not, and how strong each layer is. For the plain-words version of the same ideas, see [Features](features.md#part-7-the-safety-guards).
+What stops an agent from force-pushing, rewriting history, or changing things it should not, and how strong each layer is. For the plain-words version of the same ideas, see [Features](features.md#part-7-the-safety-guards).
 
 ## Who can do what
 
 | Action | Agent | You, on the board |
 | --- | --- | --- |
 | Create, advance, gate, route, progress | yes, through `bin/job` | no need |
-| Edit code in the worktree | yes, uncommitted | |
+| Edit code in the worktree | yes, may commit | |
 | Approve the spec | no | yes |
-| Commit | no | yes, one click |
+| Commit | yes, plain `git commit` | yes, one click |
 | Unblock a parked job | no | yes |
-| Push, open a PR or MR | no | your own step, outside the factory |
+| Push | yes, plain `git push` | your own step |
+| Open a PR or MR | no | your own step, outside the factory |
 
-`approve`, `commit`, and `unblock` are not CLI commands. They run only from the board.
+The board commands `approve`, `commit`, and `unblock` are not CLI commands. They run only from the board. A plain `git commit` is allowed and is not the board command.
 
 The board binds to localhost and prints a code in its link. The code becomes a session cookie. Every action also needs a custom header and a loopback `Host`. The approval key lives only in the server's memory, and the git hooks check its hash.
 
 The commit click refuses unless all of these hold:
 
 - the gate passed this round, and the working tree is the one that passed
-- the branch holds no commit the board did not make
+- the branch holds no commit the board did not make (an agent's own commit means no click is needed)
 - no protected path was touched
 - the repo's own hooks pass
 

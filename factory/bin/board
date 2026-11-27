@@ -132,7 +132,8 @@ def ask_args(engine, exe, me, system, question, session, model, effort):
         args = [exe, "-p", "--output-format", "json", "--append-system-prompt", system,
                 "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--tools", "Read,Grep,Glob,Bash",
                 "--allowedTools", f"Bash({me} skill:*)", f"Bash({me} brief:*)", f"Bash({me} note:*)", f"Bash({me} edit:*)", f"Bash({me} create:*)",
-                f"Bash({me} pipeline show)", f"Bash({me} pipeline propose:*)", f"Bash({me} pipeline clear)", "Read", "Grep", "Glob"]
+                f"Bash({me} pipeline show)", f"Bash({me} pipeline propose:*)", f"Bash({me} pipeline clear)",
+                "Bash(git add*)", "Bash(git commit*)", "Bash(git push*)", "Read", "Grep", "Glob"]
         args += (["--model", model] if model else []) + (["--effort", effort] if effort else [])
         return args + (["--resume", session] if session else []), question[:4000]
     prompt = f"{system}\n\nUser: {question[:4000]}"

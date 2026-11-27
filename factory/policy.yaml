@@ -3,8 +3,22 @@ rules:
   - capability: shell
     effect: deny
     match:
-      - git push*
-      - git -C * push*
+      # Plain `git commit` and `git push` are allowed below. These spellings rewrite shared history or delete refs.
+      - git push*--force*
+      - git push*-f*
+      - git push*--delete*
+      - git push*--mirror*
+      - git push * :*
+      - git -C * push*--force*
+      - git -C * push*-f*
+      - git -C * push*--delete*
+      - git -C * push*--mirror*
+      - git -C * push * :*
+      - *--amend*
+      - git reset --hard*
+      - git -C * reset --hard*
+      - git clean -f*
+      - git -C * clean -f*
       - aws s3 rm*
       - curl -X POST*
       # Never bypass git hooks: `--no-verify`, `commit -n`, a hooks path override, or pre-commit's skip variables.
@@ -14,12 +28,10 @@ rules:
       - *core.hooksPath*
       - *SKIP=*
       - *PRE_COMMIT_ALLOW_NO_CONFIG*
-  # Backstop: ask beats allow, so the `git -C *` allow patterns cannot pass mutating verbs.
+  # Backstop: ask beats allow, so the `git -C *` allow patterns cannot pass the git verbs still on ask.
   - capability: shell
     effect: ask
     match:
-      - git add*
-      - git -C * add*
       - git am*
       - git -C * am*
       - git apply*
@@ -32,8 +44,6 @@ rules:
       - git -C * clean*
       - git clone*
       - git -C * clone*
-      - git commit*
-      - git -C * commit*
       - git config*
       - git -C * config*
       - git gc*
@@ -135,6 +145,12 @@ rules:
       - whoami
       - git branch
       - git branch *
+      - git add*
+      - git -C * add*
+      - git commit*
+      - git -C * commit*
+      - git push*
+      - git -C * push*
       - git describe *
       - git diff
       - git diff *

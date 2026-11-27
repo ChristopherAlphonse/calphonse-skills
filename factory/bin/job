@@ -397,7 +397,7 @@ def from_polish(job, d, rd, to):
 def from_ship(job, d, rd, to):
     if to == "ready":
         need((d / "pr-body.md").exists(), "pr-body.md missing")
-        need(job["commit"], "nothing committed: the user commits locally from the board")
+        need(job["commit"] or branch_has_commit(job), "nothing committed: commit the branch or click Commit locally")
     elif to == "build":
         to = bump_round(job)
     return to
@@ -502,6 +502,15 @@ def changed_files(cwd, base="HEAD"):
 
 def base_of(job):
     return job.get("base_commit") or "HEAD"
+
+
+def branch_has_commit(job):
+    """True when an agent or the user committed on the job's worktree branch."""
+    wt = job["worktree"]
+    if not wt or not Path(wt).exists():
+        return False
+    head = git(["rev-parse", "HEAD"], wt).stdout.strip()
+    return bool(head) and head != base_of(job)
 
 
 def protected_hits(cwd, base="HEAD"):
@@ -1483,6 +1492,7 @@ def ask_system(jid, board="build", act=False):
             + ("This is a read-only review: never edit, create, or delete code, and never post anywhere. " if review else "")
             + f"To change the board run only: {me} skill <id> <name> on|off, "
             f"{me} brief <id> <stage> <text> (empty text clears), {me} note <id> <text>, {me} pipeline show|propose|clear (adding, removing or moving a stage; the guide below has the exact form), {me} edit <id> <file.md> <old text> <new text> (one exact, unique piece of a job file such as spec.md; when the user comments on lines or asks for a change to a job file, make it with this instead of a brief). "
+            + "Plain git add, commit and push are allowed; force pushes are not. "
             + ("Unblock is a button the user clicks. " if review else "Approve spec, Commit locally and Unblock are buttons the user clicks: say which one. ")
             + (BOT_PERSONA if act else "")
             + (f"ACT MODE: the user chose Act. When they ask for work and no job exists, start one yourself with `{me} create <id> <title>` (a build job), `{me} create <id> <title> --investigate` for a read-only look into a question with no diff, or `{me} create <id> <title> --prove` to check that a finished task works for real. Use only those forms, pick a short lowercase id, then tell them to select it on the board. "

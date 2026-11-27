@@ -2,7 +2,7 @@
 
 The factory takes a feature from idea to a reviewed, committed change on a local branch. It does this by chaining the other skills in this repo as stages. A script moves each job from stage to stage and checks the evidence before every move. You follow the work, approve, and chat on a board of connected stages.
 
-No stage agent pushes or opens a PR or MR, and the job's commit is the one you make by clicking a button on the board. You can tell the orchestrator in chat to commit or push, and it will.
+Agents may use plain `git commit` and `git push`. Force pushes are blocked, and no agent opens a PR or MR. You can also commit from the board with **Commit locally**.
 
 It also reviews an existing branch or diff: a review job scopes the change, runs independent reviewers, reconciles and verifies their findings, and writes a report with paste-ready comments. A review never writes code and never posts unless you say so. A prove job checks that a finished task works for real and writes a UAT.
 
@@ -24,7 +24,7 @@ stateDiagram-v2
     polish --> gate: polish.md says DONE
     polish --> build: REWORK
     gate --> ship: GATE PASS after polish
-    ship --> ready: you click Commit locally
+    ship --> ready: a commit exists (your click or an agent)
     ready --> [*]
     rejected --> [*]
     build --> needs_human: BLOCKED, or rounds used up
@@ -43,7 +43,7 @@ stateDiagram-v2
 3. Install the policy for your harness: `bin/tick install claude`.
 4. Start a job in Claude Code with `/factory <feature idea>`.
 5. Open the board with `bin/job board`, then open the address it prints.
-6. Click **Approve spec** when the spec is right, and **Commit locally** when the job reaches ship.
+6. Click **Approve spec** when the spec is right. At ship, click **Commit locally** only if an agent has not already committed the branch.
 7. Keep passes going after your clicks: run `bin/tick loop claude` in a spare terminal, or use `/loop 5m /factory run`.
 
 Gitignore `.planning/` and `.worktrees/` in the project.
@@ -55,11 +55,12 @@ To review a branch instead: `bin/job create <id> "<title>" --review BASE HEAD`, 
 | Action | Agent | You, on the board |
 | --- | --- | --- |
 | Create, advance, gate, route, progress | yes, through `bin/job` | no need |
-| Edit code in the worktree | yes, uncommitted | |
+| Edit code in the worktree | yes, may commit | |
 | Approve the spec | no | yes |
-| Commit | no | yes, one click |
+| Commit | yes, plain `git commit` | yes, one click |
 | Unblock a parked job | no | yes |
-| Push, open a PR or MR | no | your own step, outside the factory |
+| Push | yes, plain `git push` | your own step |
+| Open a PR or MR | no | your own step, outside the factory |
 
 ## Where to read more
 

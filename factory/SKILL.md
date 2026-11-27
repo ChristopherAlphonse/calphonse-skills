@@ -1,6 +1,6 @@
 ---
 name: factory
-description: Take a feature from idea to a reviewed local commit by chaining this repo's skills as stages (shape, spec, build, polish, ship) on a board of connected stages. Use when the user wants a whole feature driven end to end, a software factory, a pipeline, or the board. Also runs read-only code reviews of a branch or diff as review jobs, with a verified report and paste-ready comments. Stage agents never commit, push, or open a PR/MR on their own, and the user can tell the orchestrator to; a review never edits code or posts unless the user says so.
+description: Take a feature from idea to a reviewed local commit by chaining this repo's skills as stages (shape, spec, build, polish, ship) on a board of connected stages. Use when the user wants a whole feature driven end to end, a software factory, a pipeline, or the board. Also runs read-only code reviews of a branch or diff as review jobs, with a verified report and paste-ready comments. Agents may use plain git commit and push; force pushes, PRs and MRs stay out of reach; a review never edits code or posts unless the user says so.
 ---
 
 # Factory
@@ -51,12 +51,12 @@ Only the user changes the pipeline: an agent can propose a change with `JOB pipe
 
 These hold in every harness and are enforced by structure, not by this text.
 
-- **Baseline shell rules.** `policy.yaml` is the human-in-the-loop baseline for every harness (Claude Code, Kiro, OpenCode). It denies `git push`, `aws s3 rm`, and `curl -X POST`, asks before every git verb that changes a repository, and allows a list of read-only commands. Deny beats ask, and ask beats allow. A command no rule names is not allowed, so it waits for a human. `TICK` turns the file into each harness's format and refuses a headless pass until the project's policy covers it. The factory's own denies below are stricter, never looser.
-- **No commit, push, PR, or MR on an agent's own initiative.** Stage agents leave changes uncommitted in the job's worktree. The job's commit is `JOB commit`, which the user triggers from the board. It runs the repo's own hooks and refuses unless the tree matches the one that passed the gate.
-- **Stage agents and unattended `TICK` passes never run** `git commit`, `git push`, `git merge`, `git rebase`, `git config`, `git -c`, `git -C`, `gh`, `glab`, `curl`, or `wget`, and never use the network. Nobody is there to say yes, so policy blocks them.
-- **The user can tell you, in this chat, to commit, push, or open a PR or MR. Then do it.** Their words are the approval. Do the one named action, say plainly what you ran, and do not re-argue the rule. The harness's own permission prompt still applies. Before a push, check the branch and its remote tip. Never force-push unless the user said force, and use `--force-with-lease` with the tip you checked. Never push a branch that is not the one named.
+- **Baseline shell rules.** `policy.yaml` is the human-in-the-loop baseline for every harness (Claude Code, Kiro, OpenCode). It denies force pushes, history rewrites, hook bypasses, `aws s3 rm`, and `curl -X POST`, asks before the other git verbs that change a repository, and allows plain `git add`, `git commit`, `git push` plus read-only commands. Deny beats ask, and ask beats allow. A command no rule names is not allowed, so it waits for a human. `TICK` turns the file into each harness's format and refuses a headless pass until the project's policy covers it. The factory's own denies below are stricter, never looser.
+- **Plain commit and push are allowed for every agent.** A stage agent may commit the worktree, and the user can still click **Commit locally** at ship. That button runs the repo's own hooks and refuses unless the tree matches the one that passed the gate. A job reaches `ready` when the branch holds a commit either way.
+- **Stage agents and unattended `TICK` passes never run** `git merge`, `git rebase`, `git config`, `git -c`, `git -C`, `gh`, `glab`, `curl`, or `wget`, and never use the network beyond a plain push. Nobody is there to say yes to those, so policy blocks them. Force pushes and hook bypasses are denied everywhere.
+- **The user can tell you, in this chat, to commit or push. Then do it.** Their words are the approval. Do the one named action, say plainly what you ran, and do not re-argue the rule. The harness's own permission prompt still applies. Push only the named branch. Force pushes are denied by policy, so do not offer them as a shortcut. Never push to the default branch or any branch the remote protects: check `git symbolic-ref refs/remotes/origin/HEAD` and `gh api repos/{owner}/{repo}/rules/branches/<branch>` (or ask) first, and if it needs a PR, push a new feature branch and open a PR instead. If a push is rejected (`GH013`, "protected branch", "must be made through a pull request"), stop: do not retry, force, or look for a bypass. Push a differently named branch, open the PR, and say so.
 - **Board buttons** (Approve spec, Commit locally, Unblock) are the user's. If the user tells you in chat to press one for a named job, press it in the browser and report that you did. Never press one unasked.
-- **Never** try to run `approve`, `commit`, or `unblock` from the CLI. They are the user's buttons on the board, and the CLI refuses them. Starting the board (`JOB board`, `JOB watch`) is yours to do.
+- **Never** try to run the board commands `approve`, `commit`, or `unblock` from the CLI. They are the user's buttons, and the CLI refuses them. A plain `git commit` is a different thing and is allowed. Starting the board (`JOB board`, `JOB watch`) is yours to do.
 - **Protected paths** (CI config, CODEOWNERS, `.env`, factory config, plus any in `config.json`) fail the gate when touched.
 - **Audit.** Every state change is one line in `.planning/factory/audit.log`.
 - **Board.** Started by `JOB board`. It binds to localhost, redeems the code in its link for a session cookie, and holds the approval key in memory. The user's clicks are the only approvals.
@@ -70,7 +70,7 @@ The harness is `harness` in `.planning/factory/config.json` (`claude`, `opencode
 ## Rules
 
 - `JOB` is the only writer of `job.json`. Never edit it. `JOB advance` checks the files that justify a move and refuses the rest.
-- Builders write code and leave it uncommitted. Reviewers and provers never edit. Fixes go to a builder.
+- Builders write code and may commit it. Reviewers and provers never edit. Fixes go to a builder.
 - A gate passes on a command's output, never on an agent saying "done". `JOB gate` runs `checks` from `.planning/factory/config.json`. If `checks` is empty, stop and ask the user.
 - Each subagent starts fresh. Its prompt gives the job id, the job folder, the worktree and branch, and the stage's one-line brief. It replies with one line.
 - Where the harness lets you pick a model, choose it by stage: the largest for shape, spec, and build (design and code writing); a mid-size one for review (judgment on a diff); the smallest for polish (the comment-sicko pass, a mechanical cleanup), prove and ship (run commands, write the UAT, stage the commit). If a stage proves too hard for its model, rerun it one tier up.
@@ -89,11 +89,11 @@ Each stage's agent writes the file named here with the status line first. `JOB a
 | --- | --- | --- | --- |
 | shape | `lets-talk-about-it`, plus `spike` only if the shape rests on an unknown, then `simplify` on `shape.md` (decisions to approve at the top, below the status line) | `shape.md` with `STATUS: READY`, or `rejection.md` | to `spec`, or `rejected` |
 | spec | `prd-mode`, then its task list, then `simplify` on `spec.md` and the tasks file (decisions to approve at the top, below the status line) | `spec.md`, tasks file under `.planning/tasks/` | **user approves on the board**, then to `build` (this creates the local worktree and branch) |
-| build | `swe` plus stack skills, one task at a time, no commits | `build.md` with `STATUS: READY` or `BLOCKED`. Run `JOB progress <id> <done> <total>` after each task | to `gate`, or `needs-human` when blocked |
+| build | `swe` plus stack skills, one task at a time, may commit | `build.md` with `STATUS: READY` or `BLOCKED`. Run `JOB progress <id> <done> <total>` after each task | to `gate`, or `needs-human` when blocked |
 | gate | `JOB gate <id>` (a script, not an agent) | `round-N/checks.md` with `GATE: PASS` or `FAIL` | to `polish` on pass, `build` on fail |
-| polish | `comment-sicko`, then `simplify` on prose touched | `polish.md` with `STATUS: DONE` or `REWORK`. No commit | to `gate` when done (the gate reruns), `build` when comment-sicko condemns workaround code that needs a real fix |
+| polish | `comment-sicko`, then `simplify` on prose touched | `polish.md` with `STATUS: DONE` or `REWORK`. May commit | to `gate` when done (the gate reruns), `build` when comment-sicko condemns workaround code that needs a real fix |
 | gate again | `JOB gate <id>` | `round-N/checks.md` | to `ship` on pass |
-| ship | `pr-body-style` (+ `demo-script` optional) | `pr-body.md`, and `commit.md` holding the commit message | **user clicks Commit locally on the board**, then to `ready` |
+| ship | `pr-body-style` (+ `demo-script` optional) | `pr-body.md`, and `commit.md` holding the commit message | **user clicks Commit locally on the board** or the branch already holds a commit, then to `ready` |
 
 Stack skills are suggested by `bin/job` from the files in the job's diff, only in the build hint and a review job's review hint, as a file-to-skill map (`suggested stack skills (...): *.ts -> typescript-strict-style`). Other stages get none. Treat it as a suggestion: use the skills the files you touch need. `JOB stack <id>` refreshes it, and leaving build does it for you.
 
@@ -180,7 +180,7 @@ The verifier did not write the reviews and must not trust them. For each ranked 
 
 ## Loop
 
-A pass finds nothing to run, or only `hold` rows, and ends. To continue automatically after the user's click, start `TICK loop <harness> [seconds]` (default 15 seconds). Ask the user before starting it, unless their own instructions (such as `~/.claude/CLAUDE.md`) already authorize it. To start it: run `TICK check <harness>` (and `TICK install <harness>` if it fails), confirm no loop runs with `pgrep -fl "tick loop"`, then `nohup TICK loop <harness> > .planning/factory/loop.log 2>&1 &`. This covers only the loop. Approve, commit, and unblock stay with the user. It reads `JOB queue` and runs a pass whenever a row says `run`, so approving a spec, committing, or unblocking starts the next pass with no chat message. It never approves anything, runs one loop per project, and stops retrying a state that changed no job file in two passes (`stalled`, visible on the board). `--once` does a single check. Alternatively schedule `TICK <harness>` with cron or launchd every few minutes. In Claude Code, `/loop 5m /factory run` does the same interactively. Everything is files, so any pass resumes every job from its stage, in any harness.
+A pass finds nothing to run, or only `hold` rows, and ends. To continue automatically after the user's click, start `TICK loop <harness> [seconds]` (default 15 seconds). Ask the user before starting it, unless their own instructions (such as `~/.claude/CLAUDE.md`) already authorize it. To start it: run `TICK check <harness>` (and `TICK install <harness>` if it fails), confirm no loop runs with `pgrep -fl "tick loop"`, then `nohup TICK loop <harness> > .planning/factory/loop.log 2>&1 &`. This covers only the loop. The board buttons Approve spec, Commit locally and Unblock stay with the user; plain `git commit` and `git push` are allowed. It reads `JOB queue` and runs a pass whenever a row says `run`, so approving a spec, committing on the board, or unblocking starts the next pass with no chat message. It never approves anything, runs one loop per project, and stops retrying a state that changed no job file in two passes (`stalled`, visible on the board). `--once` does a single check. Alternatively schedule `TICK <harness>` with cron or launchd every few minutes. In Claude Code, `/loop 5m /factory run` does the same interactively. Everything is files, so any pass resumes every job from its stage, in any harness.
 
 ## Board
 
@@ -190,7 +190,7 @@ The page has a collapsible left sidebar that lists the boards: Feature shows bui
 
 ## Out of scope
 
-No stage or unattended pass pushes, opens a PR or MR, merges, or deploys. `ready` means a local commit exists and a PR body is written. The user pushes and opens the MR by their own process, or tells you in chat to do it (see Enterprise policy).
+No stage or unattended pass opens a PR or MR, merges, or deploys. Plain pushes are allowed. `ready` means a local commit exists and a PR body is written. The user opens the MR by their own process, or tells you in chat to push (see Enterprise policy).
 
 ## Small tasks
 
