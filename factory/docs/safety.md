@@ -31,9 +31,9 @@ The layers differ in strength. Only your remote's rules stop an agent that runs 
 
 ```mermaid
 flowchart TD
-    A["Agent tries to commit or push"] --> B{"Does a deny rule match?"}
+    A["Agent tries a destructive git command"] --> B{"Does a deny rule match?"}
     B -- yes --> X["Blocked by Claude Code"]
-    B -- no --> D["The commit or push happens, and your project's own hooks run"]
+    B -- no --> D["A plain commit or push happens, and your project's own hooks run"]
     R["Branch protection on your remote"] -.-> S["The one layer an agent on your machine cannot edit"]
 ```
 
