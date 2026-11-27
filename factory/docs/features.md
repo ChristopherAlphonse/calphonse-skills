@@ -48,6 +48,8 @@ Each stage is a box called a **node**, joined by lines like a subway map. Each j
 
 ### 1.6.1 One lane per repo
 
+A small, clear change does not need the whole chain. `bin/job create <id> "<title>" --quick` (or ask the chat bar for a quick job) runs spec, build, gate and ship only. Shape, polish and any custom stages are skipped. You still approve the spec, and the gate still runs your checks.
+
 When your project folder holds several repos (a GitLab group, say), give each job its repo: `bin/job create <id> "<title>" --repo <dir>`. The board then draws one **lane** per repo: the repo's name, then its own row of stages, with that repo's jobs on it. Each repo's agent moves along its own lane, so you see every repo's progress at once instead of one long line. A board with no `--repo` jobs looks as before. Each chip also shows the job's latest "now:" note under its title.
 
 ### 1.7 Filters
