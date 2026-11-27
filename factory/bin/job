@@ -278,19 +278,29 @@ def build_files(job):
     return changed_files(job["worktree"] or repo_of(job), base_of(job))
 
 
+def investigating(job):
+    return (job.get("review") or {}).get("mode") == "investigate"
+
+
 def review_files(job):
+    if investigating(job):
+        return []
     return git_files(["diff", "--name-only", "-z", job["review"]["base"], job["review"]["head"]], repo_of(job))
 
 
 @serialized
 def cmd_create(jid, title, *opts):
-    usage = "usage: create <id> <title> [--repo DIR] [--review BASE HEAD]"
+    usage = "usage: create <id> <title> [--repo DIR] [--review BASE HEAD | --investigate]"
     opts, repo = list(opts), None
+    investigate = opts == ["--investigate"]
     if opts[:1] == ["--repo"]:
         need(len(opts) >= 2, usage)
         repo, opts = resolve_repo(opts[1]), opts[2:]
-    need(len(opts) in (0, 3) and (not opts or opts[0] == "--review"), usage)
-    review = resolve_review(opts[1], opts[2], Path(repo) if repo else ROOT) if opts else None
+    need(investigate or (len(opts) in (0, 3) and (not opts or opts[0] == "--review")), usage)
+    if investigate:
+        review = {"mode": "investigate", "base_ref": "", "head_ref": "", "base": "", "head": ""}
+    else:
+        review = resolve_review(opts[1], opts[2], Path(repo) if repo else ROOT) if opts else None
     d = jobdir(jid)
     need(not d.exists(), f"{jid} exists")
     d.mkdir(parents=True)
@@ -303,14 +313,15 @@ def cmd_create(jid, title, *opts):
     }
     if review:
         job.update(stage=pipeline_order("review")[0], round=1, review=review)
-        try:
-            make_worktree(job)
-        except BaseException:
-            shutil.rmtree(d)
-            raise
+        if not investigate:
+            try:
+                make_worktree(job)
+            except BaseException:
+                shutil.rmtree(d)
+                raise
         job["stack"] = detect_stack(review_files(job))
     save(job)
-    audit("create-review" if review else "create", jid, f"{review['base_ref']}..{review['head_ref']}" if review else title)
+    audit("create-review" if review else "create", jid, "investigation" if investigate else f"{review['base_ref']}..{review['head_ref']}" if review else title)
     audit("start", jid, job["stage"])
     print(jid)
     announce_board()
@@ -1489,7 +1500,8 @@ def ask_system(jid, board="build", act=False):
             f"{me} brief <id> <stage> <text> (empty text clears), {me} note <id> <text>, {me} pipeline show|propose|clear (adding, removing or moving a stage; the guide below has the exact form), {me} edit <id> <file.md> <old text> <new text> (one exact, unique piece of a job file such as spec.md; when the user comments on lines or asks for a change to a job file, make it with this instead of a brief). "
             + ("Unblock is a button the user clicks. " if review else "Approve spec, Commit locally and Unblock are buttons the user clicks: say which one. ")
             + (BOT_PERSONA if act else "")
-            + ("ACT MODE: the user chose Act. A pipeline change you propose is applied for them the moment you finish, so propose exactly what they asked and nothing else, and do not tell them to click Apply. "
+            + (f"ACT MODE: the user chose Act. When they ask for work and no job exists, start one yourself with `{me} create <id> <title>` (a build job), or `{me} create <id> <title> --investigate` for a read-only look into a question with no diff. Use only those two forms, pick a short lowercase id, then tell them to select it on the board. "
+               "A pipeline change you propose is applied for them the moment you finish, so propose exactly what they asked and nothing else, and do not tell them to click Apply. "
                "A request to add a workflow, task, node, step or stage is a request to run `pipeline propose add`. Do it. Never refuse it, never ask a question first, and never push back on it: only the command may refuse. "
                "What the new stage would do (commit, push, repeat on a timer) is the stage agent's business, not a reason to decline; add the stage and say in one sentence what will block. " if act else
                "CHAT MODE: a pipeline change you propose waits for the user's Apply click on the board. ")
@@ -1518,7 +1530,7 @@ if __name__ == "__main__":
     if name == "pipeline":
         pass
     elif name == "create":
-        need(len(args) in (2, 4, 5, 7), "create takes <id> <title> [--repo DIR] [--review BASE HEAD]")
+        need(len(args) in (2, 3, 4, 5, 7), "create takes <id> <title> [--repo DIR] [--review BASE HEAD | --investigate]")
     else:
         need(len(args) == arity, f"{name} takes {arity} args")
     fn(*args)

@@ -52,7 +52,7 @@ stateDiagram-v2
 
 Gitignore `.planning/` and `.worktrees/` in the project.
 
-To review a branch instead: `bin/job create <id> "<title>" --review BASE HEAD`, then `/factory run`.
+To review a branch instead: `bin/job create <id> "<title>" --review BASE HEAD`, then `/factory run`. To look into a question with no diff (an audit, "how good is X?"): `bin/job create <id> "<title>" --investigate`. In a new project, `/factory` sets itself up on the first run and Factory Bot can start the job from the board's chat.
 
 ## Who can do what
 

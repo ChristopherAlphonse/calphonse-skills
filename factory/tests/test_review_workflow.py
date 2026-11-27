@@ -67,6 +67,22 @@ class TestCreate(Review):
         self.ok("create", "good", "T", "--review", "main", "feature/x")
         self.no("create", "good", "T", "--review", "main", "feature/x")
 
+    def test_an_investigation_is_a_read_only_job_with_no_diff_and_no_worktree(self):
+        self.ok("create", "inv", "Themes", "--investigate")
+        job = self.js("inv")
+        self.assertEqual((self.stage("inv"), job["review"]["mode"], job["worktree"], job["stack"]), ("scope", "investigate", None, []))
+        self.assertFalse((self.root / ".worktrees" / "inv").exists())
+        self.no("advance", "inv", "review")
+        (self.jd("inv") / "scope.md").write_text("STATUS: READY\n\nquestion: contrast of the themes\n")
+        self.ok("advance", "inv", "review")
+        self.assertEqual(self.stage("inv"), "review")
+
+    def test_an_investigation_takes_no_other_options(self):
+        for args in (("--investigate", "--review", "main", "x"), ("--repo", ".", "--investigate"), ("--investigate", "now")):
+            with self.subTest(args=args):
+                self.no("create", "bad", "T", *args)
+                self.assertFalse(self.jd("bad").exists())
+
     def test_a_plain_create_is_still_a_build_job(self):
         self.ok("create", "b", "T")
         self.assertEqual(self.stage("b"), "shape")

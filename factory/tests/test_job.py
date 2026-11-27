@@ -1442,6 +1442,8 @@ class TestServer(Factory):
         act = mod.ask_system("a", "build", True)
         self.assertIn("pipeline show|propose|clear", act)
         self.assertIn("Never refuse it", act)
+        self.assertIn("start one yourself", act)
+        self.assertNotIn("start one yourself", mod.ask_system("a", "build", False))
         self.assertIn("never perform it", guide)
         self.assertIn("commit-and-push", guide)
 

@@ -118,7 +118,9 @@ export const BOARD_DEFINITIONS: Record<string, Omit<BoardDefinition, "id" | "lab
     ],
     place: (job) =>
       job.review
-        ? `${job.review.baseRef} .. ${job.review.headRef}`
+        ? job.review.head
+          ? `${job.review.baseRef} .. ${job.review.headRef}`
+          : "investigation"
         : (job.branch ?? job.worktree),
     humanActionPath: () => "unblock",
     statusBits: (job) => [

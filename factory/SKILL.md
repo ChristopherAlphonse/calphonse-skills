@@ -15,6 +15,10 @@ Before any other tool call, including `JOB create` and `JOB queue`, run `JOB boa
 
 The board has buttons (Approve spec, Commit locally, Unblock), a skill switch and a note box per job, and a chat bar. The user does everything there and never needs a terminal.
 
+## First run
+
+Right after the link, if `.planning/factory/config.json` does not exist, the project is new to the factory. Do not skip the factory because of that: set it up, then do what the user asked. Tell the user in one line what you will write (a config with their harness, and the harness's shell policy) and ask once. On yes, write `config.json` with `{"harness": "<harness>"}` (`claude` in Claude Code, `opencode` in OpenCode, `kiro` in Kiro), add `checks` only if the repo's own test command is plain to see (a `test` script, `pytest`, `go test`), then run `TICK install`. Install makes the file read-only for every agent after this, so write it before you install. A missing `checks` blocks a build job at its gate and nothing else, so an investigation or a review needs none. Then create the job for the user's request and carry on.
+
 ## Waiting on the user
 
 When a job waits on the user (spec approval, **Commit locally**, **Unblock**), run `JOB wait` once (90 seconds by default, `JOB wait 110` to choose). If it prints `RESUME: <ids> ...`, run `JOB queue` and carry on. If it prints `STILL WAITING`, end your turn with the board link and one line saying what to click. A long-open turn slows the session down, so never loop on `JOB wait`. If `TICK loop` runs, it picks the job up after the click; if not, the user says "continue".
@@ -30,6 +34,7 @@ This skill runs two workflows on one engine and one board, as two tabs:
 - **Build**: a feature idea becomes a local commit and a PR body. `JOB create <id> "<title>"` makes a build job.
 - **Several repos**: when the project folder holds several git repos (a GitLab group), make one build job per repo with `JOB create <id> "<title>" --repo <dir>`. Name it `<ticket>-<repo>` (for example `proj-174-data-ui`): the branch is `feature/<TICKET>` from the id's leading key and number, so every repo works on the same ticket. The board draws one lane per repo, and `concurrency` in `config.json` sets how many repo agents run at once.
 - **Review**: a branch or diff becomes a verified report and paste-ready comments, and no code is written. `JOB create <id> "<title>" --review <base> <head>` makes a review job. The two refs are local, so the user fetches the PR or MR branch first, for example `git fetch origin pull/42/head:pr-42`.
+- **Investigate**: a question about the project (how good is the contrast of the themes, where does the auth flow leak) becomes a verified report with suggested improvements, and no code is written. `JOB create <id> "<title>" --investigate` makes a review job with no refs and no worktree. Put the question and the folders to read in `scope.md`. The reviewers read the project's working tree and never edit it. Use it when the user wants to learn or audit something rather than review a diff.
 
 The sections below say which workflow they belong to. A review job never edits code, commits, pushes, or posts.
 
@@ -182,4 +187,4 @@ No stage or unattended pass pushes, opens a PR or MR, merges, or deploys. `ready
 
 ## Small tasks
 
-The pipeline is for features the user wants shaped, specced, reviewed and approved. For a fix, an edit, a history repair or any one-off command, skip it: do the work directly in the repo, run the repo's tests, and leave one change for the user to review. Do not create a job for it. If the user's own words say to skip the factory, skip it.
+The pipeline is for features the user wants shaped, specced, reviewed and approved. For a fix, an edit, a history repair or any one-off command, skip it: do the work directly in the repo, run the repo's tests, and leave one change for the user to review. Do not create a job for it. If the user's own words say to skip the factory, skip it. A request to look into, audit or learn about something is not a small task: make an `--investigate` job. Missing config is not a reason to skip the factory either: see First run.

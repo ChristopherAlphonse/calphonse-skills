@@ -149,6 +149,12 @@ When a job is blocked, out of rounds, or something looked tampered with, it move
 
 A review job checks a branch or a diff. It writes **no code**. Create one with two local refs: `bin/job create <id> "<title>" --review BASE HEAD`. It runs once, with no rounds. The Review board shows it.
 
+**Investigate** is the same job with a question instead of a diff: `bin/job create <id> "<title>" --investigate`. Use it to learn about or audit something ("how good is the contrast of our themes?"). It has no refs and makes no worktree. The scope stage writes the question and the folders to read into `scope.md`, the reviewers read the project itself and never edit it, and the report lists findings with the evidence that was rerun. Factory Bot can start one for you in Act mode when no job exists.
+
+### First run
+
+In a project with no `.planning/factory/config.json`, `/factory` sets the project up before it does anything else: it says what it will write, asks once, writes the config with your harness, installs the harness's shell policy, and then creates the job for your request. You do not need a terminal.
+
 ### 3.1 Scope: "what are we looking at?"
 
 An agent finds the project's own lint, type and test tools, and builds a **Boundary map**: a list of every outside thing the change touches (database tables, other repos, shared libraries, queues), where the real definition can be read or that it cannot be reached, every "keep the output identical" promise, and every year or version written into the code. If it cannot continue, it writes `rejection.md` and the job stops as **rejected**.
