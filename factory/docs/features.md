@@ -55,7 +55,7 @@ When your project folder holds several repos (a GitLab group, say), give each jo
 Buttons along the top that hide the noise:
 
 - **Needs you** shows only jobs waiting for your click.
-- **Ready to land** shows finished jobs waiting to be committed.
+- **Ready to land** shows finished jobs whose branch has a commit (by an agent or by your click).
 - **Pipeline** is about the stage order. A change waiting for your Apply click appears under **Pipeline change** (see [Part 9](#part-9-custom-stages-your-own-boxes-on-the-belt)).
 
 ### 1.8 The side panel
@@ -96,7 +96,7 @@ When you approve, the factory makes a **worktree**: a private copy of your proje
 
 ### 2.6 Build: "make it"
 
-An agent writes the code, one small task at a time, using `swe` plus the stack skills (see [Part 4](#part-4-helpers-skills-and-reviewers)). It never commits. It leaves its changes lying on the table, uncommitted. If it gets stuck, it writes `STATUS: BLOCKED`.
+An agent writes the code, one small task at a time, using `swe` plus the stack skills (see [Part 4](#part-4-helpers-skills-and-reviewers)). It may commit as it goes. If it gets stuck, it writes `STATUS: BLOCKED`.
 
 ### 2.7 Gate: "does the test command pass?"
 
@@ -108,11 +108,11 @@ An agent removes pointless comments and workaround code with `comment-sicko`, an
 
 ### 2.10 Ship: "write the paperwork"
 
-An agent writes the pull request text (`pr-body.md`) and the commit message (`commit.md`) with `pr-body-style`. It may add a short spoken demo script with `demo-script`. Then the belt **stops and waits for you** again.
+An agent writes the pull request text (`pr-body.md`) and the commit message (`commit.md`) with `pr-body-style`. It may add a short spoken demo script with `demo-script`. If the branch has no commit yet, the belt **stops and waits for you** again.
 
 ### 2.11 Commit locally (your button)
 
-You read the paperwork and click **Commit locally**. The factory makes the one and only commit, on the job's branch. The click is refused unless all of these are true:
+You read the paperwork and click **Commit locally** if an agent has not already committed. The factory commits on the job's branch. The click is refused unless all of these are true:
 
 - the gate passed this round, on this exact set of files
 - the branch has no commit the board did not make
@@ -121,7 +121,7 @@ You read the paperwork and click **Commit locally**. The factory makes the one a
 
 ### 2.12 Ready
 
-The job is done. A local commit exists and a pull request text is written. No stage pushes. Pushing and opening the pull request is yours, done your own way, or by telling the orchestrator in chat.
+The job is done. A local commit exists and a pull request text is written. Stages may push a plain `git push`; force pushes are blocked. Opening the pull request is yours, done your own way.
 
 A finished job leaves no worktree folder behind. Its branch stays until its work is in main, then `bin/job prune` (or `bin/job close`) deletes it. A squash merge counts: the branch is landed when every file it changed is identical in main. Prune then moves a landed ready job's folder to `.planning/factory/archive/`, so its card leaves the board. A branch that has not landed, or that another live job still uses, is never deleted, and an unlanded ready job keeps its card.
 
@@ -365,7 +365,7 @@ It can do only a few things:
 - post a "now:" note
 - prepare a change to the custom stages
 
-It cannot approve, commit, unblock, move a stage, edit `job.json` or code, use the network, or change a built-in stage. When you ask for something it cannot do, it says so and points at the nearest thing it can do.
+It cannot use the board buttons to approve, commit or unblock, move a stage, edit `job.json` or code, use the network beyond a plain push, or change a built-in stage. When you ask for something it cannot do, it says so and points at the nearest thing it can do.
 
 ### 6.6 Chat mode and Act mode
 
@@ -403,9 +403,9 @@ The board listens only on your own computer. The link's code becomes a cookie. E
 
 `policy.yaml` is a list of shell commands in three piles:
 
-- **Deny**: never allowed, such as `git push`, `aws s3 rm` and `curl -X POST`
-- **Ask**: needs a human, such as `git add`, `git commit`, `git merge` and `git rebase`
-- **Allow**: safe to run alone, such as tests, linters and format checks
+- **Deny**: never allowed, such as force pushes, `aws s3 rm` and `curl -X POST`
+- **Ask**: needs a human, such as `git merge` and `git rebase`
+- **Allow**: safe to run alone, such as plain `git add`, `git commit`, `git push`, tests, linters and format checks
 
 Deny beats ask, and ask beats allow. A command no rule names counts as blocked.
 
@@ -435,11 +435,11 @@ Some files are off limits: CI config, CODEOWNERS, `.env`, hook config, the facto
 
 ### 7.11 Git hooks in each worktree
 
-The factory installs no hooks of its own. You can commit and push in a job's worktree at any time, and your project's own hooks run as in any checkout. The stage agents are still told not to commit, push or merge: that rule is the agent policy, not a git hook.
+The factory installs no hooks of its own. Agents, stage agents and you can commit and push in a job's worktree, and your project's own hooks run as in any checkout. Merge and force push stay blocked by policy, not by a git hook.
 
 ### 7.12 The integrity checks
 
-On every advance, gate, queue and commit, `bin/job` looks for signs of tampering: a detached HEAD, a worktree on the wrong branch, a reviewer editing a tracked file, or a `job.json` that disagrees with the log. Your own commits and pushes never park a job. If it finds one, it parks the job in **Needs you** with the reason. These checks catch trouble. They do not prevent it.
+On every advance, gate, queue and commit, `bin/job` looks for signs of tampering: a detached HEAD, a worktree on the wrong branch, a reviewer editing a tracked file, or a `job.json` that disagrees with the log. Agent and user commits never park a job. If it finds one, it parks the job in **Needs you** with the reason. These checks catch trouble. They do not prevent it.
 
 ### 7.13 The audit log
 
@@ -493,7 +493,7 @@ Apply is refused if a job sits in a stage the change removes, or if the pipeline
 
 ### 9.5 Honest limits
 
-A stage that asks for a commit or a pull will stop with `STATUS: BLOCKED`, because the shell rules forbid them. The stage is still added. The bot says so in one sentence.
+A stage that asks for a pull, a force push or a repeating timer will stop with `STATUS: BLOCKED`, because the shell rules forbid them. Plain commit and push are allowed. The stage is still added. The bot says so in one sentence.
 
 ### 9.6 Kept in each project
 
@@ -501,12 +501,12 @@ A stage that asks for a commit or a pull will stop with `STATUS: BLOCKED`, becau
 
 ## Part 10: What the factory will never do
 
-- Push, open a PR or MR, merge, or deploy
-- Commit without your click
+- Force-push, open a PR or MR, merge, or deploy
+- Commit without a gate pass, or block a job because an agent committed
 - Let an agent grade its own work
 - Edit code in a review job
 - Post a comment from a review unless you say so
-- Use the network from an agent
+- Use the network from an agent beyond a plain git push
 - Move a job without proof
 
 ## Where to go next

@@ -848,6 +848,13 @@ class TestPolicy(Factory):
         self.adv("j", "ready")
         self.no("advance", "j", "build")
 
+    def test_ready_accepts_a_commit_an_agent_made_in_the_worktree(self):
+        self.to_ship("j")
+        self.user_commits_in_worktree("j")
+        self.adv("j", "ready")
+        self.assertIsNone(self.js("j")["commit"])
+        self.assertEqual(self.stage("j"), "ready")
+
     def test_commits_and_pushes_in_the_worktree_are_never_blocked_and_never_park_the_job(self):
         bare = self.base / "remote.git"
         self.git("init", "--bare", "-b", "main", str(bare))

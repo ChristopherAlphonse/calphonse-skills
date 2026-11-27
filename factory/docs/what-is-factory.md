@@ -7,8 +7,8 @@ The factory takes a feature from a one-line idea to a reviewed change committed 
 | Question | Answer |
 | --- | --- |
 | What does it produce? | A reviewed, tested change on a local branch, plus a written pull request (PR) body. Or, for a review job, a verified report with paste-ready comments. |
-| What do you do? | Approve the spec, click **Commit locally**, and click **Unblock** when a job is stuck. Nothing else needs you. |
-| What can it never do? | Push code, open a PR or merge request (MR), merge, or deploy. |
+| What do you do? | Approve the spec, click **Commit locally** if no agent has committed yet, and click **Unblock** when a job is stuck. |
+| What can it never do? | Force-push, open a PR or merge request (MR), merge, or deploy. |
 | What stops it going wrong? | Every move between stages needs evidence in a file or a command's output. An agent saying "done" counts for nothing. |
 
 ## Terms used here
@@ -32,7 +32,7 @@ Three decisions shape everything else:
 
 1. **One fresh agent per stage.** Each stage starts a new agent that reads the previous stage's file. It carries no memory of how the earlier agent justified itself.
 2. **A script moves the job, not an agent.** `bin/job` is the only thing that changes a job's state. It reads the stage's file, checks the status line, and refuses the move if the evidence is missing.
-3. **You hold the three irreversible clicks.** Approving a spec, committing, and unblocking are buttons on the board. The command line refuses them.
+3. **You hold three board buttons.** Approving a spec, **Commit locally**, and unblocking run only from the board. Plain `git commit` is also allowed for agents.
 
 The cost is speed. A job passes through many stages, and a review that finds problems sends the job back to build. For a one-line fix, the factory is the wrong tool.
 
@@ -46,10 +46,10 @@ A build job runs these stages in order.
 | --- | --- | --- |
 | shape | Questions the idea and settles what to build. | `shape.md` says `STATUS: READY` |
 | spec | Writes a spec and a task list. | You approve it on the board |
-| build | Writes the code, one task at a time, uncommitted. | `build.md` says `STATUS: READY` |
+| build | Writes the code, one task at a time; may commit it. | `build.md` says `STATUS: READY` |
 | gate | Runs your `checks` command. | The command passes |
 | polish | Removes workaround comments and tidies prose. | `polish.md` says `STATUS: DONE`, then the gate reruns |
-| ship | Writes the PR body and the commit message. | You click **Commit locally** |
+| ship | Writes the PR body and the commit message. | A commit exists (your click or an agent) |
 
 A failed gate sends the job back to build. A job gets three build rounds by default. After that it moves to **Needs you** instead of looping.
 
@@ -79,15 +79,15 @@ You can add a stage, such as an extra QA pass after build. You ask in the board'
 
 ## How it keeps you in control
 
-Agents work in a worktree and leave changes uncommitted. The only commit is the one your click makes. That click is refused unless the gate passed on this exact working tree, no protected path was touched, and the repo's own hooks pass.
+Agents work in a worktree and may commit there. The board's **Commit locally** click is a second way to commit; it is refused unless the gate passed on this exact working tree, no protected path was touched, and the repo's own hooks pass. A job reaches `ready` once the branch has a commit.
 
 Protected paths are CI config, CODEOWNERS, `.env`, hook config, and anything you add in `config.json`. Touching one fails the gate.
 
-The safety layers differ in strength. Deny rules and the guard hook block the ordinary routes to `git commit` and `git push`. Integrity checks detect a moved branch or changed hooks and park the job on you. Neither stops a process that runs as you and goes around them. Only branch protection on your remote is out of an agent's reach on your machine, so turn it on for every repo the factory touches. The full table is in [Safety](safety.md).
+The safety layers differ in strength. Deny rules and the guard hook block force pushes and hook bypasses while allowing plain `git commit` and `git push`. Integrity checks detect a moved branch or changed hooks and park the job on you. Neither stops a process that runs as you and goes around them. Only branch protection on your remote is out of an agent's reach on your machine, so turn it on for every repo the factory touches. The full table is in [Safety](safety.md).
 
 ## What it does not do
 
-- No stage agent pushes, opens a PR or MR, merges, or deploys. `ready` means a local commit exists and a PR body is written. You push by your own process, or tell the orchestrator in chat to.
+- No stage agent force-pushes, opens a PR or MR, merges, or deploys. Plain pushes are allowed. `ready` means a local commit exists and a PR body is written.
 - A review of a branch you do not trust runs that branch's tests, so it runs that code on your machine.
 - The gate is only as strong as your `checks` command. If your tests pass when no tests run, so does the gate.
 

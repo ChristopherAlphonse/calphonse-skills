@@ -32,7 +32,7 @@ Reference for every command, setting, file and environment variable. Run command
 | `bin/job pipeline propose move ID AFTER` | propose moving a custom stage |
 | `bin/job pipeline clear` | drop the pending proposal |
 
-`approve`, `commit`, `unblock` and `pipeline apply` are refused on the command line. They run only from the board.
+The board commands `approve`, `commit`, `unblock` and `pipeline apply` are refused on the command line. They run only from the board. Plain `git commit` and `git push` are allowed for agents.
 
 ### Queue actions
 
@@ -151,9 +151,9 @@ State lives in the project, never in this repo.
 | --- | --- | --- | --- |
 | shape | `lets-talk-about-it`, then `simplify` | `shape.md` | `STATUS: READY` |
 | spec | `prd-mode`, then `simplify` | `spec.md` | your approval on the board |
-| build | `swe` plus stack skills | `build.md` | `STATUS: READY`, changes left uncommitted |
+| build | `swe` plus stack skills | `build.md` | `STATUS: READY`, changes may be committed |
 | gate | `bin/job gate` (a script) | `round-N/checks.md` | `GATE: PASS` |
 | review | a `code` reviewer whose skill follows the diff (`code-review-frontend` for TS/JS/React only, `python`, `dotnet`, `aws`), `qa-review`, `test-review`, plus `architecture-review` when the diff calls for it | `round-N/review-<name>.md`, then `reconcile.md` if anything is CHANGES | `VERDICT: PASS` from every reviewer |
 | polish | `comment-sicko`, then `simplify` | `polish.md` | `STATUS: DONE`, then a fresh gate run |
 | prove | `prove-it-works` | `uat.md` | `STATUS: PASS` |
-| ship | `pr-body-style` | `pr-body.md` and `commit.md` | your Commit locally click |
+| ship | `pr-body-style` | `pr-body.md` and `commit.md` | a commit on the job branch (your click or an agent) |

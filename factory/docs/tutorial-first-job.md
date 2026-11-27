@@ -97,7 +97,7 @@ If the gate fails or a reviewer asks for changes, the job goes back to **build**
 
 When the job reaches **ship**, the agent has written `pr-body.md` and `commit.md`. The job appears under **Ready to land**.
 
-Read both files. Click **Commit locally**.
+Read both files. If an agent has not already committed the branch, click **Commit locally**.
 
 The click is refused if the gate did not pass on this exact working tree, if a protected path changed, or if your repo's own hooks fail. The board states which check failed.
 
@@ -105,7 +105,7 @@ On success, the job moves to **ready**. Your change is a commit on the branch `f
 
 ## What you have now
 
-A reviewed, tested commit on a local branch, and a PR body in `.planning/factory/jobs/<id>/pr-body.md`. The factory never pushes. To publish, push the branch and open the PR yourself.
+A reviewed, tested commit on a local branch, and a PR body in `.planning/factory/jobs/<id>/pr-body.md`. Agents can push the branch with a plain `git push`; force pushes are blocked. Opening the PR is yours.
 
 ## Next
 
