@@ -4,17 +4,24 @@ rules:
     effect: deny
     match:
       # Plain `git commit` and `git push` are allowed below. These spellings rewrite shared history or delete refs.
+      # `-f` only as its own word, so a branch like `feature/x-fix` still pushes. bin/guard also catches `-uf`.
       - git push*--force*
-      - git push*-f*
+      - git push -f
+      - git push -f *
+      - git push * -f
+      - git push * -f *
       - git push*--delete*
       - git push*--mirror*
       - git push * :*
+      - git push * +*
       - git -C * push*--force*
-      - git -C * push*-f*
+      - git -C * push * -f
+      - git -C * push * -f *
       - git -C * push*--delete*
       - git -C * push*--mirror*
       - git -C * push * :*
-      - *--amend*
+      - git -C * push * +*
+      - *git commit*--amend*
       - git reset --hard*
       - git -C * reset --hard*
       - git clean -f*

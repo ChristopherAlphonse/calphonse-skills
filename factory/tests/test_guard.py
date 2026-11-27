@@ -46,6 +46,20 @@ class Guard:
             with self.subTest(c):
                 self.assertEqual(self.sh(c), 0)
 
+    def test_a_push_whose_branch_or_message_looks_like_a_flag_passes(self):
+        for c in ("git push -u origin feature/PROJ-174-fix-login", "git push origin feat-flags",
+                  "git push origin HEAD:feature/x"):
+            with self.subTest(c):
+                self.assertEqual(self.sh(c), 0)
+
+    def test_every_force_push_or_ref_delete_spelling_is_blocked(self):
+        for c in ("git push -f", "git push -f origin x", "git push origin x -f", "git push -uf origin x",
+                  "git push --force-with-lease origin x", "git push origin +main", "git push origin +HEAD:main",
+                  "git push origin :main", "git push --delete origin x", "git push --mirror", "git push --prune origin",
+                  "ls && git push -fu origin x"):
+            with self.subTest(c):
+                self.assertEqual(self.sh(c), 2)
+
     def test_a_command_no_rule_names_is_blocked(self):
         self.assertEqual(self.sh("rm -rf somewhere"), 2)
 
