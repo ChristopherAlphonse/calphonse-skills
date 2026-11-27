@@ -8,9 +8,9 @@ Reference for every command, setting, file and environment variable. Run command
 | --- | --- |
 | `bin/job create <id> "<title>"` | start a build job at shape |
 | `bin/job create <id> "<title>" --repo DIR` | start a build job that works in the git repo at `DIR` (relative to the project folder). The board shows one lane per repo. `--repo DIR` also goes before `--review BASE HEAD` |
-| `bin/job create <id> "<title>" --review BASE HEAD` | start a review job at scope. It shows on the Review board |
-| `bin/job create <id> "<what to check>" --prove` | start a prove job: one stage, no worktree, writes `uat.md`. It shows on the Prove board. It takes no other option |
-| `bin/job create <id> "<title>" --investigate` | start a read-only review job about a question, with no refs, no diff and no worktree. It shows on the Review board. It takes no other option |
+| `bin/job create <id> "<title>" --review BASE HEAD` | start a review job at scope. It shows on the Audit board |
+| `bin/job create <id> "<what to check>" --prove` | start a prove job: one stage, no worktree, writes `uat.md`. It shows on the Acceptance board. It takes no other option |
+| `bin/job create <id> "<title>" --investigate` | start a read-only review job about a question, with no refs, no diff and no worktree. It shows on the Audit board. It takes no other option |
 | `bin/job stack <id>` | recompute the stack skills for a job |
 | `bin/job queue` | list jobs as `action id stage hint` |
 | `bin/job advance <id> <stage>` | move a job if the evidence allows it |

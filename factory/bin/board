@@ -45,8 +45,8 @@ def board_is_stale():
 
 STALE_META = b'<span id="meta">restart the board: its code changed since it started</span>'
 # board id -> (label, which of the engine's jobs it shows)
-BOARD_SPECS = {"build": ("Build", lambda job: not job.get("review") and not job.get("prove")), "review": ("Review", lambda job: bool(job.get("review"))),
-               "prove": ("Prove", lambda job: bool(job.get("prove")))}
+BOARD_SPECS = {"build": ("Feature", lambda job: not job.get("review") and not job.get("prove")), "review": ("Audit", lambda job: bool(job.get("review"))),
+               "prove": ("Acceptance", lambda job: bool(job.get("prove")))}
 WATCH_FILE = "watch.json"
 CHAT_LOG = STATE / "chat.jsonl"
 CHAT_SHOWN = 200

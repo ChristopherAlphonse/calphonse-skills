@@ -30,9 +30,9 @@ The board prints a link that ends in `?c=` and a code. The code is a secret hand
 
 When the board's own code changed after it started, `bin/job board` still prints the same link and adds a line saying to restart the board, and the page keeps saying "restart the board" until you do. It never restarts by itself, because that would log out every open tab.
 
-### 1.3 Two boards: Build and Review
+### 1.3 Three boards: Feature, Audit and Acceptance
 
-There are two boards on one page. **Build** shows jobs that make new things. **Review** shows jobs that only look at things. They never mix.
+There are three boards on one page. **Feature** shows jobs that make new things. **Audit** shows review jobs, which only look at things. **Acceptance** shows prove jobs, which check that something works. They never mix.
 
 ### 1.4 The left sidebar
 
@@ -478,7 +478,7 @@ Data, not code. It has an id, a workflow (`build`, `review` or `prove`), the sta
 
 ### 9.2 Where one can go
 
-After `shape`, `spec`, `build` or `polish` on the Build board. After `scope`, `review`, `reconcile` or `verify` on the Review board. Before or after `prove` on the Prove board. Or after another custom stage. Never after `gate`, `ship` or `report`, because those hold the safety checks and the commit click.
+After `shape`, `spec`, `build` or `polish` on the Feature board. After `scope`, `review`, `reconcile` or `verify` on the Audit board. Before or after `prove` on the Acceptance board. Or after another custom stage. Never after `gate`, `ship` or `report`, because those hold the safety checks and the commit click.
 
 ### 9.3 Ask, then click Apply
 
