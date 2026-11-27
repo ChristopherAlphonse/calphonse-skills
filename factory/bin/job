@@ -567,6 +567,44 @@ def audited_state(jid, lines=None):
     return st
 
 
+def stage_spans(lines):
+    """Each job's (stage, seconds spent in it), walked from the audit log. The stage a job is in now runs to now."""
+    def secs(ts):
+        return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
+    entered, spans = {}, []
+    for e in lines + [{"job": j, "action": "now", "actor": "", "ts": now()} for j in {e.get("job") for e in lines} if j]:
+        jid = e.get("job")
+        if not jid:
+            continue
+        stage = audited_state(jid, [e])["stage"]
+        if stage and e["action"] != "now" and entered.get(jid, ("",))[0] == stage:
+            continue  # `create` then `start` name the same first stage
+        if e["action"] == "now" or stage:
+            if jid in entered:
+                prev, since = entered[jid]
+                spans.append((jid, prev, secs(e["ts"]) - since))
+            if stage and stage not in TERMINAL:
+                entered[jid] = (stage, secs(e["ts"]))
+            else:
+                entered.pop(jid, None)
+    return spans
+
+
+def cmd_times():
+    """Where the time goes: per stage, how many jobs passed through it and how long they stayed."""
+    by = {}
+    for jid, stage, t in stage_spans(audit_lines()):
+        by.setdefault(stage, []).append(t)
+    if not by:
+        return print("no stage moves in the audit log yet")
+    fmt = lambda t: f"{t / 3600:.1f}h" if t >= 3600 else f"{t / 60:.0f}m"
+    print(f"{'stage':<14}{'visits':>7}{'median':>9}{'max':>9}{'total':>9}")
+    for stage, ts in sorted(by.items(), key=lambda kv: -sum(kv[1])):
+        ts.sort()
+        print(f"{stage:<14}{len(ts):>7}{fmt(ts[len(ts) // 2]):>9}{fmt(ts[-1]):>9}{fmt(sum(ts)):>9}")
+    print("needs-human and spec include time waiting on you; a stage visited more than once per job looped back.")
+
+
 def integrity_problems(job, lines=None):
     """Detect tampering the OS cannot prevent when the agent shares the user's file permissions."""
     probs, a = [], audited_state(job["id"], lines)
@@ -1550,7 +1588,7 @@ HUMAN_ONLY = {"approve", "commit", "unblock"}
 
 COMMANDS = {
     "create": (cmd_create, None), "advance": (cmd_advance, 2), "gate": (cmd_gate, 1), "stack": (cmd_stack, 1), "watch": (cmd_watch, 1), "board": (cmd_board, 0),
-    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_watch, 1), "pipeline": (cmd_pipeline, 0), "standing": (cmd_standing, 0), "skill": (cmd_skill, 3), "brief": (cmd_brief, 3), "edit": (cmd_edit, 4), "wait": (cmd_wait, 1), "close": (cmd_close, 1), "prune": (cmd_prune, 0), "retire": (cmd_retire, 1),
+    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_watch, 1), "pipeline": (cmd_pipeline, 0), "standing": (cmd_standing, 0), "times": (cmd_times, 0), "skill": (cmd_skill, 3), "brief": (cmd_brief, 3), "edit": (cmd_edit, 4), "wait": (cmd_wait, 1), "close": (cmd_close, 1), "prune": (cmd_prune, 0), "retire": (cmd_retire, 1),
 }
 
 if __name__ == "__main__":

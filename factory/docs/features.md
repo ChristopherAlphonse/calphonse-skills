@@ -233,6 +233,8 @@ Want to tell the next agent something? Type a note in the stage's note box (or `
 
 Want every agent on every job to know something, such as "plain push is fine"? Say it once in the chat bar. The assistant saves it as a standing rule in `.planning/factory/standing.md`, and every stage hint carries it. Ask the chat bar to list or remove them. Standing rules are advice: they never loosen the shell policy, and only the chat bar can change them.
 
+Wondering where the time goes? `bin/job times` (or ask the chat bar) reads `audit.log` and lists every stage by total time: how many visits, the median, and the longest. `spec` and `needs-human` include time waiting on you. A stage with more visits than jobs looped back, usually build after a failed gate.
+
 ### 4.5 The reviewers
 
 | Reviewer | Looks at |
