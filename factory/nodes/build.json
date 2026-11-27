@@ -1,0 +1,8 @@
+{
+  "id": "build",
+  "workflow": "build",
+  "skill": "swe",
+  "model": "large",
+  "writes": "code",
+  "hint": "swe plus stack skill, one task at a time -> build.md (STATUS: READY, or STATUS: BLOCKED)"
+}

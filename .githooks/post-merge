@@ -1,3 +1,7 @@
 #!/bin/sh
-# Keep the swe always-on hook wired into Claude Code, Kiro and OpenCode after the repo changes.
-exec "$(git rev-parse --show-toplevel)/scripts/install-swe-hook" --quiet
+# Keep the swe always-on hook wired into Claude Code, Kiro and OpenCode after the repo changes,
+# and warn when the skill router rules drift from the skills on disk.
+root="$(git rev-parse --show-toplevel)"
+"$root/scripts/install-swe-hook" --quiet
+"$root/scripts/route" --check || echo "route: fix scripts/route-rules.json" >&2
+exit 0

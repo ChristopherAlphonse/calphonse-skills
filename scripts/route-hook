@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+"""Prompt hook for Claude Code (UserPromptSubmit) and Kiro (userPromptSubmit).
+
+Reads the hook JSON on stdin, runs scripts/route on the prompt, prints the picks. The harness adds
+that stdout to the conversation. No routing logic lives here. A failure prints nothing so a prompt is never blocked.
+"""
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+ROUTE = Path(__file__).with_name("route")
+
+
+def main():
+    try:
+        prompt = json.load(sys.stdin).get("prompt", "")
+        out = subprocess.run([sys.executable, str(ROUTE), prompt], capture_output=True, text=True, timeout=10).stdout.strip()
+    except Exception:
+        return
+    if not out:
+        return
+    repo = ROUTE.parent.parent
+    lines = [f"- {s} ({repo / p}): {why}" for s, p, why in (l.split("\t") for l in out.splitlines())]
+    print("Skill router picked these skills for this prompt. Read each SKILL.md and follow it:\n" + "\n".join(lines))
+
+
+if __name__ == "__main__":
+    main()

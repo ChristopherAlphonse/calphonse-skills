@@ -56,31 +56,13 @@ AREA_TEXT = {
     "code": "the job's worktree under .worktrees/ and the job folder under .planning/factory/jobs/",
     "notes": "your own notes in the job folder under .planning/factory/jobs/",
 }
-STAGE_AREA = {"shape": "planning", "spec": "planning", "build": "code", "polish": "code"}  # every other stage: notes
-STAGE_SKILL = {
-    "shape": "lets-talk-about-it", "spec": "prd-mode", "build": "swe", "review": "review-blind-spots",
-    "polish": "comment-sicko", "prove": "prove-it-works", "ship": "pr-body-style",
-    "scope": "", "reconcile": "reconcile-reviews", "verify": "prove-it-works", "report": "simplify",
-}
-ON_DEMAND = {
-    "shape": "Load spike only if the shape rests on an unknown, and simplify for the decisions at the top of shape.md.",
-    "spec": "Load simplify for spec.md and the tasks file.",
-    "review": "The brief names your reviewer skill (qa-review by its absolute path, test-review, the code lens, or "
-              "architecture-review): read it before you start.",
-    "polish": "Load simplify for prose you touched.",
-    "ship": "Load demo-script only if the brief asks for a demo.",
-}
 # Claude Code narrows a subagent by tool name only, never by folder, so a stage agent loses only the tools no stage
 # needs. Folder limits stay with the project-wide settings and guard hook.
 CLAUDE_TOOLS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "NotebookEdit", "TodoWrite", "Skill"]
 CLAUDE_DROPPED = ["Agent", "Task", "WebFetch", "WebSearch"]
 OPENCODE_DROPPED = ["task", "webfetch", "websearch", "codesearch"]
-# SKILL.md picks the model by stage. Review-workflow and custom stages follow the same tiers: judgment on a diff is
-# sonnet, running commands and writing a short file is haiku. A custom stage not listed here gets sonnet.
-CLAUDE_MODEL = {"shape": "opus", "spec": "opus", "build": "opus", "review": "sonnet", "scope": "sonnet",
-                "reconcile": "sonnet", "polish": "haiku", "prove": "haiku", "ship": "haiku", "verify": "haiku",
-                "report": "haiku", "amend": "haiku"}
-CLAUDE_DEFAULT_MODEL = "sonnet"
+# Each node file names a model tier. A custom stage gets mid, except `amend` (a one-line plan change), which gets small.
+CLAUDE_TIER = {"large": "opus", "mid": "sonnet", "small": "haiku"}
 GEN_VERSION = "factory-gen v1"
 STAMP = re.compile(r"factory-gen v\d+ sha256:[0-9a-f]{64}")
 HARNESS_SOURCE = "set harness in config.json"
@@ -419,7 +401,7 @@ def pipeline_stages():
             if sid == "gate" or sid in out:
                 continue
             c = custom.get(sid)
-            out[sid] = (c.get("skill", ""), c["brief"]) if c else (STAGE_SKILL[sid], "")
+            out[sid] = (c.get("skill", ""), c["brief"]) if c else (node(sid)["skill"], "")
     names = [f"{SKILL}-{sid}" for sid in out]
     clash = [n for n in names if n == f"{SKILL}-guard" or names.count(n) > 1]
     if clash:
@@ -427,12 +409,25 @@ def pipeline_stages():
     return [(sid, skill, brief) for sid, (skill, brief) in out.items()]
 
 
+def node(sid):
+    return job_module().NODES.get(sid, {})
+
+
+def area_of(sid):
+    return node(sid).get("writes", "notes")
+
+
+def claude_model(sid):
+    return CLAUDE_TIER[node(sid).get("model") or ("small" if sid == "amend" else "mid")]
+
+
 def stamp():
-    """Hash of pipeline.json and the generator version. The project folder is left out on purpose."""
+    """Hash of pipeline.json, the node files and the generator version. The project folder is left out on purpose."""
     try:
         data = job_module().PIPELINE_FILE.read_bytes()
     except OSError:
         data = b""
+    data += json.dumps(job_module().NODES, sort_keys=True).encode()
     digest = hashlib.sha256(GEN_VERSION.encode() + b"\0" + data).hexdigest()
     return f"{GEN_VERSION} sha256:{digest}"
 
@@ -447,8 +442,8 @@ def stage_prompt(sid, skill, brief, area, preloaded=True):
         parts.append("No skill is preloaded for this stage." if preloaded else "This stage has no skill of its own.")
     else:
         parts.append(f"Your preloaded skill is {skill}." if preloaded else f"Load the {skill} skill before you start.")
-    if sid in ON_DEMAND:
-        parts.append(ON_DEMAND[sid])
+    if node(sid).get("on_demand"):
+        parts.append(node(sid)["on_demand"])
     parts += [
         "Before you edit a file, load the stack skill for that kind of file (.ts -> typescript-strict-style, "
         ".py -> python, and so on).",
@@ -465,7 +460,7 @@ def kiro_stage_files():
     files = {f"{GUARD_DIR['kiro']}/{SKILL}-guard-{a}.json": guard_rules(g) for a, g in WRITE_AREAS.items()}
     mark = stamp()
     for sid, skill, brief in pipeline_stages():
-        area = STAGE_AREA.get(sid, "notes")
+        area = area_of(sid)
         agent = {
             "name": f"{SKILL}-{sid}",
             "description": f"Factory {sid} stage agent. {mark}",
@@ -489,8 +484,8 @@ def claude_stage_files():
     mark, files = stamp(), {}
     for sid, skill, brief in pipeline_stages():
         head = [f"name: {SKILL}-{sid}", f"description: Factory {sid} stage agent. {mark}",
-                f"tools: {', '.join(CLAUDE_TOOLS)}", f"model: {CLAUDE_MODEL.get(sid, CLAUDE_DEFAULT_MODEL)}"]
-        body = stage_prompt(sid, skill, brief, STAGE_AREA.get(sid, "notes"), preloaded=False)
+                f"tools: {', '.join(CLAUDE_TOOLS)}", f"model: {claude_model(sid)}"]
+        body = stage_prompt(sid, skill, brief, area_of(sid), preloaded=False)
         files[f".claude/agents/{SKILL}-{sid}.md"] = "---\n" + "\n".join(head) + "\n---\n\n" + body + "\n"
     return files
 
@@ -501,7 +496,7 @@ def opencode_stage_agents():
     mark, agents = stamp(), {}
     shell = {r["resource"]: r["effect"] for r in opencode_rules() if r["action"] == "shell"}
     for sid, skill, brief in pipeline_stages():
-        area = STAGE_AREA.get(sid, "notes")
+        area = area_of(sid)
         edit = {"*": "deny", **{g: "allow" for g in WRITE_AREAS[area]}, **{g: "deny" for g in NO_WRITE}}
         agents[f"{SKILL}-{sid}"] = {
             "description": f"Factory {sid} stage agent. {mark}",

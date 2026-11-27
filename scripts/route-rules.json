@@ -1,0 +1,42 @@
+{
+  "work": "\\b(fix|add|implement|refactor|write|build|change|update|bug|debug|create|rewrite|migrate|optimi[sz]e)\\b",
+  "manual": {
+    "comment-sicko": "persona, only when asked by name",
+    "qa-review": "runs only on request (disable-model-invocation)",
+    "swe": "always-on mode, loaded by hook or instructions, not routed"
+  },
+  "intent": [
+    {"skills": ["pr-follow-up"], "when": "address(ing)? .*(comment|feedback)|reviewer (comment|feedback)|follow[- ]?up on .*\\b(pr|mr)\\b|\\brebase\\b|fix (the )?ci\\b|ci (is )?(failing|red|broken)", "reason": "existing PR/MR follow-up"},
+    {"skills": ["reconcile-reviews"], "when": "reconcile|merge (these |the )?reviews|multiple reviews|which review (claims|findings)", "reason": "several reviews to merge"},
+    {"skills": ["performance-review-humanizer"], "when": "performance review|self[- ]review|self[- ]assessment", "reason": "first-person work write-up"},
+    {"skills": ["pr-body-style"], "when": "\\b(pr|mr|pull request|merge request) (body|description|title)|open (a |the )?(pr|mr)\\b|create (a |the )?(pr|mr)\\b", "reason": "PR/MR body or creation"},
+    {"skills": ["prd-mode"], "when": "\\bprd\\b|product requirements|generate tasks from", "reason": "PRD or task list from a PRD"},
+    {"skills": ["spike"], "when": "\\bspike\\b|proof of concept|\\bpoc\\b|is this even possible|feasib|autoresearch|before i commit to", "reason": "feasibility or metric experiment"},
+    {"skills": ["lets-talk-about-it"], "when": "stress[- ]test|interrogate|grill me|poke holes|let'?s talk about|talk through", "reason": "plan stress-test or feature discussion"},
+    {"skills": ["prove-it-works"], "when": "prove it|\\buat\\b|verify (that )?it works|confirm (that )?it works|really done|is it done", "reason": "verify a finished task"},
+    {"skills": ["prove-it-works"], "when": "\\b(done|finished|complete|completed)\\b", "git": "dirty", "reason": "work finished with uncommitted changes"},
+    {"skills": ["whats-going-on"], "when": "what'?s going on|onboard|unfamiliar (repo|codebase)|map (this |the )?(repo|codebase)|new to this (repo|codebase)", "reason": "codebase orientation"},
+    {"skills": ["architecture-review"], "when": "architecture review|distributed systems|reduce (infra|infrastructure) cost|find bottlenecks|simplify (my |the )?architecture|make this scalable", "reason": "architecture audit"},
+    {"skills": ["demo-script"], "when": "demo script|sprint demo|show[- ]and[- ]tell|feature walkthrough|demo this", "reason": "spoken demo"},
+    {"skills": ["documentation-writer"], "when": "\\bdocs\\b|documentation|\\breadme\\b|tutorial|how-to guide|diataxis|product copy", "reason": "documentation writing"},
+    {"skills": ["simplify"], "when": "\\beli5\\b|plain english|say that plainly|in plain (words|language)|i don'?t follow|\\bsimplify\\b|explain as you go|teach me", "reason": "plain-language restatement or teaching"},
+    {"skills": ["docker-app-sandboxing"], "when": "\\bsbx\\b|docker sandbox|microvm|sandbox(ed|ing)? (the |an? )?(agent|app)|run .* in (a )?sandbox", "reason": "isolated sandbox"},
+    {"skills": ["factory"], "when": "software factory|\\bfactory\\b|idea to (a )?commit|the board\\b|drive .* end to end", "reason": "end-to-end job on the board"},
+    {"skills": ["nextjs-proxy-csp-hardening"], "when": "\\bcsp\\b|content security policy|proxy\\.ts|security headers|script nonce", "reason": "CSP and proxy.ts hardening"},
+    {"skills": ["aws"], "when": "\\baws\\b|cloudformation|\\bcdk\\b|\\blambda\\b|\\bs3\\b|\\biam\\b|cognito|bedrock|sagemaker|dynamodb|\\bec2\\b|\\becs\\b|\\beks\\b", "reason": "AWS work"},
+    {"skills": ["dotnet"], "when": "\\bc#|\\.net\\b|asp\\.net|dotnet|minimal api", "reason": "C#/.NET"},
+    {"skills": ["python"], "when": "\\bpython\\b|\\bpytest\\b|asyncio|\\buv (add|run|sync)\\b|\\bmypy\\b|\\bpyright\\b", "reason": "Python"},
+    {"skills": ["vercel-react-best-practices"], "when": "\\breact\\b|next\\.?js|\\bjsx\\b|\\btsx\\b|\\buse(effect|state)\\b", "reason": "React/Next.js"},
+    {"skills": ["typescript-strict-style"], "when": "\\btypescript\\b|\\bts\\b file", "reason": "TypeScript"}
+  ],
+  "review": {
+    "trigger": "\\breview(s|ing|ed)?\\b|\\bcode review\\b|look over (the )?(pr|mr|diff|branch)",
+    "unless": "performance review|self[- ]review|self[- ]assessment|reconcile|address|reviewer (comment|feedback)",
+    "named": [
+      {"when": "\\btests?\\b|coverage|mutation|tested enough", "skills": ["test-review"], "reason": "named: test review"},
+      {"when": "architecture|scalab|bottleneck", "skills": ["architecture-review"], "reason": "named: architecture review"}
+    ],
+    "frontend": {"skills": ["code-review-frontend", "test-review", "review-blind-spots"], "reason": "review of TS/JS/React changes"},
+    "default": {"skills": ["factory", "review-blind-spots"], "reason": "review job for a branch or diff"}
+  }
+}

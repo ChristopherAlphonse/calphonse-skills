@@ -1,0 +1,9 @@
+{
+  "id": "polish",
+  "workflow": "build",
+  "skill": "comment-sicko",
+  "model": "small",
+  "writes": "code",
+  "hint": "comment-sicko then simplify -> polish.md (STATUS: DONE, or STATUS: REWORK to send it back to build)",
+  "on_demand": "Load simplify for prose you touched."
+}

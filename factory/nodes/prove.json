@@ -1,0 +1,8 @@
+{
+  "id": "prove",
+  "workflow": "prove",
+  "skill": "prove-it-works",
+  "model": "small",
+  "writes": "notes",
+  "hint": "prove-it-works on what the job title says: run the real thing and check the real result -> uat.md (STATUS: PASS or STATUS: FAIL, with the evidence); never edit code"
+}

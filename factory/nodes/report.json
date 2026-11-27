@@ -1,0 +1,8 @@
+{
+  "id": "report",
+  "workflow": "review",
+  "skill": "simplify",
+  "model": "small",
+  "writes": "notes",
+  "hint": "simplify -> report.md (STATUS: READY, FINDINGS: n, BLOCKERS: n) and comments.md to paste by hand; never post"
+}

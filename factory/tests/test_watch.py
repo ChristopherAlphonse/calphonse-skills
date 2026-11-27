@@ -209,6 +209,7 @@ class TestWatchRebuild(Watch):
         shutil.copy2(JOB, self.copy / "bin" / "job")
         shutil.copy2(JOB.parent / "board", self.copy / "bin" / "board")
         shutil.copytree(JOB.parent.parent / "dashboard", self.copy / "dashboard")
+        shutil.copytree(JOB.parent.parent / "nodes", self.copy / "nodes")
         self.dist = self.copy / "dashboard" / "dist"
         for src in (self.copy / "dashboard").glob("*.ts"):  # fixed clock
             os.utime(src, (1_000_000, 1_000_000))

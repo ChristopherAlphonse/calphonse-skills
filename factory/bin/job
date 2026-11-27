@@ -32,24 +32,7 @@ CHECKS_FILE = "checks.md"
 SPEC_FILE = "spec.md"
 HUMAN_STAGES = {"needs-human"}
 TERMINAL = {"ready", "rejected"}
-HINT = {
-    "shape": "lets-talk-about-it then simplify on shape.md (decisions to approve first, below the STATUS line) -> shape.md (STATUS: READY, or reject with rejection.md)",
-    "spec": "prd-mode then simplify on spec.md and the tasks file (decisions to approve first, below the STATUS line) -> spec.md and the tasks file, then wait for the user to approve",
-    "build": "swe plus stack skill, one task at a time -> build.md (STATUS: READY, or STATUS: BLOCKED)",
-    "gate": "job gate <id>: it passes the job on, or sends it back to build",
-    "polish": "comment-sicko then simplify -> polish.md (STATUS: DONE, or STATUS: REWORK to send it back to build)",
-    "ship": "pr-body-style (+ demo-script) -> pr-body.md and commit.md, then a commit on the branch (yours or the user's click)",
-}
-HINT_REVIEW = {
-    "scope": "find the repo's own lint, type, and test tooling (CI config, Makefile, pyproject, package scripts, whatever it uses) -> scope.md (STATUS: READY, or reject with rejection.md); add an architecture reviewer with `job route`",
-    "review": "code (lens chosen from the stack skills below: python for Python, dotnet for C#, typescript-strict-style and vercel-react-best-practices for TS/JS/React; code-review-frontend ONLY when TS/JS/React files are in the diff; for any other language the repo's own tooling alone, never a frontend skill), qa (qa-review), test (test-review), and routed extras -> round-1/review-<name>.md; read-only, never edit",
-    "reconcile": "reconcile-reviews -> reconcile.md (STATUS: READY), one ranked list with file and line",
-    "verify": "prove-it-works: rerun every VERIFIED (ran) command and check every cited line -> verified.md (STATUS: READY), drop what does not reproduce",
-    "report": "simplify -> report.md (STATUS: READY, FINDINGS: n, BLOCKERS: n) and comments.md to paste by hand; never post",
-}
-HINT_PROVE = {
-    "prove": "prove-it-works on what the job title says: run the real thing and check the real result -> uat.md (STATUS: PASS or STATUS: FAIL, with the evidence); never edit code",
-}
+GATE_HINT = "job gate <id>: it passes the job on, or sends it back to build"
 STACK_RULES = [
     ("typescript-strict-style", {".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"}, set()),
     ("vercel-react-best-practices", {".tsx", ".jsx"}, {"next.config.js", "next.config.mjs", "next.config.ts"}),
@@ -138,6 +121,55 @@ def standing_rules():
         return [l[2:].strip() for l in STANDING_FILE.read_text().splitlines() if l.startswith("- ")]
     except OSError:
         return []
+
+
+NODES_DIR = SELF.parent.parent / "nodes"
+NODE_FIELDS = {"id": str, "workflow": str, "skill": str, "model": str, "writes": str, "hint": str, "on_demand": str}
+MODELS = ("large", "mid", "small")
+WRITES = ("planning", "code", "notes")
+
+
+def node_problems(n, stem):
+    """Why one node file cannot be used, as plain sentences."""
+    if not isinstance(n, dict):
+        return ["must hold an object"]
+    errs = [f"unknown field {k!r}" for k in n if k not in NODE_FIELDS]
+    errs += [f"{k} must be text" for k, t in NODE_FIELDS.items() if k in n and not isinstance(n[k], t)]
+    errs += [f"needs {k}" for k in NODE_FIELDS if k != "on_demand" and k not in n]
+    if errs:
+        return errs
+    if n["id"] != stem:
+        errs.append(f"id {n['id']!r} does not match the file name")
+    if n["workflow"] not in BASE_ORDER or stem not in BASE_ORDER[n["workflow"]]:
+        errs.append(f"{stem} is not a {n['workflow']} stage")
+    if n["model"] not in MODELS:
+        errs.append(f"model must be one of {', '.join(MODELS)}")
+    if n["writes"] not in WRITES:
+        errs.append(f"writes must be one of {', '.join(WRITES)}")
+    if n["skill"] and not SKILL_NAME.fullmatch(n["skill"]):
+        errs.append(f"{n['skill']!r} is not a skill name")
+    return errs
+
+
+def load_nodes():
+    """Every built-in stage's contract from factory/nodes/<id>.json: skill, model tier, write area, hint. Fails closed."""
+    nodes, errs = {}, []
+    for f in sorted(NODES_DIR.glob("*.json")):
+        try:
+            n = json.loads(f.read_text())
+        except ValueError:
+            errs.append(f"{f.name}: not valid JSON")
+            continue
+        errs += [f"{f.name}: {e}" for e in node_problems(n, f.stem)]
+        nodes[f.stem] = n
+    errs += [f"no node file for {sid}" for order in BASE_ORDER.values() for sid in order if sid not in nodes]
+    need(not errs, f"{NODES_DIR} is not valid: {'; '.join(errs)}")
+    return nodes
+
+
+def stage_hints(wf):
+    out = {sid: NODES[sid]["hint"] for sid in BASE_ORDER[wf]}
+    return {**out, "gate": GATE_HINT} if wf == "build" else out
 
 
 def die(msg):
@@ -802,7 +834,8 @@ def compile_state(state):
     """Each workflow's transitions, hints, display order and next-stage map, from the order list."""
     customs = {c["id"]: c for c in state["stages"]}
     out = {}
-    for wf, hints_base in (("build", HINT), ("review", HINT_REVIEW), ("prove", HINT_PROVE)):
+    for wf in BASE_ORDER:
+        hints_base = stage_hints(wf)
         seq = state["order"][wf]
         nxt = {x: (seq[i + 1] if i + 1 < len(seq) else "ready") for i, x in enumerate(seq)}
         trans, hints, mine = {}, {}, {}
@@ -1154,6 +1187,7 @@ def cmd_note(jid, text):
 
 
 SKILL_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")
+NODES = load_nodes()
 
 
 @serialized
