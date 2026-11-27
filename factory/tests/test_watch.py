@@ -1,5 +1,5 @@
 from pathlib import Path
-import http.client, json, os, re, shutil, subprocess, sys, unittest
+import http.client, json, os, re, shutil, signal, subprocess, sys, threading, time, unittest
 
 from test_dashboard_build import NODE_24
 from test_job import JOB, Factory
@@ -69,6 +69,38 @@ class TestWatch(Watch):
         status, _, headers = self.http_full("GET", "/api/build/jobs")
         self.assertEqual(status, 200)
         self.assertEqual(headers.get("X-Board-Stale"), "1")
+
+    def copy_of_factory(self):
+        copy = self.base / "factory-copy"
+        shutil.copytree(Path(JOB).resolve().parents[1], copy, ignore=shutil.ignore_patterns("tests", "__pycache__"))
+        return copy
+
+    def test_the_jobs_response_carries_a_stamp_that_changes_when_the_page_does(self):
+        copy = self.copy_of_factory()
+        self.start_watch(job=copy / "bin" / "job")
+        first = self.http_full("GET", "/api/build/jobs")[2]["X-Dist"]
+        self.assertEqual(self.http_full("GET", "/api/build/jobs")[2]["X-Dist"], first)
+        (copy / "dashboard" / "dist" / "zz-new-module.js").write_text("export {};\n")
+        self.assertNotEqual(self.http_full("GET", "/api/build/jobs")[2]["X-Dist"], first)
+
+    def test_dev_mode_restarts_the_board_when_its_code_changes(self):
+        copy = self.copy_of_factory()
+        p = subprocess.Popen([sys.executable, "-I", str(copy / "bin" / "job"), "watch", "0"], cwd=str(self.base),
+                             env={**self.env, "FACTORY_DEV": "1"}, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                             stderr=subprocess.DEVNULL, text=True)
+        self.addCleanup(p.stdout.close)
+        self.addCleanup(p.wait)
+        self.addCleanup(p.send_signal, signal.SIGINT)
+        guard = threading.Timer(60, p.kill)
+        guard.daemon = True
+        guard.start()
+        self.addCleanup(guard.cancel)
+        first = p.stdout.readline()
+        self.assertRegex(first, r"^watch: 127\.0\.0\.1:\d+/\?c=\S+")
+        os.utime(copy / "bin" / "board", (time.time() + 5, time.time() + 5))
+        second = p.stdout.readline()
+        self.assertRegex(second, r"^watch: 127\.0\.0\.1:\d+/\?c=\S+")
+        self.assertNotEqual(first, second)
 
     def test_login_rules(self):
         self.start_watch()

@@ -21,32 +21,35 @@ import {
   request,
 } from "/static/payloads.js";
 import { drawWires } from "/static/wires.js";
-             
-            
-         
-      
-        
-        
-                
-                          
+
+
+
+
+
+
+
+
 
 const POLL_INTERVAL_MS = 2000;
 const LAYOUT_STORAGE_KEY = "factory.board";
 const CANVAS_HORIZONTAL_PADDING = 56;
 const CANVAS_VERTICAL_PADDING = 200;
 const STALE_BOARD_TEXT = "restart the board: its code changed since it started";
+const PAGE_CHANGED_TEXT = "page code changed: save your edits, then reload";
 
 // ---- state: one View per board, plus which boards are open as tabs
 const viewsByBoardId = new Map                   ();
 let boardOrder           = [];
 let openBoardIds           = [];
 let activeBoardId                = null;
-                                                        
+
 const editorsByKey = new Map                      ();
 let activeEditorKey                = null;
 let currentScale = 1;
 let sidebarCollapsed = false;
 let boardIsStale = false;
+let pageStamp                = null;
+let pageChanged = false;
 
 function currentView()            {
   if (!activeBoardId) throw new Error("no active board");
@@ -61,12 +64,12 @@ function currentJob()                  {
 }
 
 // The persisted keys stay terse so a layout saved by an older page still loads.
-                        
-                  
-                     
-                 
-                         
- 
+
+
+
+
+
+
 
 function saveLayout()       {
   const layout               = {
@@ -315,7 +318,7 @@ function renderTabs()       {
       return filterButton;
     }),
   );
-  requireElement("meta").textContent = boardIsStale ? STALE_BOARD_TEXT : `updated ${new Date().toLocaleTimeString()}`;
+  requireElement("meta").textContent = pageChanged ? PAGE_CHANGED_TEXT : boardIsStale ? STALE_BOARD_TEXT : `updated ${new Date().toLocaleTimeString()}`;
   updateFaviconAndTitle();
 }
 
@@ -674,7 +677,7 @@ function renderPanel()       {
   requireElement("panel").replaceChildren(...(job ? renderJobView(job) : renderOverview()));
 }
 
-                                               
+
 
 async function readFileSnapshot(boardId        , jobId        , fileName        )                           {
   try {
@@ -788,6 +791,13 @@ async function fetchJobs(boardView           )                {
       throw new Error(`status ${jobsResponse.status}/${stagesResponse.status}`);
     }
     boardIsStale = jobsResponse.headers.get("X-Board-Stale") === "1";
+    const stamp = jobsResponse.headers.get("X-Dist");
+    if (stamp && pageStamp === null) pageStamp = stamp;
+    pageChanged = Boolean(stamp && pageStamp !== stamp);
+    if (pageChanged && ![...editorsByKey.values()].some((handle) => handle.dirty())) {
+      window.location.reload();
+      return;
+    }
     const [jobsText, stagesText] = await Promise.all([jobsResponse.text(), stagesResponse.text()]);
     const payloadSignature = `${jobsText}\n${stagesText}`;
     if (payloadSignature === boardView.payloadSignature) {

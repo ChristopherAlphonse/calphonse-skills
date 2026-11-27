@@ -5,7 +5,7 @@ Build (jobs that write code) and Review (read-only code reviews). It runs the bu
   board watch [port|auto]   run the board in the foreground
   board ensure              print the link of the running board, starting one if needed
 """
-import contextlib, fcntl, hashlib, io, hmac, importlib.machinery, importlib.util, json, os, re, secrets, select, shutil, socket, subprocess, sys, tempfile, time
+import contextlib, fcntl, hashlib, io, hmac, importlib.machinery, importlib.util, json, os, re, secrets, select, shutil, socket, subprocess, sys, tempfile, threading, time
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -357,8 +357,9 @@ class Handler(BaseHTTPRequestHandler):
                 "custom": {c["id"]: {"label": c["label"], "blurb": c["brief"] or c["label"]} for c in ENGINE.pipeline_custom() if c["workflow"] == board},
                 "proposal": ENGINE.proposal_state()}))
         if m.group(2) == "jobs":
+            rebuild_dashboard()
             return self.send(200, json.dumps([ENGINE.snapshot(j) for j in ENGINE.all_jobs() if BOARD_SPECS[board][1](j)]),
-                             extra={"X-Board-Stale": "1"} if board_is_stale() else None)
+                             extra={"X-Dist": dist_stamp(), **({"X-Board-Stale": "1"} if board_is_stale() else {})})
         return self.get_file(board, q.get("job", [""])[0], q.get("name", [""])[0])
 
     def do_POST(self):
@@ -408,19 +409,44 @@ class Handler(BaseHTTPRequestHandler):
         self.send(200, "{}")
 
 
+REBUILD_LOCK = threading.Lock()
+FAILED_AT = [None]
+
+
+def dist_stamp():
+    """Changes whenever a file the page loads changes, so an open tab knows to reload."""
+    try:
+        files = [*DIST_DIR.glob("*.js"), DASH_DIR / "dashboard.css", DASH_DIR / "index.html"]
+        return str(max(p.stat().st_mtime_ns for p in files))
+    except (OSError, ValueError):
+        return ""
+
+
 def rebuild_dashboard():
-    """Regenerate dist/ when a .ts is newer. The committed dist is the fallback, so this never raises."""
+    """Regenerate dist/ when a .ts is newer. The committed dist is the fallback, so this never raises.
+    It runs on every jobs poll, so one rebuild at a time, and a failed one is not retried until a source changes."""
+    if not REBUILD_LOCK.acquire(blocking=False):
+        return
+    try:
+        _rebuild_dashboard()
+    finally:
+        REBUILD_LOCK.release()
+
+
+def _rebuild_dashboard():
     def warn(msg):
         print(f"dashboard: {msg}; serving the committed dist", file=sys.stderr)
 
     try:
+        newest = max((src.stat().st_mtime_ns for src in DASH_DIR.glob("*.ts")), default=0)
         stale = any(not (DIST_DIR / f"{src.stem}.js").exists()
                     or src.stat().st_mtime > (DIST_DIR / f"{src.stem}.js").stat().st_mtime
                     for src in DASH_DIR.glob("*.ts"))
     except OSError as e:
         return warn(f"cannot compare sources with dist/ ({e})")
-    if not stale:
+    if not stale or FAILED_AT[0] == newest:
         return
+    FAILED_AT[0] = newest
     node = shutil.which("node")
     if not node:
         return warn("a source is newer than dist/ but node is not on PATH")
@@ -429,7 +455,8 @@ def rebuild_dashboard():
     except (OSError, subprocess.SubprocessError) as e:
         return warn(f"rebuild failed ({e})")
     if r.returncode:
-        warn(f"rebuild failed ({(r.stderr.strip().splitlines() or ['no output'])[-1]})")
+        return warn(f"rebuild failed ({(r.stderr.strip().splitlines() or ['no output'])[-1]})")
+    FAILED_AT[0] = None
 
 
 def bind(port):
@@ -558,9 +585,31 @@ def cmd_ensure():
         print(m.group(1))
 
 
+def dev_supervise(port):
+    """FACTORY_DEV=1: restart the board when bin/board or bin/job change. Each restart makes a new link, because the session and keys live in memory on purpose."""
+    env = {k: v for k, v in os.environ.items() if k != "FACTORY_DEV"}
+    while True:
+        seen = own_fingerprint()
+        child = subprocess.Popen([sys.executable, "-I", str(Path(__file__).resolve()), "watch", port], env=env)
+        try:
+            while child.poll() is None and own_fingerprint() == seen:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            child.terminate()
+            child.wait()
+            return
+        if child.poll() is not None:
+            sys.exit(child.returncode)
+        child.terminate()
+        child.wait()
+        print("dev: board code changed, restarting", file=sys.stderr, flush=True)
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
-    if cmd == "watch":
+    if cmd == "watch" and os.environ.get("FACTORY_DEV") == "1":
+        dev_supervise(sys.argv[2] if len(sys.argv) > 2 else str(FIRST_PORT))
+    elif cmd == "watch":
         cmd_watch(sys.argv[2] if len(sys.argv) > 2 else str(FIRST_PORT))
     elif cmd == "ensure":
         cmd_ensure()

@@ -10,7 +10,7 @@ The board is written in TypeScript, in `dashboard/*.ts`. The server reads the ge
 - When a source is newer or a dist file is missing, and Node is absent or the build fails, they print one `dashboard:` warning, log it in `audit.log`, and serve the committed `dist/`.
 - To build by hand, run `node factory/dashboard/build.mjs`. It needs Node 24 or later.
 - `node factory/dashboard/build.mjs --check` fails when a `dist/*.js` is stale, missing or has no `.ts`. `tests/test_dashboard_build.py` runs it.
-- A running board does not reload. Restart it after you edit a `.ts` file.
+- The page reloads by itself after you edit a `.ts` file: the board rebuilds `dist/` on its next poll (needs `node` on PATH), and an open tab reloads once no editor tab has unsaved text. Edits to `bin/board` or `bin/job` need a restart. Run the board with `FACTORY_DEV=1` (`FACTORY_DEV=1 bin/job watch`) to restart it on those edits. Every restart makes a new link.
 - Only erasable syntax is allowed: no `enum`, `namespace` or constructor parameter properties.
 - `dashboard/tsconfig.json` is for running `tsc` by hand and needs TypeScript 5.8 or later (`erasableSyntaxOnly`). Nothing runs it for you.
 
