@@ -16,7 +16,7 @@ What stops an agent from force-pushing, rewriting history, or changing things it
 
 The board commands `approve`, `commit`, and `unblock` are not CLI commands. They run only from the board. A plain `git commit` is allowed and is not the board command.
 
-The board binds to localhost and prints a code in its link. The code becomes a session cookie. Every action also needs a custom header and a loopback `Host`. The approval key lives only in the server's memory, and the git hooks check its hash.
+The board binds to localhost and prints a code in its link. The code becomes a session cookie. Every action also needs a custom header and a loopback `Host`. The approval key lives only in the server's memory and authorises the board buttons.
 
 The commit click refuses unless all of these hold:
 

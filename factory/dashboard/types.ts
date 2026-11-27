@@ -40,6 +40,7 @@ interface JobFields {
   worktree: string | null;
   repo?: string | null;
   commit?: string | null;
+  tip?: string | null;
   note: string;
   review?: ReviewRange;
   activity?: Activity[];

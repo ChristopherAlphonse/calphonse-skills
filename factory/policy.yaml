@@ -145,12 +145,11 @@ rules:
       - whoami
       - git branch
       - git branch *
+      # Plain staging, commit and push run unattended. Deny rules above stop force pushes and hook bypasses.
+      # `git -C` is a global option and stays blocked, so it has no allow form here.
       - git add*
-      - git -C * add*
       - git commit*
-      - git -C * commit*
       - git push*
-      - git -C * push*
       - git describe *
       - git diff
       - git diff *

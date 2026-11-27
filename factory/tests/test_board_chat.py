@@ -25,13 +25,15 @@ class TestChatTurnCap(Factory):
         self.assertEqual(st, 200)
         return json.loads(body)
 
-    def test_the_bot_may_create_a_job_but_never_approve_commit_or_unblock(self):
+    def test_the_bot_may_create_a_job_but_never_press_a_board_button(self):
         self.board()
         self.ask("")
         allowed = [a for a in json.loads(self.calls.read_text().splitlines()[0]) if a.startswith("Bash(")]
         self.assertTrue(any(a.endswith(" create:*)") for a in allowed), allowed)
         for button in ("approve", "commit", "unblock"):
-            self.assertFalse(any(f" {button}" in a for a in allowed), allowed)
+            self.assertFalse(any(f" {button}:*)" in a for a in allowed), allowed)
+        self.assertTrue(any(a == "Bash(git commit*)" for a in allowed), allowed)
+        self.assertTrue(any(a == "Bash(git push*)" for a in allowed), allowed)
 
     def resumed(self):
         return ["--resume" in json.loads(l) for l in self.calls.read_text().splitlines()]

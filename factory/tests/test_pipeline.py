@@ -75,7 +75,7 @@ class TestPropose(Pipeline):
         for args, why in (
             (("remove", "build", "spec"), "spec cannot be removed: nothing is built until you approve the spec"),
             (("remove", "build", "build"), "build cannot be removed"),
-            (("remove", "build", "ship"), "ship cannot be removed: it is where you click Commit locally"),
+            (("remove", "build", "ship"), "ship cannot be removed: it is where the change is committed"),
             (("remove", "review", "report"), "report cannot be removed"),
             (("remove", "prove", "prove"), "prove cannot be removed: it is the check"),
             (("move", "build", "build", "start"), "build has to come after spec"),

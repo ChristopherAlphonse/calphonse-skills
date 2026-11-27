@@ -37,15 +37,20 @@ class Guard:
         self.assertEqual(self.sh("ls -la"), 0)
 
     def test_an_ask_blocks_even_inside_a_chain_or_substitution(self):
-        for c in ("git add x", "ls && git add x", "echo $(git add x)", "ls | git add x", "echo `git add x`"):
+        for c in ("git merge x", "ls && git merge x", "echo $(git merge x)", "ls | git merge x", "echo `git merge x`"):
             with self.subTest(c):
                 self.assertEqual(self.sh(c), 2)
+
+    def test_a_plain_commit_and_push_pass(self):
+        for c in ("git commit -m x", "git push origin main", "git add x"):
+            with self.subTest(c):
+                self.assertEqual(self.sh(c), 0)
 
     def test_a_command_no_rule_names_is_blocked(self):
         self.assertEqual(self.sh("rm -rf somewhere"), 2)
 
     def test_a_deny_blocks(self):
-        for c in ("git commit -m x", "git --no-pager commit -m x", "gh pr create", "env git commit -m x"):
+        for c in ("git push --force origin main", "git commit --amend --no-edit", "gh pr create", "env git push --force origin main"):
             with self.subTest(c):
                 self.assertEqual(self.sh(c), 2)
 
@@ -121,7 +126,7 @@ class OpenCodeGuard(Guard, unittest.TestCase):
 
     def test_the_plugin_blocks_what_the_guard_blocks_and_passes_the_rest(self):
         self.assertEqual(self.plugin("bash", {"command": "ls"}), "ok")
-        self.assertTrue(self.plugin("bash", {"command": "git add x"}).startswith("blocked: "))
+        self.assertTrue(self.plugin("bash", {"command": "git merge x"}).startswith("blocked: "))
         self.assertTrue(self.plugin("write", {"filePath": "opencode.jsonc"}).startswith("blocked: "))
 
     def test_the_plugin_blocks_when_the_guard_cannot_run(self):

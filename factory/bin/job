@@ -38,7 +38,7 @@ HINT = {
     "build": "swe plus stack skill, one task at a time -> build.md (STATUS: READY, or STATUS: BLOCKED)",
     "gate": "job gate <id>: it passes the job on, or sends it back to build",
     "polish": "comment-sicko then simplify -> polish.md (STATUS: DONE, or STATUS: REWORK to send it back to build)",
-    "ship": "pr-body-style (+ demo-script) -> pr-body.md and commit.md, then wait for the user to click Commit locally",
+    "ship": "pr-body-style (+ demo-script) -> pr-body.md and commit.md, then a commit on the branch (yours or the user's click)",
 }
 HINT_REVIEW = {
     "scope": "find the repo's own lint, type, and test tooling (CI config, Makefile, pyproject, package scripts, whatever it uses) -> scope.md (STATUS: READY, or reject with rejection.md); add an architecture reviewer with `job route`",
@@ -397,7 +397,11 @@ def from_polish(job, d, rd, to):
 def from_ship(job, d, rd, to):
     if to == "ready":
         need((d / "pr-body.md").exists(), "pr-body.md missing")
-        need(job["commit"] or branch_has_commit(job), "nothing committed: commit the branch or click Commit locally")
+        tip = job["commit"]
+        if not tip and branch_has_commit(job):
+            tip = git_out(["rev-parse", "HEAD"], job["worktree"]).strip()
+        need(tip, "nothing committed: commit the branch or click Commit locally")
+        job["tip"] = tip
     elif to == "build":
         to = bump_round(job)
     return to
@@ -571,7 +575,8 @@ def worktree_problems(job, wt):
     if git(["symbolic-ref", "-q", "HEAD"], wt).stdout.strip() != (f"refs/heads/{job['branch']}" if job["branch"] else ""):
         probs.append("worktree is not on the job's branch")
     if job.get("review"):
-        edited = git_files(["diff", "--name-only", "-z", "HEAD"], wt)
+        # Compare to the reviewed commit, so a commit cannot hide an edit to tracked files.
+        edited = git_files(["diff", "--name-only", "-z", job["review"]["head"]], wt)
         if edited:
             probs.append("a reviewer edited tracked files: " + ", ".join(edited[:5]))
     return probs
@@ -630,7 +635,7 @@ BASE_ORDER = {
 WHY_REQUIRED = {
     "spec": "nothing is built until you approve the spec",
     "build": "it is where the code gets written",
-    "ship": "it is where you click Commit locally",
+    "ship": "it is where the change is committed",
     "scope": "reviewers need it",
     "review": "it is the review",
     "report": "it is the result",
@@ -699,7 +704,7 @@ def order_problems(wf, order, custom_ids):
         before("spec", "build", "build has to come after spec: nothing is built until you approve the spec")
         before("build", "polish", "polish has to come after build: it works on the code build writes")
         if "ship" in pos and order[-1] != "ship":
-            errs.append("ship has to be the last stage: it waits for your Commit locally click")
+            errs.append("ship has to be the last stage: it is where the branch gets its commit")
     elif wf == "review":
         before("scope", "review", "review has to come after scope")
         before("review", "reconcile", "reconcile has to come after review")
@@ -1174,6 +1179,7 @@ def cmd_commit(jid):
     d = jobdir(jid)
     need(job["stage"] == "ship", f"{jid} is at {job['stage']}")
     need(not job["commit"], "already committed")
+    need(not branch_has_commit(job), "the branch already holds a commit")
     need((d / "pr-body.md").exists(), "pr-body.md missing")
     msg = d / "commit.md"
     need(msg.exists() and msg.read_text().strip(), "commit.md missing or empty")
@@ -1247,7 +1253,7 @@ def archive_job(job):
 
 @serialized
 def cmd_close(jid):
-    """Finish a job at ship whose work the user committed on its branch outside the board."""
+    """Finish a job at ship whose work was committed on its branch outside the board."""
     job = load(jid)
     need(job["stage"] == "ship", f"{jid} is at {job['stage']}, only a job at ship can be closed")
     need((jobdir(jid) / "pr-body.md").exists(), "pr-body.md missing")
@@ -1260,7 +1266,7 @@ def cmd_close(jid):
     job["commit"] = job["tip"] = job["commit"] or head
     job["stage"], job["ended"] = "ready", now()
     save(job)
-    audit("close", jid, f"{job['commit']} committed outside the board")
+    audit("close", jid, f"{job['commit']} committed on the branch")
     release_worktree(job)
     save(job)
     drop_merged_branch(job)
@@ -1342,7 +1348,8 @@ def waiting_on_human(job):
         return (d / SPEC_FILE).exists() and (not job["approvals"].get("spec")
                 or job["approvals"].get("spec_sha") != file_sha(d / SPEC_FILE))
     if s == "ship":
-        return (d / "pr-body.md").exists() and (d / "commit.md").exists() and not job["commit"]
+        return ((d / "pr-body.md").exists() and (d / "commit.md").exists()
+                and not job["commit"] and not branch_has_commit(job))
     return False
 
 
@@ -1378,8 +1385,8 @@ def needs_you(job):
         todo = "Read spec.md under Files, then click Approve spec."
     elif s == "ship":
         action, files = "Commit locally", "pr-body.md and commit.md"
-        why = "The gate passed and the PR body and commit message are written. Nothing is committed until you click."
-        todo = "Read pr-body.md and commit.md under Files, then click Commit locally."
+        why = "The gate passed and the PR body and commit message are written. The branch still has no commit."
+        todo = "Read pr-body.md and commit.md under Files, then commit the branch or click Commit locally."
     else:
         action, files = "Unblock", "blocked.md"
         why = job.get("note") or "The job stopped and cannot continue on its own."

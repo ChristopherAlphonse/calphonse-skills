@@ -27,7 +27,7 @@ Three rules hold the whole repo together.
 
 1. **A skill does one thing.** `swe` makes the smallest change. `qa-review` judges maintainability. `prove-it-works` checks the real result. None of them tries to be a workflow.
 2. **A workflow is a chain of skills.** `factory` calls other skills as stages, for building and for reviewing. They add no new judgment of their own. They add order, evidence checks, and a place for you to say yes.
-3. **You stay in control.** Agents write files and leave code uncommitted. A script checks the files before a job moves on. Only your click on the board approves a spec or commits.
+3. **You stay in control.** Agents write files and may commit and push plainly. A script checks the files before a job moves on. Only your click on the board approves a spec; destructive git forms and PR/MR creation stay denied.
 
 ```mermaid
 flowchart LR
@@ -86,7 +86,7 @@ Then try `qa-review` on a branch with changes. It reviews only the lines you cha
 
 ## How the factory works
 
-`factory` takes a feature idea and produces a reviewed commit on a local branch, with a PR body written. It never pushes and never opens a PR or MR.
+`factory` takes a feature idea and produces a reviewed commit on a local branch, with a PR body written. Plain pushes are allowed; it never opens a PR or MR.
 
 Each box below is a stage. A fresh agent runs the skill named in it and writes one file. A script, `bin/job`, reads that file and decides whether the job may move on. Gold boxes wait for your click on the board.
 
@@ -104,13 +104,13 @@ flowchart LR
     gate2 --> prove["prove<br/>prove-it-works"]
     prove -->|"fail"| build
     prove -->|"pass"| ship["ship<br/>pr-body-style"]
-    ship --> commit{{"You click Commit locally"}}
+    ship --> commit{{"A commit on the branch"}}
     commit --> ready(["ready"])
     build -.->|"blocked or rounds used up"| human["Needs you"]
     human -.->|"you click Unblock"| build
 
     classDef you fill:#fff3bf,stroke:#b8860b,color:#000
-    class approve,commit,human you
+    class approve,human you
 ```
 
 Four things make this safe to run unattended:
@@ -120,7 +120,7 @@ Four things make this safe to run unattended:
 | Evidence, not "done"  | An agent saying it finished counts for nothing. `bin/job` advances a job only when the stage's file exists with the right status line, and the gate passes on a command's real output. |
 | Fresh agent per stage | Each stage starts with no memory of the last one, so a reviewer never inherits the builder's blind spots.                                                                              |
 | Bounded retries       | A job gets `max_rounds` build rounds (default 3), then lands in **Needs you** instead of looping.                                                                                      |
-| No push, no PR        | The only commit is the one you trigger. Shell rules block `git push`, `gh`, `glab`, and `curl`, and your remote's protected branches are the real backstop.                            |
+| No force push, no PR  | Plain commits and pushes are allowed. Shell rules block force pushes, hook bypasses, `gh`, `glab`, and `curl`, and your remote's protected branches are the real backstop.              |
 
 Stack skills are picked from file names, not by the agent: TypeScript and React files add `typescript-strict-style` and `vercel-react-best-practices`, C# adds `dotnet`, Python adds `python`.
 

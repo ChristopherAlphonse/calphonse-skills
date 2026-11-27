@@ -238,6 +238,19 @@ class TestNoHumanGatesAndNoWrites(Review):
         self.ok("queue")
         self.assertEqual(self.stage("r"), "scope")
 
+    def test_a_reviewer_committing_a_tracked_file_also_parks_the_job(self):
+        self.new_review()
+        target = self.wt("r") / "src" / "math.ts"
+        original = target.read_text()
+        target.write_text(original + "// fixed it\n")
+        self.git("add", "-A", cwd=self.wt("r"))
+        self.git("commit", "-m", "reviewer edit", cwd=self.wt("r"))
+        self.ok("queue")
+        self.assertEqual(self.stage("r"), "needs-human")
+        self.assertIn("a reviewer edited tracked files", self.js("r")["note"])
+        self.human("unblock", "r")
+        self.assertEqual(target.read_text(), original)
+
     def test_scratch_files_from_running_tests_do_not_park_the_job(self):
         self.new_review()
         (self.wt("r") / "coverage.out").write_text("generated\n")

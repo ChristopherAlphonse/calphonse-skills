@@ -165,9 +165,11 @@ class TickTests(unittest.TestCase):
                        "gh", "glab", "curl", "sh -c"]:
             self.assertIn(needed, BLOCKED)
         run(self.root, "install", "claude")
-        deny = json.loads((self.root / ".claude" / "settings.json").read_text())["permissions"]["deny"]
-        self.assertIn("Bash(git * commit *)", deny)
-        self.assertIn("Bash(git * commit)", deny)
+        perms = json.loads((self.root / ".claude" / "settings.json").read_text())["permissions"]
+        self.assertIn("Bash(git * merge *)", perms["deny"])
+        self.assertIn("Bash(git * merge)", perms["deny"])
+        self.assertIn("Bash(git commit*)", perms["allow"])
+        self.assertIn("Bash(git push*)", perms["allow"])
 
     def test_unknown_harness_and_bad_usage_refused(self):
         self.assertEqual(run(self.root, "bash", "--dry-run").returncode, 2)
@@ -334,7 +336,10 @@ class BaselinePolicyTests(unittest.TestCase):
     def test_policy_yaml_is_read_in_full(self):
         self.assertIn("git push*--force*", self.base["deny"])
         self.assertIn("curl -X POST*", self.base["deny"])
-        self.assertIn("git -C * commit*", self.base["ask"])
+        self.assertIn("git commit*", self.base["allow"])
+        self.assertIn("git push*", self.base["allow"])
+        self.assertNotIn("git -C * commit*", self.base["allow"])
+        self.assertIn("git -C * merge*", self.base["ask"])
         self.assertIn("git worktree*", self.base["ask"])
         self.assertIn("git status *", self.base["allow"])
         self.assertIn("sed -n '*,*p'*", self.base["allow"])
@@ -383,7 +388,7 @@ class BaselinePolicyTests(unittest.TestCase):
     def test_the_project_cannot_allow_what_the_policy_denies_or_asks_for(self):
         state = self.root / ".planning" / SKILL
         state.mkdir(parents=True)
-        (state / "config.json").write_text(json.dumps({"allow": ["git add*", "gh *"]}))
+        (state / "config.json").write_text(json.dumps({"allow": ["git merge*", "gh *"]}))
         for h in HARNESSES:
             with self.subTest(h):
                 root = self.root / h
@@ -392,7 +397,7 @@ class BaselinePolicyTests(unittest.TestCase):
                 (root / ".planning" / SKILL / "config.json").write_text((state / "config.json").read_text())
                 run(root, "install", h)
                 got = enforced(root, h)
-                self.assertFalse({"git add*", "gh *"} & got["allow"])
+                self.assertFalse({"git merge*", "gh *"} & got["allow"])
                 self.assertEqual(run(root, "check", h).returncode, 0)
 
     def test_a_bad_allow_list_is_refused(self):
@@ -428,6 +433,8 @@ class BaselinePolicyTests(unittest.TestCase):
             root.mkdir()
             run(root, "install", h)
             for pattern in enforced(root, h)["allow"]:
+                if pattern in ("git push*", "git -C * push*"):
+                    continue  # plain push is allowed; only its destructive forms are denied
                 with self.subTest(harness=h, pattern=pattern):
                     self.assertNotRegex(pattern, r"install|publish|deploy|upload|push|terraform apply|^aws |^docker |^kubectl ")
 
@@ -435,12 +442,12 @@ class BaselinePolicyTests(unittest.TestCase):
         run(self.root, "install", "claude")
         path = self.root / ".claude" / "settings.json"
         cfg = json.loads(path.read_text())
-        cfg["permissions"]["ask"].remove("Bash(git add*)")
+        cfg["permissions"]["ask"].remove("Bash(git merge*)")
         path.write_text(json.dumps(cfg))
         r = run(self.root, "check", "claude")
         self.assertEqual(r.returncode, 2)
-        self.assertIn("git add*", r.stderr)
-        cfg["permissions"]["deny"].append("Bash(git add*)")
+        self.assertIn("git merge*", r.stderr)
+        cfg["permissions"]["deny"].append("Bash(git merge*)")
         path.write_text(json.dumps(cfg))
         self.assertEqual(run(self.root, "check", "claude").returncode, 0)
 
@@ -476,7 +483,7 @@ class BaselinePolicyTests(unittest.TestCase):
         path.write_text(json.dumps(cfg))
         r = run(self.root, "check", "kiro")
         self.assertEqual(r.returncode, 2)
-        self.assertIn("git commit*", r.stderr)
+        self.assertIn("git merge*", r.stderr)
 
     def test_a_malformed_policy_file_is_refused_rather_than_half_read(self):
         bad = {

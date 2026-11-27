@@ -34,7 +34,7 @@ Never ask the user what to write the body for when the answer can be found. Work
 1. A PR/MR URL, branch, or draft body in the message or conversation.
 2. Otherwise the current branch of the repo in the working directory (or the repo the conversation has been about): diff against the default branch, and read the open PR/MR for it if one exists.
 3. If the branch has no diff against the default branch, say so in one line and stop.
-4. Also publish every factory branch that is ready: each `.planning/factory/jobs/*/job.json` with a non-empty `commit` (the user clicked **Commit locally**) whose `branch` has no PR yet. Use that job's `pr-body.md` as the body (fix it against the diff if needed) and the subject of its `commit.md` as the title. Open one PR per branch. Skip jobs with no `commit`.
+4. Also publish every factory branch that is ready: each `.planning/factory/jobs/*/job.json` at stage `ready` whose `branch` has no PR yet. Use that job's `pr-body.md` as the body (fix it against the diff if needed) and the subject of its `commit.md` as the title. Open one PR per branch. Skip jobs whose branch has no commit.
 
 Ask only when two or more candidates remain after this (for example, several repos with unrelated changes), and then name the candidates in the question. Do not offer a menu of input types.
 
@@ -263,9 +263,9 @@ Prefer the CLI (`gh pr create`, `glab mr create`) over raw API calls; reach for 
 
 ### Factory branches
 
-Factory branches live in `.worktrees/<id>/`, and that worktree's pre-push hook refuses pushes without the board's key. Never use `--no-verify` or change `core.hooksPath` to get past it. When the user invoked this skill directly, the Commit locally click already happened: push from the main checkout, not the worktree, with `cd <repo root> && git push -u origin <branch>`, so the repo's own hooks run as usual. Push only when `git rev-parse <branch>` equals the job's `commit`. If the tip differs, someone committed after the user's click: skip that branch and say why in one line. If a hook rejects the push, stop and show the error.
+Factory branches live in `.worktrees/<id>/`. Agents may push from the worktree or from the main checkout; either way the repo's own hooks run. Never use `--no-verify` or change `core.hooksPath` to get past a hook. When the user invoked this skill directly, push from the main checkout with `cd <repo root> && git push -u origin <branch>`. Push only when `git rev-parse <branch>` equals the job's `tip`. If the tip differs, the branch moved after the job finished: skip that branch and say why in one line. If a hook rejects the push, stop and show the error.
 
-Never end by handing the user commands to push or open the PR/MR. Do it. Skip publishing only when the user says "draft only" or similar, when the target is a PR/MR in someone else's repo, or when this skill runs as a `factory` stage (factory forbids push and `gh`/`glab`). If the push or CLI/API call fails for another reason, show the error and the body.
+Never end by handing the user commands to push or open the PR/MR. Do it. Skip publishing only when the user says "draft only" or similar, when the target is a PR/MR in someone else's repo, or when this skill runs as a `factory` stage (that stage writes the body and commit message; it does not open a PR/MR). If the push or CLI/API call fails for another reason, show the error and the body.
 
 ## CI Checks Reference
 

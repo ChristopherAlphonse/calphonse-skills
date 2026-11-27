@@ -76,4 +76,4 @@ It prints a single-use link. Open it in a browser, click through what you change
 
 ## Done means
 
-Tests pass, `build.mjs --check` passes, `README.md`, `docs/`, `SKILL.md` and `board-agent.md` match the behavior (a new feature gets an entry in `docs/features.md`), nothing is committed (the user commits), and you have said what you did not verify.
+Tests pass, `build.mjs --check` passes, `README.md`, `docs/`, `SKILL.md` and `board-agent.md` match the behavior (a new feature gets an entry in `docs/features.md`), and you have said what you did not verify.

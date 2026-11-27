@@ -523,7 +523,7 @@ def write_private(path, text):
 
 
 def cmd_watch(port):
-    """Run the board. The engine gets the one key, whose hash its git hooks check."""
+    """Run the board. The engine gets the one key that authorises its board buttons."""
     global SESSION, CODE, ENGINE
     ENGINE = load_engine()
     rebuild_dashboard()

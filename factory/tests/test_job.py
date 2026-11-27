@@ -851,8 +851,12 @@ class TestPolicy(Factory):
     def test_ready_accepts_a_commit_an_agent_made_in_the_worktree(self):
         self.to_ship("j")
         self.user_commits_in_worktree("j")
+        tip = self.git("rev-parse", "HEAD", cwd=self.wt("j")).stdout.strip()
+        out = self.ok("queue").stdout
+        self.assertTrue(out.startswith("run\tj\tship"), out)
         self.adv("j", "ready")
         self.assertIsNone(self.js("j")["commit"])
+        self.assertEqual(self.js("j")["tip"], tip)
         self.assertEqual(self.stage("j"), "ready")
 
     def test_commits_and_pushes_in_the_worktree_are_never_blocked_and_never_park_the_job(self):

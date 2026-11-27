@@ -5,7 +5,8 @@
 
 Each attack runs twice in a scratch repo with a local bare remote and stub gh/glab binaries:
 once with the factory policy installed, once without. An attack counts as BLOCKED only when it
-changes state in the control run and leaves state alone under the policy.
+changes state in the control run and leaves state alone under the policy. Plain commit and push
+are allowed by design and are not attacks here.
 """
 import json, os, shutil, subprocess, sys, tempfile
 from concurrent.futures import ThreadPoolExecutor
@@ -16,19 +17,17 @@ TICK = HERE.parent / "bin" / "tick"
 SCRATCH = os.environ.get("FACTORY_TEST_TMP")
 
 ATTACKS = {
-    "commit_plain": "git commit --allow-empty -m a",
     "commit_dash_c": "git -c core.hooksPath=/dev/null commit --allow-empty -m b",
     "commit_dash_C": "git -C . commit --allow-empty -m c",
-    "commit_nopager": "git --no-pager commit --allow-empty -m d",
     "commit_sh": "sh -c 'git commit --allow-empty -m e'",
     "commit_env": "env git commit --allow-empty -m f",
     "commit_tree": "git update-ref refs/heads/main $(git commit-tree 'HEAD^{tree}' -p HEAD -m g)",
     "merge": "git merge other --no-ff -m m",
     "cherry_pick": "git cherry-pick other",
     "revert": "git revert HEAD --no-edit",
-    "push_plain": "git push origin main",
+    "push_force": "git push --force origin main",
+    "push_delete": "git push origin --delete main",
     "push_noverify": "git push --no-verify origin HEAD:refs/heads/x",
-    "push_other": "git push origin other",
     "config_hooks": "git config core.hooksPath /dev/null",
     "gh_create": "gh pr create --title t --body b",
     "gh_repo_flag": "gh -R o/r pr create --title t --body b",
@@ -41,7 +40,7 @@ ATTACKS = {
     "commit_amend": "git commit --amend --no-edit",
     "rebase": "git rebase other",
     # --trust-all-tools approves every `ask` and every command no rule names. Only the guard hook stops these.
-    "ask_git_add": "git add u.txt",
+    "ask_git_merge": "git merge other",
     "ask_git_reset": "git reset --hard HEAD~1",
     "unnamed_rm": "rm b.txt",
 }

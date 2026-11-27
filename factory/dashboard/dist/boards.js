@@ -13,9 +13,9 @@ const BUILD_STAGES          = [
   {
     id: "ship",
     label: "Ship",
-    blurb: "PR body and commit message. You commit.",
+    blurb: "PR body and commit message, then a commit on the branch.",
   },
-  { id: "ready", label: "Ready", blurb: "Committed locally." },
+  { id: "ready", label: "Ready", blurb: "Commit on the branch." },
 ];
 
 const PROVE_STAGES          = [
@@ -79,7 +79,7 @@ export const BOARD_DEFINITIONS                                                  
     homeStage: "build",
     doneLabel: "Ready to land",
     intro:
-      "Local only. Nothing is pushed, and nothing is committed until you click.",
+      "Plain commits and pushes are allowed. Board buttons stay yours.",
     kind: "Build job",
     stats: (job) => [
       [!job.round ? "-" : `${job.round}/${job.roundLimit}`, "round"],
@@ -93,8 +93,8 @@ export const BOARD_DEFINITIONS                                                  
         ...(job.stage === "gate" || job.gate
           ? [{ text: `gate ${job.gate || "pending"}`, cls: job.gate || "" }]
           : []),
-        ...(job.commit
-          ? [{ text: `committed locally ${job.commit.slice(0, 7)}`, cls: "PASS" }]
+        ...(job.commit || job.tip
+          ? [{ text: `commit ${(job.commit || job.tip).slice(0, 7)}`, cls: "PASS" }]
           : []),
       ],
       ...stackChips(job),
