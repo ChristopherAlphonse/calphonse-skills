@@ -10,34 +10,25 @@ description: >
 
 # Prove It Works
 
-After finishing a task, check the real result directly before saying it is
-done. Do not rely on stand-ins such as "it compiles," a status report, or
-a guess based on indirect signs.
+After finishing a task, check the real result directly before saying it is done. Don't rely on stand-ins such as "it compiles," a status report, or a guess from indirect signs.
 
-**Why:** Work that has not been checked may be wrong, and nobody knows. Indirect
-checks (file timestamps, how fresh the output looks, an agent saying it
-succeeded, an old screenshot) feel cheaper than looking at the real thing.
-Acting on a wrong guess costs far more than checking the source.
+**Why:** Unchecked work may be wrong, and nobody knows. Indirect checks (file timestamps, how fresh the output looks, an agent saying it succeeded, an old screenshot) feel cheaper than looking at the real thing. Acting on a wrong guess costs far more than checking the source.
 
 ## When to Use
 
-- A task is finished and you are about to tell the user it is done.
-- You are about to trust another agent's report that something worked.
-- A check just failed and you are not sure whether the system or the
-  check is at fault.
+- A task is finished and you're about to tell the user it's done.
+- You're about to trust another agent's report that something worked.
+- A check just failed and you're not sure whether the system or the check is at fault.
 
 ## When Not to Use
 
 - The task is still in progress. Check once the work is complete.
-- The user asked only for an explanation or opinion, with no result to
-  verify.
+- The user asked only for an explanation or opinion, with no result to verify.
 
 ## What You Need First
 
-- A clear list of what the user asked for: the exact outputs, values,
-  file paths, and formats they named.
-- A way to see the real result: run the feature, open the file, or read
-  the value from where it actually lives.
+- A clear list of what the user asked for: the exact outputs, values, file paths, and formats they named.
+- A way to see the real result: run the feature, open the file, or read the value from where it lives.
 
 ## Workflow
 
@@ -47,10 +38,8 @@ Re-read the original request and write down each thing that must be true.
 
 ### Step 2: Check each one at the source
 
-- Check that a process is running by asking the system directly, not by
-  looking at files or logs it may have left behind.
-- Read the actual value from where it lives, not from a cached or
-  re-formatted copy.
+- Check a process is running by asking the system directly, not by looking at files or logs it may have left behind.
+- Read the actual value from where it lives, not a cached or re-formatted copy.
 - Run the feature the way a user would, and look at what it really does.
 - Look at the actual changes made, not your memory of making them.
 
@@ -59,48 +48,35 @@ If the work includes a test you wrote or kept, judge it with two edits:
 - **Break the behavior.** Make the code return a wrong value or skip an effect. If the test still passes, it proves nothing. Usual causes: an assertion looser than the contract, or an expected value computed by the code under test.
 - **Change only the internals.** Restructure the code and keep every observable result. If the test now fails, it is pinned to the implementation. Rewrite it to assert what a caller or user can observe.
 
-If the work includes a number you measured (a speedup, a latency, a test count), find what limits it before you report it, and rule out that it measured something other than the work you think. A before and after taken on different inputs, a warm cache against a cold one, or a run that never reached the changed code all produce numbers that look real.
+If the work includes a number you measured (a speedup, a latency, a test count), find what limits it before you report it, and rule out that it measured something other than the work you think. A before and after on different inputs, a warm cache against a cold one, or a run that never reached the changed code all produce numbers that look real.
 
 ### Step 3: If a check fails, doubt the check first
 
-Before assuming the system is broken, make sure you looked in the right
-place and in the right way. Then fix whichever one is actually wrong.
+Before assuming the system is broken, make sure you looked in the right place and the right way. Then fix whichever is actually wrong.
 
 ### Step 4: Script the check when you can
 
-The strongest proof is a script that repeats the same comparison every
-time, instead of a one-time look. Write the script, run it, and keep its
-output so a reviewer can run it again instead of taking your word.
+The strongest proof is a script that repeats the same comparison every time, not a one-time look. Write it, run it, and keep its output so a reviewer can rerun it instead of taking your word.
 
-Keep the script and its output where the user can see them. Save them to
-version control only for large or complex work where the trail must be
-auditable later, such as a big port or migration.
+Keep the script and output where the user can see them. Save them to version control only for large or complex work where the trail must be auditable later, such as a big port or migration.
 
 ### Step 5: Report what you checked
 
-Tell the user what you checked and how. Say plainly anything you could
-not check, instead of claiming the task is complete.
+Tell the user what you checked and how. Say plainly anything you couldn't check, instead of claiming the task is complete.
 
 ### Step 6: Write the UAT document
 
-This is always the last step. Once the checks above are done, read
-`references/uat-documentation.md` and follow it to write the UAT document
-for the work. It has its own rules for when it does not apply (for
-example, when there is no feature to test), so follow them. Do not skip
-this step just because the checks passed.
+Always the last step. Once the checks are done, read `references/uat-documentation.md` and follow it to write the UAT document for the work. It has its own rules for when it doesn't apply (for example, no feature to test), so follow them. Don't skip this step just because the checks passed.
 
 ## References
 
-- `references/uat-documentation.md`: how to write the UAT document. Read
-  it in Step 6.
+- `references/uat-documentation.md`: how to write the UAT document. Read it in Step 6.
 
 ## Final Checks
 
 - [ ] Every requirement from the request was checked against the real result
-- [ ] Each check looked at the source, not a cached copy, a status report,
-      or "it compiles"
-- [ ] Any failed check was traced to its real cause (the system or the
-      check itself)
+- [ ] Each check looked at the source, not a cached copy, a status report, or "it compiles"
+- [ ] Any failed check was traced to its real cause (the system or the check itself)
 - [ ] Each test you wrote fails when the behavior breaks and survives an internal refactor
 - [ ] Each number you report has a stated limiter and a confirmed measurement of the right work
 - [ ] Anything that could not be checked is stated openly in the report

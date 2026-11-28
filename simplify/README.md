@@ -34,16 +34,11 @@ The reply is only the reworded text, in plain words. No grammar lesson.
 
 ## Explaining as you go
 
-Ask it to teach while it works, for example "explain as you go" or "teach me". The agent does the task as usual, explains why it chose one approach over the alternatives, points out patterns in the code, and puts a short `★ Insight` callout before and after each code change. The explanations stay in the chat, not in the code.
+Say "explain as you go" or "teach me". The agent does the task as usual, explains why it chose one approach over the alternatives, points out code patterns, and puts a short `★ Insight` callout before and after each code change. Explanations stay in chat, not in the code.
 
 ## Rules
 
-- Lead with the outcome or answer.
-- Replace identifiers, flags, class names and acronyms with what they do. Keep a name only if the reader must act on it.
-- Keep caveats that change what the reader should do.
-- Aim for 1-3 sentences unless the original had several distinct points.
-- No analogies unless the idea can't be said plainly.
-- No new information, and no re-arguing the original.
+The rules live in `SKILL.md`.
 
 ## Layout
 
@@ -53,3 +48,4 @@ Ask it to teach while it works, for example "explain as you go" or "teach me". T
 | `references/technical-check.md` | Two before/after examples of restating technical messages |
 | `references/sentence-check.md`  | Reword a user's own sentence in plain words               |
 | `references/explain-as-you-go.md` | Teaching mode: explain choices and patterns while working |
+| `references/terse-mode.md`      | Terse mode: short replies for the whole session, every fact kept |

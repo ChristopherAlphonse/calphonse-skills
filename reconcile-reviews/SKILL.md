@@ -5,47 +5,47 @@ description: Merge several review documents of the same PR/MR (from different sk
 
 # Reconcile reviews
 
-Turn N review documents into one list a developer can act on. Compare the documents, check the claims against the code, rank by evidence, and (only when asked) post inline comments.
+Turn N review documents into one list a developer can act on. Compare the documents, check claims against the code, rank by evidence, and (only when asked) post inline comments.
 
 ## 1. Collect
 
 - Find the review files (the user names them, or look in the workspace and `.planning/reviews/`). Read every one in full.
-- For each document, note how it was produced: measured or reproduced, read from code only, or delegated to sub-agents and not re-checked. Evidence strength is the main ranking input.
+- For each, note how it was produced: measured or reproduced, read from code only, or delegated to sub-agents and not re-checked. Evidence strength is the main ranking input.
 
 ## 2. Compare
 
 Build one table per topic, not one summary per document:
 
 - **Agree**: same finding in 2+ documents. Say who reproduced it.
-- **Differ**: same topic, different severity or opposite conclusion. Show each document's verdict and the evidence behind it. A measured result beats a code-reading guess; say so.
+- **Differ**: same topic, different severity or opposite conclusion. Show each document's verdict and evidence. A measured result beats a code-reading guess; say so.
 - **Only one document**: flag as unverified unless that document reproduced it.
-- Cross-check the facts the documents quote (test counts, file counts, include counts). A mismatch is worth one line.
-- **Not checked**: list every item any document says it did not check, and every claim of "fine" that rests on code outside the diff. Do not carry these into a footer. Each one that the change's correctness depends on becomes an open question in the ranked list: what to look at, where, and who can answer. Where the real definition is reachable (another repo in the mirror, a schema file), open it now and settle the item.
-- **Claims of fine**: reread the lines each "X is handled" or "X is safe" sentence cites. A claim about the wrong function is a misreading, so drop it and say so. See [review-blind-spots](../review-blind-spots/SKILL.md).
+- Cross-check facts the documents quote (test counts, file counts, include counts). A mismatch is worth one line.
+- **Not checked**: list every item any document says it did not check, and every "fine" claim resting on code outside the diff. Don't carry these into a footer. Each one the change's correctness depends on becomes an open question in the ranked list: what to look at, where, and who can answer. Where the real definition is reachable (another repo in the mirror, a schema file), open it now and settle the item.
+- **Claims of fine**: reread the lines each "X is handled" or "X is safe" sentence cites. A claim about the wrong function is a misreading: drop it and say so. See [review-blind-spots](../review-blind-spots/SKILL.md).
 
 ## 3. Rank "most concerning"
 
-Order by, in this order:
+Order by:
 
 1. Reproduced defect with user-visible or data-loss impact.
 2. Reproduced defect with wasted work only.
 3. Code-reading claim with a plausible data-loss path, not yet reproduced (mark "needs a check").
-4. Scale limits that do not bite at measured sizes.
+4. Scale limits that don't bite at measured sizes.
 5. Style and hygiene.
 
-An open question on external behavior ranks with a reproduced defect when the change's correctness depends on it, and the recommendation cannot be "safe to merge" until it is answered.
+An open question on external behavior ranks with a reproduced defect when the change's correctness depends on it, and the recommendation can't be "safe to merge" until answered.
 
-Do not promote a claim because several documents repeat it if none of them measured it. If a document's severity contradicts measurements at real sizes, say which one you trust and why. Keep a finding the user insists on, but state at what size it starts to matter.
+Don't promote a claim because several documents repeat it if none measured it. If a document's severity contradicts measurements at real sizes, say which you trust and why. Keep a finding the user insists on, but state at what size it starts to matter.
 
 ## 4. Pin to code
 
 For every item to fix, give `path:line` and what that line does.
 
-- Confirm the checkout is the MR head (`git rev-parse HEAD` against the remote branch). If it is not, say so and stop guessing.
+- Confirm the checkout is the MR head (`git rev-parse HEAD` against the remote branch). If not, say so and stop guessing.
 - Read the line before citing it. Documents drift; quote what the code shows now.
-- Where a document's claim is partly wrong (for example "no log" when some paths log), correct it and cite the exact lines that do log.
+- Where a claim is partly wrong (e.g. "no log" when some paths log), correct it and cite the exact lines that do log.
 - Give the smallest fix in one or two sentences. Name an existing pattern in the repo when one exists.
-- State the order to do them in when fixes depend on each other (for example signature changes first).
+- State the order when fixes depend on each other (e.g. signature changes first).
 
 Reply in plain words. If the user asks to simplify, load the `simplify` skill.
 
@@ -53,20 +53,20 @@ Reply in plain words. If the user asks to simplify, load the `simplify` skill.
 
 Posting is visible to other people. Do it only on an explicit request, and say whose account it posts as.
 
-Post with `gh` (GitHub) or `glab` (GitLab), never `curl` or `wget`. The inline-comment payloads for both are in [forge-cli](../pr-follow-up/references/forge-cli.md#inline-comments). If the CLI is missing or logged out, stop and tell the user.
+Post with `gh` (GitHub) or `glab` (GitLab), never `curl` or `wget`. Inline-comment payloads for both: [forge-cli](../pr-follow-up/references/forge-cli.md#inline-comments). If the CLI is missing or logged out, stop and tell the user.
 
 1. Find the MR from the project and branch; confirm the source branch matches the checkout.
-2. Post inline comments only. Do not post a top-level summary comment. Items with no single line (scope, unverified risks, missing approvals) stay in your reply to the user.
+2. Post inline comments only. No top-level summary comment. Items with no single line (scope, unverified risks, missing approvals) stay in your reply to the user.
 3. Inline comments go on lines the MR changed. GitLab rejects any other line.
-   - Compute the changed lines first: `git diff -U0 <target>...HEAD -- <file>` and read the `+start,count` of each hunk.
+   - Compute changed lines first: `git diff -U0 <target>...HEAD -- <file>`, reading the `+start,count` of each hunk.
    - If the real defect is in unchanged code, anchor on the nearest changed line that leads to it and name the unchanged function in the comment.
-4. A batch review call is not rolled back when one comment fails. Verify every anchor before the call, and after a failure re-send only the comments that were not created. Do not post duplicates.
-5. Write every comment in the shape from `references/comment-style.md`: urgency label, the problem, one piece of evidence, the fix. Do not paste the whole report into every comment.
-6. Return the MR link and the list of file and line anchors that were posted, plus any anchor that had to move.
+4. A batch review call is not rolled back when one comment fails. Verify every anchor before the call, and after a failure re-send only the comments not created. No duplicates.
+5. Write every comment in the shape from `references/comment-style.md`: urgency label, the problem, one piece of evidence, the fix. Don't paste the whole report into every comment.
+6. Return the MR link and the list of file and line anchors posted, plus any anchor that had to move.
 
 ## Output rules
 
 - Lead with the answer. Plain words, no preamble.
 - End with what was not checked (real cloud runs, plans, dependency scans, the other repo's MR).
-- Durable output (a merged report) goes under `.planning/reviews/` in the target project, never in this repo.
+- Durable output (a merged report) goes under `.planning/reviews/` in the target project, never this repo.
 - No URLs or real hostnames in files written here; use placeholders like `MR_URL`.

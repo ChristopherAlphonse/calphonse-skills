@@ -11,44 +11,32 @@ description: >
 
 # What's Going On
 
-Create a concise onboarding map of an unfamiliar repo in one pass. Default to
-reading files yourself; fan out to sub-agents only if the repo is large
-enough that parallel exploration clearly saves time. The final simplify step
-always runs, on its own sub-agent.
+Make a concise onboarding map of an unfamiliar repo in one pass. Read files yourself by default; fan out to sub-agents only if the repo is large enough that parallel exploration clearly saves time. The final simplify step always runs, on its own sub-agent.
 
 ## When Not to Use
 
-- The user wants a feature built, a bug fixed, or a diff reviewed: use the
-  relevant implementation/review skill instead.
-- The repo has fewer than ~5 source files: just read it directly.
-- Docs already exist and are current (check `docs/`, `README.md`, `AGENTS.md`,
-  and any steering/context files first): update those instead of generating
-  a parallel set.
+- User wants a feature built, a bug fixed, or a diff reviewed: use the relevant implementation/review skill.
+- Repo has fewer than ~5 source files: just read it.
+- Docs already exist and are current (check `docs/`, `README.md`, `AGENTS.md`, steering/context files first): update those instead of generating a parallel set.
 
 ## Guardrails
 
 - Do not modify source code.
-- Prefer evidence over guesses. Cite files for important claims or label assumptions.
-- Read the smallest set of files that explains the system: README, AGENTS.md,
-  package/build config, routes/entrypoints, tests, core modules, `.planning/*`
-  if present: these often already document stack and structure; reuse that,
-  don't re-derive it.
-- Focus on core use cases, lifecycle, architecture, stack, conventions, and
-  concerns. Skip roadmap, refactor advice, and peripheral features.
-- Conventions must reflect patterns actually observed in code, not a style
-  guide's aspirations. Concerns must each tie to a specific file or area, not
-  generic advice.
+- Evidence over guesses. Cite files for important claims or label assumptions.
+- Read the smallest set of files that explains the system: README, AGENTS.md, package/build config, routes/entrypoints, tests, core modules, `.planning/*` if present. These often already document stack and structure: reuse, don't re-derive.
+- Focus on core use cases, lifecycle, architecture, stack, conventions, concerns. Skip roadmap, refactor advice, peripheral features.
+- Conventions reflect patterns actually observed in code, not a style guide's aspirations. Each concern ties to a specific file or area, not generic advice.
 
 ## Workflow
 
-1. **Orient:** Identify repo type, run/build/test commands, main entrypoints, and existing docs (README, AGENTS.md, steering).
-2. **Decide scope:** Small/medium repo (single service, one language): do steps 3-5 yourself in one pass. Large or multi-module repo (multiple independently-buildable projects, or a monorepo), fan out sub-agents one per concern area (architecture/flows, stack/integrations, conventions/testing, concerns) against the same repo root, then consolidate their findings yourself.
-3. **Trace architecture and flows:** Identify 5-10 major components only (exclude thin wrappers, utilities, config-only files), and trace 3-5 primary flows end-to-end (entrypoint → validation/business logic → persistence/external call → result). For the full per-flow trace format (user journey diagram, component table, sequence diagram, data structures), follow [references/lifecycle.md](references/lifecycle.md).
-4. **Identify stack, conventions, and concerns:** Stack from manifests/build files (languages, frameworks, runtime, key dependencies, build/run commands). Conventions from code actually in use (naming, error handling, DTO/layering patterns, how to run tests). Concerns from what you observed (hardcoded identifiers, TODO/FIXME density in critical paths, missing tests around key flows, outdated dependencies): each tied to a file/area.
-5. **Write the output documents** to `.planning/system/` (create it if needed):
-   - `architecture.md`: the component table, data/control flow for the traced flows, integration points, and new-engineer navigation. Follow [references/architecture.md](references/architecture.md) for the full mandated structure (system overview diagram, component catalog, integration points, navigation guide, selection guidelines).
+1. **Orient:** Identify repo type, run/build/test commands, main entrypoints, existing docs (README, AGENTS.md, steering).
+2. **Decide scope:** Small/medium repo (single service, one language): do steps 3-5 yourself in one pass. Large or multi-module repo (multiple independently-buildable projects, or a monorepo): fan out sub-agents one per concern area (architecture/flows, stack/integrations, conventions/testing, concerns) against the same repo root, then consolidate yourself.
+3. **Trace architecture and flows:** Identify 5-10 major components only (exclude thin wrappers, utilities, config-only files), and trace 3-5 primary flows end-to-end (entrypoint → validation/business logic → persistence/external call → result). Per-flow trace format (user journey diagram, component table, sequence diagram, data structures): [references/lifecycle.md](references/lifecycle.md).
+4. **Identify stack, conventions, and concerns:** Stack from manifests/build files (languages, frameworks, runtime, key dependencies, build/run commands). Conventions from code in use (naming, error handling, DTO/layering patterns, how to run tests). Concerns from what you observed (hardcoded identifiers, TODO/FIXME density in critical paths, missing tests around key flows, outdated dependencies), each tied to a file/area.
+5. **Write the output documents** to `.planning/system/` (create if needed):
+   - `architecture.md`: component table, data/control flow for the traced flows, integration points, new-engineer navigation. Full mandated structure (system overview diagram, component catalog, integration points, navigation guide, selection guidelines): [references/architecture.md](references/architecture.md).
    - `onboard.md`: in this order: **Stack**, **Conventions**, **Concerns**, **What's Doing What** (core use cases, each with a one-line description and evidence files).
-   - Only include detail beyond what already exists in README/AGENTS/steering docs: link to those rather than duplicating them.
+   - Include only detail beyond what README/AGENTS/steering docs already hold: link to those, don't duplicate.
 6. **Simplify, always:** After `onboard.md` is written, spawn a sub-agent on the harness's smallest model to rewrite it in plain language. Its brief: activate the `simplify` skill, read `.planning/system/onboard.md`, restate it for a reader who does not know the codebase or its vocabulary, write the result to `.planning/system/simplify-onboarding.md`, and edit nothing else.
    - Claude Code: use the Agent tool with `model: haiku` and that brief. Create no agent file.
    - Kiro: check for `.kiro/agents/onboarding-simplifier.md` in the target repo. If missing, create it:
@@ -68,7 +56,7 @@ always runs, on its own sub-agent.
 
 ## Output Shape
 
-`architecture.md` structure is defined in [references/architecture.md](references/architecture.md).
+`architecture.md` structure: [references/architecture.md](references/architecture.md).
 
 `onboard.md`:
 ```markdown
@@ -90,7 +78,7 @@ always runs, on its own sub-agent.
   Evidence: <key files>
 ```
 
-`simplify-onboarding.md`: plain-language rewrite of `onboard.md`, no new facts added.
+`simplify-onboarding.md`: plain-language rewrite of `onboard.md`, no new facts.
 
 ## Validation
 
@@ -105,10 +93,10 @@ always runs, on its own sub-agent.
 
 | Pitfall | Solution |
 |---------|----------|
-| Re-deriving info that's already in README/AGENTS/steering docs | Read those first; link to them instead of duplicating |
-| Producing an exhaustive file-by-file listing | Favor a small number of traced, representative flows and components |
-| Spawning parallel agents for a small repo | Only fan out for genuinely large/multi-module repos |
-| Skipping the simplify sub-agent, or writing it yourself | Always spawn the simplify sub-agent; it must do that rewrite |
+| Re-deriving info already in README/AGENTS/steering docs | Read those first; link instead of duplicating |
+| Exhaustive file-by-file listing | Favor a few traced, representative flows and components |
+| Parallel agents for a small repo | Fan out only for genuinely large/multi-module repos |
+| Skipping the simplify sub-agent, or writing it yourself | Always spawn it; it must do that rewrite |
 
 ## Teaching The Map
 

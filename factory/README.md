@@ -1,16 +1,16 @@
 # Factory
 
-The factory takes a feature from idea to a reviewed, committed change on a local branch. It does this by chaining the other skills in this repo as stages. A script moves each job from stage to stage and checks the evidence before every move. You follow the work, approve, and chat on a board of connected stages.
+Factory takes a feature from idea to a reviewed, committed change on a local branch. It chains this repo's other skills as stages. A script moves each job stage to stage and checks evidence before every move. You follow the work, approve, and chat on a board of connected stages.
 
-Agents may use plain `git commit` and `git push`. Force pushes are blocked, and no agent opens a PR or MR. You can also commit from the board with **Commit locally**.
+Agents may use plain `git commit` and `git push`. Force pushes blocked. No agent opens a PR or MR. You can also commit from the board with **Commit locally**.
 
-It also reviews an existing branch or diff: a review job scopes the change, runs independent reviewers, reconciles and verifies their findings, and writes a report with paste-ready comments. A review never writes code and never posts unless you say so. A prove job checks that a finished task works for real and writes a UAT.
+It also reviews an existing branch or diff: a review job scopes the change, runs independent reviewers, reconciles and verifies findings, and writes a report with paste-ready comments. A review never writes code and never posts unless you say so. A prove job checks a finished task works for real and writes a UAT.
 
-Every feature, command, safety layer and setting is explained in [docs/](docs/README.md). `SKILL.md` is the contract an agent follows.
+Every feature, command, safety layer and setting: [docs/](docs/README.md). `SKILL.md` is the contract an agent follows.
 
 ## How a job moves
 
-A job sits in one stage at a time. The stages marked **you** wait for a click on the board. Everything else needs evidence in a file.
+A job sits in one stage at a time. Stages marked **you** wait for a board click. Everything else needs evidence in a file.
 
 ```mermaid
 stateDiagram-v2
@@ -33,22 +33,22 @@ stateDiagram-v2
 
 ## Quick start
 
-1. Link the factory and the skills it calls into `~/.claude/skills`: `factory`, `lets-talk-about-it`, `prd-mode`, `swe`, `code-review-frontend`, `qa-review`, `test-review`, `comment-sicko`, `prove-it-works`, `pr-body-style`, plus the stack skills you use.
-2. In the project, create `.planning/factory/config.json` and set your harness and the command that must pass before review:
+1. Link factory and the skills it calls into `~/.claude/skills`: `factory`, `lets-talk-about-it`, `prd-mode`, `swe`, `code-review-frontend`, `qa-review`, `test-review`, `comment-sicko`, `prove-it-works`, `pr-body-style`, plus your stack skills.
+2. In the project, create `.planning/factory/config.json` with your harness and the command that must pass before review:
 
    ```json
    { "harness": "claude", "checks": "npm test" }
    ```
 
-3. Install the policy for your harness: `bin/tick install claude`.
-4. Start a job in Claude Code with `/factory <feature idea>`.
-5. Open the board with `bin/job board`, then open the address it prints.
-6. Click **Approve spec** when the spec is right. At ship, click **Commit locally** only if an agent has not already committed the branch.
-7. Keep passes going after your clicks: run `bin/tick loop claude` in a spare terminal, or use `/loop 5m /factory run`.
+3. Install the harness policy: `bin/tick install claude`.
+4. Start a job in Claude Code: `/factory <feature idea>`.
+5. Open the board: `bin/job board`, then the address it prints.
+6. Click **Approve spec** when the spec is right. At ship, click **Commit locally** only if an agent hasn't already committed the branch.
+7. Keep passes going after your clicks: `bin/tick loop claude` in a spare terminal, or `/loop 5m /factory run`.
 
 Gitignore `.planning/` and `.worktrees/` in the project.
 
-To review a branch instead: `bin/job create <id> "<title>" --review BASE HEAD`, then `/factory run`. To look into a question with no diff (an audit, "how good is X?"): `bin/job create <id> "<title>" --investigate`. To check that something already built works: `bin/job create <id> "<what to check>" --prove`. In a new project, `/factory` sets itself up on the first run and Factory Bot can start the job from the board's chat.
+Review a branch: `bin/job create <id> "<title>" --review BASE HEAD`, then `/factory run`. Look into a question with no diff ("how good is X?"): `bin/job create <id> "<title>" --investigate`. Check something already built works: `bin/job create <id> "<what to check>" --prove`. In a new project `/factory` sets itself up on first run, and Factory Bot can start the job from the board's chat.
 
 ## Who can do what
 

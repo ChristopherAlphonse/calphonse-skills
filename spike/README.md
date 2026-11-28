@@ -2,7 +2,7 @@
 
 Run throwaway experiments, sized in story points, to answer a feasibility question before you commit to a real build. The deliverable is a verdict backed by pasted output, not the code.
 
-The skill splits an idea into small testable questions, builds one standalone directory per question, runs each one, and reports VALIDATED, PARTIAL, INVALIDATED or INCONCLUSIVE. It does not report anything it did not run in the session.
+It splits an idea into small testable questions, builds one standalone directory per question, runs each, and reports VALIDATED, PARTIAL, INVALIDATED or INCONCLUSIVE. It reports nothing it didn't run in the session.
 
 ## How to Use
 
@@ -20,25 +20,25 @@ compare pdfjs vs camelot for extracting tables from PDFs
 what should I spike next?
 ```
 
-Do not use it when the answer is in the docs or the existing code (research and answer instead), when the idea is already validated (implement it), or for production code.
+Don't use it when the answer is in the docs or existing code (research and answer), the idea is already validated (implement it), or for production code.
 
 ## What Happens
 
 1. **Decompose.** The idea becomes 2-5 questions, each with Given / When / Then, a risk level and story points, ordered by risk.
-2. **Align.** You see the table and choose: build all in this order, or adjust. No code is written before you answer.
-3. **Research.** One approach per spike. It reuses what the repo already has.
+2. **Align.** You see the table and choose: build all in this order, or adjust. No code before you answer.
+3. **Research.** One approach per spike, reusing what the repo has.
 4. **Build.** One directory per spike with something you can run, plus an edge case and a failure case.
-5. **Verdict.** Each spike gets a verdict with pasted results, then a short summary in chat.
+5. **Verdict.** Each spike gets a verdict with pasted results, then a short chat summary.
 
 If a spike outgrows its estimate, the skill stops and asks before continuing.
 
 ## Optimization spikes
 
-When the question is "make this metric better" — training loss, test runtime, bundle size, build time, p95 latency — the skill switches to an autoresearch loop. You agree on a primary metric, a command that prints it, the files in scope, constraints, and a termination condition. Then it tries one idea at a time, measures it, keeps improvements, reverts regressions, and logs every run so a fresh session can resume.
+When the question is "make this metric better" (training loss, test runtime, bundle size, build time, p95 latency), the skill switches to an autoresearch loop. You agree on a primary metric, a command that prints it, files in scope, constraints, and a termination condition. Then it tries one idea at a time, measures it, keeps improvements, reverts regressions, and logs every run so a fresh session can resume.
 
-For this mode, the agreed termination condition replaces the per-spike estimate check. The loop does not ask "should I continue?" once it is running. It writes its state inside the spike directory and finishes by grouping the kept changes into clean, independently mergeable branches. The original experiment branch stays put.
+Here the agreed termination condition replaces the per-spike estimate check. Once running, the loop doesn't ask "should I continue?". It writes its state inside the spike directory and finishes by grouping kept changes into clean, independently mergeable branches. The original experiment branch stays put.
 
-The same evidence rules apply. Every number in the verdict comes from output we saw, and a confidence score is advisory, not proof. The loop also runs in a disposable worktree, strips ambient credentials from the benchmark, stages only agreed files, and requires a secret scan before each keep commit — see the safety gate in the reference.
+The same evidence rules apply. Every number in the verdict comes from output we saw, and a confidence score is advisory, not proof. The loop also runs in a disposable worktree, strips ambient credentials from the benchmark, stages only agreed files, and requires a secret scan before each keep commit. See the safety gate in the reference.
 
 ## Verdicts
 
@@ -53,16 +53,16 @@ Docs, memory and code reading never produce a verdict. Only a run does.
 
 ## Output
 
-- `spikes/` at the repo root (or the folder the repo already uses), with one numbered directory per spike, such as `spikes/001-websocket-streaming/`.
-- Each directory has a `README.md` built from `references/template.md`, written in a spoken voice and organized as the questions a person would ask: what we were trying to answer, why, what we looked at, what we learned, the proof, the options, the recommendation, what could go wrong, what happens next, and the answer.
+- `spikes/` at the repo root (or the folder the repo already uses), one numbered directory per spike, such as `spikes/001-websocket-streaming/`.
+- Each directory has a `README.md` built from `references/template.md`, in a spoken voice, organized as the questions a person would ask: what we were trying to answer, why, what we looked at, what we learned, the proof, the options, the recommendation, what could go wrong, what happens next, and the answer.
 - A chat summary: one line per spike with its verdict, the overall recommendation, what was not tested, and the biggest remaining unknown.
 
 ## Defaults and Setup
 
-- **Stack:** AWS and Terraform. If the repo already uses another IaC tool, the skill uses that. It uses CDK or OpenTofu only if you ask.
-- **AWS work runs on [Floci](https://github.com/floci-io/floci)**, a local AWS emulator in Docker, with dummy credentials. It never calls real AWS. Results read "on Floci [version]", not "works on AWS". Docker must be installed for AWS spikes.
+- **Stack:** AWS and Terraform. If the repo already uses another IaC tool, the skill uses that. CDK or OpenTofu only if you ask.
+- **AWS work runs on Floci**, a local AWS emulator in Docker, with dummy credentials. It never calls real AWS. Results read "on Floci [version]", not "works on AWS". AWS spikes need Docker.
 - **Terraform** and the AWS CLI are needed only for AWS spikes.
-- No real credentials, and no shared systems (databases, queues, deployed services) without asking you first.
+- No real credentials, and no shared systems (databases, queues, deployed services) without asking first.
 
 To change the default stack or the AWS rule, edit `SKILL.md` (Non-negotiables) and `references/aws-floci.md`.
 
@@ -80,7 +80,7 @@ To change the default stack or the AWS rule, edit `SKILL.md` (Non-negotiables) a
 | `references/comparison.md`      | Head-to-head format when two approaches answer one question    |
 | `references/frontier.md`        | Finding gaps when asked "what should I spike next?"            |
 | `references/aws-floci.md`       | Floci setup, Terraform provider block, tested limits           |
-| `references/autoresearch.md`    | Autoresearch loop for measurable optimization spikes            |
+| `references/autoresearch.md`    | Autoresearch loop for measurable optimization spikes           |
 | `scripts/autoresearch_helper.py`| Stdlib helper for the log: init, log, evaluate, status, summary |
 
 ## Notes

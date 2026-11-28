@@ -1,6 +1,6 @@
 ---
 name: simplify
-description: Restate the last message in plain human language, with no jargon, or teach while working (explain choices and alternatives, surface codebase patterns, add short insight callouts around code changes). Use when the user says they don't follow, or asks to "simplify", "ELI5", "say that plainly", "in plain English", or "what does that mean"; for teaching, when they ask to "explain as you go", "teach me", "why did you do it that way", or want an explanatory mode.
+description: Restate the last message in plain human language, with no jargon, teach while working (explain choices and alternatives, surface codebase patterns, add short insight callouts around code changes), or answer tersely. Use when the user says they don't follow, or asks to "simplify", "ELI5", "say that plainly", "in plain English", or "what does that mean"; for teaching, when they ask to "explain as you go", "teach me", "why did you do it that way", or want an explanatory mode; for short replies, when they ask to "be brief", "terse", or "less tokens".
 ---
 
 Restate your last message for someone who doesn't know this codebase or its vocabulary.
@@ -18,5 +18,7 @@ Rules:
 If the user wants to learn while you work ("explain as you go", "teach me", explanatory mode), read `references/explain-as-you-go.md` instead.
 
 If the user gives you their own sentence and asks whether it reads correctly, read `references/sentence-check.md` instead.
+
+If the user wants shorter replies for the whole session ("be brief", "terse", "less tokens"), read `references/terse-mode.md` instead.
 
 To restate a technical message, see before/after examples in `references/technical-check.md`.

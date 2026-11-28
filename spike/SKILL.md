@@ -11,16 +11,16 @@ A spike is a disposable experiment that answers one specific question so the tea
 
 | Question | Mode | Read |
 |----------|------|------|
-| "Can we do X?" — feasibility, risk, a decision | The spike loop below | the reference for each step, when you reach it |
-| "Make metric X better" — a measurable target | Autoresearch loop | `references/autoresearch.md` |
+| "Can we do X?" (feasibility, risk, a decision) | The spike loop below | the reference for each step, when you reach it |
+| "Make metric X better" (a measurable target) | Autoresearch loop | `references/autoresearch.md` |
 
 Both modes use the same evidence rules and end with a verdict. Autoresearch is the long-running loop: try an idea, measure it, keep improvements, revert regressions, repeat, then finalize into clean branches. Read its reference at the start of an optimization spike and follow it instead of the step table below.
 
 ## When NOT to use this
 
-- The answer is in the docs or the existing code: research it and answer, don't build.
-- The idea is already validated: implement it.
-- The work is production code: the throwaway rules here do not apply.
+- Answer is in the docs or existing code: research and answer, don't build.
+- Idea already validated: implement it.
+- Production code: the throwaway rules don't apply.
 
 ## Loop
 
@@ -30,7 +30,7 @@ decompose → align → research → build → verdict
               iterate on findings
 ```
 
-Read the reference for each step when you reach it. Do not load them all up front.
+Read each step's reference when you reach it. Don't load them all up front.
 
 | Step | What you do | Read |
 |------|-------------|------|
@@ -44,25 +44,25 @@ Other situations:
 
 | Situation | Read |
 |-----------|------|
-| The spike touches any AWS service | `references/aws-floci.md` |
+| Spike touches any AWS service | `references/aws-floci.md` |
 | Two or more approaches answer the same question | `references/comparison.md` |
-| Spikes already exist and the user asks what to spike next | `references/frontier.md` |
-| The question is to improve a metric through repeated experiments | `references/autoresearch.md` |
+| Spikes exist and the user asks what to spike next | `references/frontier.md` |
+| Improve a metric through repeated experiments | `references/autoresearch.md` |
 
 ## Non-negotiables
 
 Read `references/evidence.md` before you build and before you report. It overrides everything else.
 
-- Nothing is reported as true unless you ran it in this session and saw the output. Your memory, the docs and your reading of the code are not tests. Label them as untested.
-- Never invent or "tidy" output, numbers or results. Paste what the run printed. If you could not run something, say so.
-- Every verdict rests on pasted output from a run of the actual question. With no run, the verdict is INCONCLUSIVE.
+- Nothing is reported as true unless you ran it this session and saw the output. Memory, docs and reading code are not tests. Label them untested.
+- Never invent or "tidy" output, numbers or results. Paste what the run printed. If you couldn't run something, say so.
+- Every verdict rests on pasted output from a run of the actual question. No run, verdict is INCONCLUSIVE.
 - Say what you did not test, every time.
-- Before you tell the user anything, trace each claim back to output in a README. Remove or relabel what you cannot trace.
-- Every spike has one testable question and a story-point estimate. Run the riskiest spike first.
+- Before telling the user anything, trace each claim back to output in a README. Remove or relabel what you can't trace.
+- Every spike has one testable question and a story-point estimate. Run the riskiest first.
 - Never write "it works" after one happy-path run. Test an edge case and a failure case.
 - If the experiment can be run, run it. For AWS that includes Terraform, which works against Floci. Never answer from assumption when a test was possible.
-- Default stack is AWS and Terraform. Use Terraform for any infrastructure-as-code in a spike, unless the repo already uses another tool. Use CDK or OpenTofu only if the user asks.
-- AWS operations run on Floci in Docker, and never on real AWS. Results are reported as "on Floci [version]", never as "works on AWS".
+- Default stack is AWS and Terraform. Use Terraform for any infrastructure-as-code in a spike, unless the repo already uses another tool. CDK or OpenTofu only if the user asks.
+- AWS operations run on Floci in Docker, never real AWS. Report "on Floci [version]", never "works on AWS".
 - No real credentials, and no touching other shared systems without asking.
 - INVALIDATED and INCONCLUSIVE are honest outcomes. Report them plainly.
 - In autoresearch mode, every keep rests on pasted metric output. A confidence score is advisory, never proof, and a single run is still a single run.
@@ -70,7 +70,7 @@ Read `references/evidence.md` before you build and before you report. It overrid
 
 ## Voice
 
-Everything you write for the user reads like a person talking: the spike READMEs, the verdicts and the chat summary. Use short sentences, "we" and "I", contractions and plain words. Phrase headings as the question a person would ask ("Why did we do this?"), never "Why we did this" or "Background". Use sentences where a bullet fragment would sound like a slide. If you can't say it out loud without stumbling, rewrite it. This changes style only. The evidence rules above still win.
+Everything you write for the user reads like a person talking: spike READMEs, verdicts, the chat summary. Short sentences, "we" and "I", contractions, plain words. Phrase headings as the question a person would ask ("Why did we do this?"), never "Why we did this" or "Background". Use sentences where a bullet fragment would sound like a slide. If you can't say it out loud without stumbling, rewrite it. This changes style only. The evidence rules above still win.
 
 ## Output
 

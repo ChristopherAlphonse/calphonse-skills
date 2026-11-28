@@ -1,8 +1,8 @@
 # Agent Skills
 
-A personal library of agent skills: small, single-purpose instruction sets that make an AI coding agent work the way you want. Each skill is a directory with a `SKILL.md` file. [AGENTS.md](AGENTS.md) is the canonical index.
+Personal library of agent skills: small, one-job instruction sets. Each skill = dir with `SKILL.md`. [AGENTS.md](AGENTS.md) = canonical index.
 
-Use one skill on its own, such as `qa-review` on a diff. Or let the [factory](#how-the-factory-works) chain many of them to take a feature from idea to a reviewed local commit.
+Use one alone (`qa-review` on a diff) or let the [factory](#how-the-factory-works) chain many: idea to reviewed local commit.
 
 ## Contents
 
@@ -23,11 +23,9 @@ Use one skill on its own, such as `qa-review` on a diff. Or let the [factory](#h
 
 ## The idea
 
-Three rules hold the whole repo together.
-
-1. **A skill does one thing.** `swe` makes the smallest change. `qa-review` judges maintainability. `prove-it-works` checks the real result. None of them tries to be a workflow.
-2. **A workflow is a chain of skills.** `factory` calls other skills as stages, for building and for reviewing. They add no new judgment of their own. They add order, evidence checks, and a place for you to say yes.
-3. **You stay in control.** Agents write files and may commit and push plainly. A script checks the files before a job moves on. Only your click on the board approves a spec; destructive git forms and PR/MR creation stay denied.
+1. **Skill does one thing.** `swe` smallest change. `qa-review` maintainability. `prove-it-works` real result. No skill is a workflow.
+2. **Workflow = chain of skills.** `factory` calls skills as stages (build and review). Adds order, evidence checks, a place for your yes. No new judgment.
+3. **You stay in control.** Agents write files, may plain commit and push. Script checks files before job moves on. Only your board click approves a spec. Destructive git and PR/MR creation denied.
 
 ```mermaid
 flowchart LR
@@ -35,60 +33,48 @@ flowchart LR
     P -->|"write"| A[".planning/*<br/>reviews, plans, specs<br/>kept with the code"]
 ```
 
-The skills travel with you. The output stays with the project it describes.
+Skills travel with you. Output stays with the project.
 
 ## Philosophy
 
-Agent skills are personal. They encode your workflows, your review standards, your testing rituals. They should not live inside a single project.
-
-**Skills travel with the developer.** When a skill lives in `~/.agents`, updating it once updates it everywhere. No per-project installs, no drift between copies. The same review standard applies to your weekend project and your team's monolith.
-
-**Artifacts stay in the project.** Skills are portable. Their output is not. Reviews, plans, and specs describe a specific codebase, so they belong in `.planning/*` inside that project, at the same commit as the code they reference.
-
-**Complex workflows decompose into small skills.** A large workflow is hard to read, test, and reuse. Splitting it into focused sub-skills solves all three. Each sub-skill does one thing; a parent orchestrator chains them together.
-
-**The system must be workspace agnostic.** The same skills work in any project directory. The index and skill conventions assume nothing about the target project. They produce artifacts that are project-aware, but the machinery stays independent.
+- **Skills travel with the developer.** Live in `~/.agents`: update once, updated everywhere. No per-project installs, no drift.
+- **Artifacts stay in the project.** Reviews, plans, specs describe one codebase. They go in `.planning/*`, same commit as the code.
+- **Big workflows split into small skills.** Easier to read, test, reuse. Parent orchestrator chains them.
+- **Workspace agnostic.** Same skills in any directory. Output is project-aware, machinery is not.
 
 ## Quick Start
 
-Install any skill with the Skills CLI:
-
 ```bash
-# List available skills
-npx skills add ChristopherAlphonse/calphonse-skills --list
-
-# Install all skills
-npx skills add ChristopherAlphonse/calphonse-skills --all
-
-# Install a single skill
-npx skills add ChristopherAlphonse/calphonse-skills --skill <name>
+npx skills add ChristopherAlphonse/calphonse-skills --list            # list
+npx skills add ChristopherAlphonse/calphonse-skills --all             # all
+npx skills add ChristopherAlphonse/calphonse-skills --skill <name>    # one
 ```
 
 ### Updating installed skills
 
 ```bash
 npx skills update          # interactive
-npx skills update -g       # global skills only
-npx skills update -p       # project skills only
-npx skills update <name>   # one specific skill
+npx skills update -g       # global only
+npx skills update -p       # project only
+npx skills update <name>   # one skill
 npx skills update -y       # no prompts
 ```
 
 ### Your first five minutes
 
-Try the skill that needs the least setup. It reads a repo and writes down what it finds, and never edits your code.
+Start with `whats-going-on`. Reads repo, writes findings, never edits code.
 
-1. Install it: `npx skills add ChristopherAlphonse/calphonse-skills --skill whats-going-on`
-2. Open any project in your agent and say: `use whats-going-on on this repo`. In tools with slash commands, `/whats-going-on` does the same.
-3. When it finishes, open `.planning/system/`. You will find `architecture.md` (components and flows), `onboard.md` (stack, conventions, concerns, core use cases), and `simplify-onboarding.md` (the same, in plain language).
+1. `npx skills add ChristopherAlphonse/calphonse-skills --skill whats-going-on`
+2. In any project say: `use whats-going-on on this repo` (or `/whats-going-on`).
+3. Open `.planning/system/`: `architecture.md`, `onboard.md`, `simplify-onboarding.md` (plain language).
 
-Then try `qa-review` on a branch with changes. It reviews only the lines you changed and ends with approve or block.
+Then `qa-review` on a branch with changes. Reviews only changed lines, ends approve or block.
 
 ## How the factory works
 
-`factory` takes a feature idea and produces a reviewed commit on a local branch, with a PR body written. Plain pushes are allowed; it never opens a PR or MR.
+`factory` takes a feature idea, makes a reviewed commit on a local branch plus PR body. Plain pushes allowed. Never opens PR or MR.
 
-Each box below is a stage. A fresh agent runs the skill named in it and writes one file. A script, `bin/job`, reads that file and decides whether the job may move on. Gold boxes wait for your click on the board.
+Each box = stage. Fresh agent runs the named skill, writes one file. Script `bin/job` reads it, decides if job moves on. Gold boxes wait for your click.
 
 ```mermaid
 flowchart LR
@@ -113,22 +99,22 @@ flowchart LR
     class approve,human you
 ```
 
-Four things make this safe to run unattended:
+Safe unattended:
 
-| Rule                  | What it means                                                                                                                                                                          |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Evidence, not "done"  | An agent saying it finished counts for nothing. `bin/job` advances a job only when the stage's file exists with the right status line, and the gate passes on a command's real output. |
-| Fresh agent per stage | Each stage starts with no memory of the last one, so a reviewer never inherits the builder's blind spots.                                                                              |
-| Bounded retries       | A job gets `max_rounds` build rounds (default 3), then lands in **Needs you** instead of looping.                                                                                      |
-| No force push, no PR  | Plain commits and pushes are allowed. Shell rules block force pushes, hook bypasses, `gh`, `glab`, and `curl`, and your remote's protected branches are the real backstop.              |
+| Rule                  | Meaning                                                                                                                              |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Evidence, not "done"  | Agent saying done = nothing. `bin/job` advances only when stage file exists with right status line and gate passes on real output.  |
+| Fresh agent per stage | No memory carried over, so reviewer never inherits builder's blind spots.                                                            |
+| Bounded retries       | `max_rounds` build rounds (default 3), then **Needs you**. No loop.                                                                  |
+| No force push, no PR  | Plain commit and push OK. Shell rules block force push, hook bypass, `gh`, `glab`, `curl`. Protected remote branches = real backstop. |
 
-Stack skills are picked from file names, not by the agent: TypeScript and React files add `typescript-strict-style` and `vercel-react-best-practices`, C# adds `dotnet`, Python adds `python`.
+Stack skills picked from file names, not by agent: TS/React add `typescript-strict-style` and `vercel-react-best-practices`, C# adds `dotnet`, Python adds `python`.
 
-For the full state machine, the trust model, and setup for Claude Code, Kiro, and OpenCode, read [factory/README.md](factory/README.md). [factory/SKILL.md](factory/SKILL.md) is the contract an agent follows.
+State machine, trust model, setup (Claude Code, Kiro, OpenCode): [factory/README.md](factory/README.md). Agent contract: [factory/SKILL.md](factory/SKILL.md).
 
 ## How factory reviews a branch
 
-A `factory` review job reviews a branch or diff you already have (`JOB create <id> "<title>" --review BASE HEAD`). It is read-only: it never edits the code, commits, or posts comments.
+Review job reviews an existing branch or diff (`JOB create <id> "<title>" --review BASE HEAD`). Read-only: no edits, commits, or comments.
 
 ```mermaid
 flowchart LR
@@ -146,30 +132,28 @@ flowchart LR
     report --> ready(["ready"])
 ```
 
-The verify stage is the point of the design. Reviewers make claims, and a claim can be wrong. The verifier did not write the reviews. It opens every cited line, reruns every command in a scratch copy, and marks each finding confirmed, dropped, or unverifiable. Only confirmed findings reach the report, with paste-ready comments for the MR.
+Verify is the point. Reviewers can be wrong. Verifier did not write reviews: opens every cited line, reruns every command in scratch copy, marks each finding confirmed, dropped, or unverifiable. Only confirmed reach the report, with paste-ready MR comments.
 
-See [factory/README.md](factory/README.md) for the full state machine and setup. Review jobs show on the Review tab of the same board as build jobs.
+Details: [factory/README.md](factory/README.md). Review jobs show on the board's Review tab.
 
 ## Skills
 
 ### How skills get used
 
-A skill is a Markdown file the agent reads when a task matches. You can name it in your prompt ("use qa-review on this branch"), type `/qa-review` where the tool supports slash commands, or just describe the task and let the agent match it to a skill's `description`.
+Skill = Markdown file agent reads when task matches. Name it in prompt, type `/qa-review`, or describe the task and let agent match `description`.
 
-Skills are small on purpose, and some call others:
-
-- `simplify` is the shared writing check. `swe`, `pr-body-style`, `documentation-writer`, `performance-review-humanizer`, and `factory` all point at it.
-- `code-review-frontend` falls back to `whats-going-on` when a repo has no codebase map.
-- `factory` calls most of the others as stages.
+- `simplify` = shared writing check. `swe`, `pr-body-style`, `documentation-writer`, `performance-review-humanizer`, `factory` point at it.
+- `code-review-frontend` falls back to `whats-going-on` when no codebase map.
+- `factory` calls most others as stages.
 
 ### Routing in code
 
-`scripts/route "<task>"` picks the skills for a task without asking a model. It reads the prompt, the changed files (from git, or `--files`) and git state, then prints `name`, `path`, `reason` per skill. It is plain Python with no dependencies, so it behaves the same in Claude Code, Kiro, OpenCode, Codex, Gemini or a bare shell.
+`scripts/route "<task>"` picks skills without a model. Reads prompt, changed files (git or `--files`), git state; prints `name`, `path`, `reason` per skill. Plain Python, no deps, same in any shell or agent CLI.
 
-- Rules live in `scripts/route-rules.json`. The file-type table is `STACK_RULES` in `factory/bin/job`, which `route` reads, so there is one copy.
-- Claude Code (this repo's `.claude/settings.json`) and Kiro run it on every prompt through `scripts/route-hook`. For Kiro, add `{"command": "REPO/scripts/route-hook"}` under `userPromptSubmit` in the agent config. Not run against the real Kiro CLI yet.
-- CLIs with no prompt hook (OpenCode, Codex, Gemini) follow the one line in [AGENTS.md](AGENTS.md): run `scripts/route` first.
-- `scripts/route --check` fails when a rule names a missing skill or an `AGENTS.md` skill has no rule. `.githooks/post-merge` runs it. Tests: `python -m unittest discover -s scripts/tests`.
+- Rules: `scripts/route-rules.json`. File-type table = `STACK_RULES` in `factory/bin/job`, which `route` reads (one copy).
+- Claude Code (`.claude/settings.json`) and Kiro run it every prompt via `scripts/route-hook`. Kiro: add `{"command": "REPO/scripts/route-hook"}` under `userPromptSubmit`. Not tested on real Kiro CLI yet.
+- CLIs without prompt hook (OpenCode, Codex, Gemini): follow [AGENTS.md](AGENTS.md), run `scripts/route` first.
+- `scripts/route --check` fails if a rule names missing skill or `AGENTS.md` skill has no rule. `.githooks/post-merge` runs it. Tests: `python -m unittest discover -s scripts/tests`.
 
 ### Which skill do I use?
 
@@ -185,7 +169,7 @@ Skills are small on purpose, and some call others:
 | Review my own change for maintainability                   | [qa-review](qa-review/SKILL.md)                                                                                                                                                                                                                     | "QA review my changes"                              |
 | Check that my tests would catch a bug                      | [test-review](test-review/SKILL.md)                                                                                                                                                                                                                 | "Are these tests good enough?"                      |
 | Review a React or TypeScript PR                            | [code-review-frontend](code-review-frontend/SKILL.md)                                                                                                                                                                                               | "Review this PR"                                    |
-| Review a branch end to end and get paste-ready comments    | [factory](factory/SKILL.md)                                                                                                                                                                                                           | "/factory review main my-branch"                    |
+| Review a branch end to end, get paste-ready comments       | [factory](factory/SKILL.md)                                                                                                                                                                                                                         | "/factory review main my-branch"                    |
 | Merge several reviews into one fix list                    | [reconcile-reviews](reconcile-reviews/SKILL.md)                                                                                                                                                                                                     | "Reconcile these reviews"                           |
 | Confirm work is really done                                | [prove-it-works](prove-it-works/SKILL.md)                                                                                                                                                                                                           | "Prove it works"                                    |
 | Strip noisy comments from a diff                           | [comment-sicko](comment-sicko/SKILL.md)                                                                                                                                                                                                             | "Run comment-sicko on this branch"                  |
@@ -194,66 +178,66 @@ Skills are small on purpose, and some call others:
 | Write or fix documentation                                 | [documentation-writer](documentation-writer/SKILL.md)                                                                                                                                                                                               | "Write a how-to for X"                              |
 | Get a plain-language version of a reply                    | [simplify](simplify/SKILL.md)                                                                                                                                                                                                                       | "ELI5"                                              |
 | Turn a self-review into warmer first-person prose          | [performance-review-humanizer](performance-review-humanizer/SKILL.md)                                                                                                                                                                               | "Humanize my performance review"                    |
-| Run untrusted code or an agent in isolation                | [docker-app-sandboxing](docker-app-sandboxing/SKILL.md) | "Sandbox this repo and run it" |
+| Run untrusted code or an agent in isolation                | [docker-app-sandboxing](docker-app-sandboxing/SKILL.md)                                                                                                                                                                                             | "Sandbox this repo and run it"                      |
 | Work with AWS, .NET, React, TypeScript, or a Next.js proxy | [aws](aws/SKILL.md), [dotnet](dotnet/SKILL.md), [vercel-react-best-practices](vercel-react-best-practices/SKILL.md), [typescript-strict-style](typescript-strict-style/SKILL.md), [nextjs-proxy-csp-hardening](nextjs-proxy-csp-hardening/SKILL.md) | Name the stack in your task                         |
 
 ### Understand
 
-| Skill                                               | What it does                                                                                                                                                                                                               | Use it when                                                                  |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| [whats-going-on](whats-going-on/SKILL.md)           | Reads an unfamiliar repo and writes a map: architecture, 3 to 5 traced flows, stack, conventions, concerns, and core use cases, plus a plain-language copy. Writes to `.planning/system/`. Never edits source.             | You joined a project, or you are about to refactor one you do not know.      |
-| [architecture-review](architecture-review/SKILL.md) | Audits a repo for needless complexity, real bottlenecks, reliability risks, and infrastructure cost. Recommends the simplest fix. Every finding is marked `VERIFIED`, `[ASSUMPTION]`, or `[NEEDS MEASUREMENT]`. Read-only. | You want to know if the system is over-built, or what breaks at 10x traffic. |
+| Skill                                               | What it does                                                                                                                                  | Use it when                                         |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| [whats-going-on](whats-going-on/SKILL.md)           | Reads unfamiliar repo, writes map: architecture, 3-5 traced flows, stack, conventions, concerns, use cases, plain copy. To `.planning/system/`. Never edits source. | Joined a project or about to refactor one you don't know. |
+| [architecture-review](architecture-review/SKILL.md) | Audits for needless complexity, bottlenecks, reliability risks, infra cost. Simplest fix. Findings marked `VERIFIED`, `[ASSUMPTION]`, `[NEEDS MEASUREMENT]`. Read-only. | Is system over-built? What breaks at 10x traffic?   |
 
 ### Plan
 
-| Skill                                             | What it does                                                                                                                                                                                                                                                                                            | Use it when                                                                                                 |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| [lets-talk-about-it](lets-talk-about-it/SKILL.md) | Checks your plan against local code and docs, asks one question at a time, states assumptions, recommends the simplest path, and lists how to verify it. For a big feature it ends with a copy-ready prompt for a separate build session. Does not implement.                                           | A plan, design, or term feels fuzzy and you want it pressure-tested first.                                  |
-| [prd-mode](prd-mode/SKILL.md)                     | Helps write a PRD that starts from the problem, sets success metrics, and bounds the scope. Can then turn a finished PRD into a checkable task list in `.planning/tasks/`.                                                                                                                              | You have an idea and need engineering and design to agree on the why.                                       |
-| [spike](spike/SKILL.md)                           | Splits an idea into 2 to 5 feasibility questions, sized in story points, and runs one throwaway experiment per question. Ends with a verdict (`VALIDATED`, `PARTIAL`, `INVALIDATED`, `INCONCLUSIVE`) backed by pasted output. Lives in `spikes/`. AWS spikes run on Floci in Docker, never on real AWS. | You ask "is this even possible?" before committing to a build. The deliverable is the answer, not the code. |
+| Skill                                             | What it does                                                                                                                                                                       | Use it when                                          |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| [lets-talk-about-it](lets-talk-about-it/SKILL.md) | Checks plan against local code and docs, one question at a time, states assumptions, recommends simplest path, lists how to verify. Big feature ends with copy-ready build prompt. No implementing. | Plan, design, or term feels fuzzy.                   |
+| [prd-mode](prd-mode/SKILL.md)                     | Writes PRD from the problem, sets metrics, bounds scope. Can turn finished PRD into task list in `.planning/tasks/`.                                                               | Idea needs engineering and design agreeing on why.   |
+| [spike](spike/SKILL.md)                           | Splits idea into 2-5 feasibility questions in story points, one throwaway experiment each. Verdict `VALIDATED`/`PARTIAL`/`INVALIDATED`/`INCONCLUSIVE` with pasted output. In `spikes/`. AWS spikes use Floci in Docker, never real AWS. | "Is this even possible?" Deliverable is the answer.  |
 
 ### Build
 
-| Skill                                                               | What it does                                                                                                                                                                                   | Use it when                                                    |
-| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| [swe](swe/SKILL.md)                                                 | Solves the whole task with the least new code: reuse what exists, add no unrequested options, finish every caller and test the change touches. Ends with what it skipped and any risk.         | Any code change where you want a small, complete diff.         |
-| [typescript-strict-style](typescript-strict-style/SKILL.md)         | A strict TS/JS discipline: bounded loops, asserted preconditions, explicit error handling, small functions, no unchecked casts, few dependencies. Cites a rule when it flags code.             | You write or review TypeScript or JavaScript.                  |
-| [vercel-react-best-practices](vercel-react-best-practices/SKILL.md) | React and Next.js performance rules from Vercel Engineering, plus patterns for components, hooks, state, forms, and accessibility.                                                             | You write, review, or refactor React or Next.js code.          |
-| [nextjs-proxy-csp-hardening](nextjs-proxy-csp-hardening/SKILL.md)   | Builds and reviews a secure `proxy.ts`: Content Security Policy, nonces, browser security headers, and migration from `middleware.ts`. Includes a CSP bypass reference for authorized testing. | You add or audit CSP in a Next.js App Router project.          |
-| [docker-app-sandboxing](docker-app-sandboxing/SKILL.md)             | Runs app work and AI coding agents inside an isolated Docker Sandbox (`sbx`): least-privilege mounts, private clones, network policy, credential proxy, and reviewed retrieval of changes.         | You run unfamiliar code or an autonomous agent against a repo. |
-| [dotnet](dotnet/SKILL.md)                                           | A router. Picks the guide for ASP.NET Core Web API work (endpoints, DTOs, error middleware, OpenAPI) or for a design pattern review (Command, Factory, Repository, DI, SOLID).                 | You work on C# or .NET.                                        |
-| [aws](aws/SKILL.md)                                                 | A router. Picks one guide from 24 (IAM, CDK, CloudFormation, networking, databases, serverless, Bedrock, billing, and more) and loads only that one.                                           | You touch an AWS service, credentials, or infrastructure code. |
-| [python](python/SKILL.md)                                           | A router. Picks one guide from 16 (asyncio, pytest, typing, packaging, uv, observability, performance, and more) and loads only that one.                                                      | You write or review Python code.                               |
+| Skill                                                               | What it does                                                                                                                              | Use it when                                          |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| [swe](swe/SKILL.md)                                                 | Whole task, least new code: reuse, no unrequested options, finish every caller and test touched. Ends with what it skipped and risk.     | Any change wanting small, complete diff.             |
+| [typescript-strict-style](typescript-strict-style/SKILL.md)         | Strict TS/JS: bounded loops, asserted preconditions, explicit errors, small functions, no unchecked casts, few deps. Cites rule on flag. | Writing or reviewing TS/JS.                          |
+| [vercel-react-best-practices](vercel-react-best-practices/SKILL.md) | Vercel Engineering React/Next.js perf rules, plus components, hooks, state, forms, a11y.                                                  | Writing, reviewing, refactoring React/Next.js.       |
+| [nextjs-proxy-csp-hardening](nextjs-proxy-csp-hardening/SKILL.md)   | Secure `proxy.ts`: CSP, nonces, security headers, `middleware.ts` migration. CSP bypass reference for authorized testing.                 | Adding or auditing CSP in Next.js App Router.        |
+| [docker-app-sandboxing](docker-app-sandboxing/SKILL.md)             | Runs app work and agents in Docker Sandbox (`sbx`): least-privilege mounts, private clones, network policy, credential proxy, reviewed retrieval. | Running unfamiliar code or autonomous agent on a repo. |
+| [dotnet](dotnet/SKILL.md)                                           | Router. Picks guide for ASP.NET Core Web API (endpoints, DTOs, error middleware, OpenAPI) or design pattern review (Command, Factory, Repository, DI, SOLID). | C# or .NET work.                                     |
+| [aws](aws/SKILL.md)                                                 | Router. Picks one of 24 guides (IAM, CDK, CloudFormation, networking, databases, serverless, Bedrock, billing...), loads only it.         | AWS service, credentials, or infra code.             |
+| [python](python/SKILL.md)                                           | Router. Picks one of 16 guides (asyncio, pytest, typing, packaging, uv, observability, performance...), loads only it.                    | Writing or reviewing Python.                         |
 
 ### Review
 
-Review skills report. They do not edit your code.
+Review skills report. They do not edit code.
 
-| Skill                                                 | What it does                                                                                                                                                                                                                 | Use it when                                                      |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| [qa-review](qa-review/SKILL.md)                       | A strict maintainability review of the lines you changed, and only those. Looks for abstraction problems, oversized files, and growing condition chains. Ends with approve or block.                                         | You want a hard look at your own diff before it goes to review.  |
-| [test-review](test-review/SKILL.md)                   | Asks whether the tests would notice if the diff were wrong. Runs five focused checks in order (scope, regression, behavior, concurrency, mutation) in a throwaway worktree. Writes to `.planning/reviews/test-review/`.      | You want proof the tests are good, not a count of them.          |
-| [code-review-frontend](code-review-frontend/SKILL.md) | Finds the repo's lint, type, and test tooling, then runs specialist reviewers in parallel: a base checklist, TypeScript and React, frontend patterns, and Vercel performance. Every finding is `VERIFIED` or `[ASSUMPTION]`. | You review a frontend PR.                                        |
-| [reconcile-reviews](reconcile-reviews/SKILL.md)       | Compares several reviews of one PR, checks their claims against the code, ranks by evidence, and pins each fix to `path:line`. Can post inline MR comments when you ask.                                                     | Two or more reviewers disagree, and you need one list to act on. |
-| [factory](factory/SKILL.md)             | Runs the review skills above as a pipeline and verifies every finding. See [How factory reviews a branch](#how-factory-reviews-a-branch).                                                                                            | You want a whole branch reviewed and reported.                   |
+| Skill                                                 | What it does                                                                                                                                          | Use it when                                        |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| [qa-review](qa-review/SKILL.md)                       | Strict maintainability review of your changed lines only: abstraction problems, oversized files, growing condition chains. Ends approve or block.     | Hard look at own diff before review.               |
+| [test-review](test-review/SKILL.md)                   | Would tests notice if diff were wrong? Five checks in order (scope, regression, behavior, concurrency, mutation) in throwaway worktree. To `.planning/reviews/test-review/`. | Want proof tests are good, not a count.            |
+| [code-review-frontend](code-review-frontend/SKILL.md) | Finds repo lint/type/test tooling, runs parallel specialists: base checklist, TS and React, frontend patterns, Vercel perf. Findings `VERIFIED` or `[ASSUMPTION]`. | Reviewing a frontend PR.                           |
+| [reconcile-reviews](reconcile-reviews/SKILL.md)       | Compares reviews of one PR, checks claims against code, ranks by evidence, pins fix to `path:line`. Posts inline MR comments on request.              | Reviewers disagree, need one list.                 |
+| [factory](factory/SKILL.md)                           | Runs review skills as pipeline, verifies every finding. See [How factory reviews a branch](#how-factory-reviews-a-branch).                            | Whole branch reviewed and reported.                |
 
 ### Verify and ship
 
-| Skill                                     | What it does                                                                                                                                                                                                                         | Use it when                                                                   |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
-| [prove-it-works](prove-it-works/SKILL.md) | Checks the real result (run the feature, read the real value, look at the real changes) instead of trusting "it compiles" or an agent's report. Ends by writing a User Acceptance Testing (UAT) document a non-developer can follow. | A task is done and you are about to say so.                                   |
-| [comment-sicko](comment-sicko/SKILL.md)   | Hunts narration, banners, commented-out code, and long justifications in a diff. Flags workaround code that needs a real fix as `MUST KILL`. Reports only, and edits comments only when you tell it to.                              | You want a branch free of comment clutter before review.                      |
-| [pr-body-style](pr-body-style/SKILL.md)   | Writes a short, business-focused PR body that matches the actual diff and current check status. Keeps your repo's template headings.                                                                                                 | You write, rewrite, or audit a PR description.                                |
-| [factory](factory/SKILL.md)               | Chains the skills above into one pipeline from idea to a reviewed local commit. See [How the factory works](#how-the-factory-works).                                                                                                 | You want a whole feature driven end to end, with you approving at two points. |
+| Skill                                     | What it does                                                                                                                                      | Use it when                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| [prove-it-works](prove-it-works/SKILL.md) | Checks real result (run feature, read real value, look at real changes), not "it compiles" or agent report. Ends with UAT doc a non-developer can follow. | Task done, about to say so.                         |
+| [comment-sicko](comment-sicko/SKILL.md)   | Hunts narration, banners, commented-out code, long justifications in a diff. Workaround code needing real fix = `MUST KILL`. Reports; edits comments only on request. | Want branch free of comment clutter.                |
+| [pr-body-style](pr-body-style/SKILL.md)   | Short, business-focused PR body matching real diff and check status. Keeps repo template headings.                                                | Writing, rewriting, auditing a PR description.      |
+| [factory](factory/SKILL.md)               | Chains skills above, idea to reviewed local commit. See [How the factory works](#how-the-factory-works).                                          | Whole feature end to end, you approve at two points. |
 
 ### Write and communicate
 
-| Skill                                                                 | What it does                                                                                                                                       | Use it when                                                             |
-| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| [documentation-writer](documentation-writer/SKILL.md)                 | Writes docs in one of four Diátaxis modes (tutorial, how-to, reference, explanation) and never mixes them. Includes product copy principles.       | You write or restructure documentation.                                 |
-| [demo-script](demo-script/SKILL.md)                                   | Writes a short spoken script: previously, now, the demonstration, the result, and the business impact. Never invents metrics.                      | You present a change to people who care about the outcome.              |
-| [simplify](simplify/SKILL.md)                                         | Restates the last message in plain language: the outcome first, then the one reason that matters.                                                  | You say "I don't follow" or "ELI5".                                     |
-| [performance-review-humanizer](performance-review-humanizer/SKILL.md) | Rewrites your first-person self-review in a warmer voice. Keeps every fact and number. Can borrow the style of a sample without copying its words. | You have a draft self-review that reads stiff.                          |
+| Skill                                                                 | What it does                                                                                                         | Use it when                                  |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| [documentation-writer](documentation-writer/SKILL.md)                 | Docs in one Diátaxis mode (tutorial, how-to, reference, explanation), never mixed. Product copy principles.          | Writing or restructuring docs.               |
+| [demo-script](demo-script/SKILL.md)                                   | Short spoken script: previously, now, demo, result, business impact. Never invents metrics.                          | Presenting a change to outcome-minded people. |
+| [simplify](simplify/SKILL.md)                                         | Restates last message in plain language: outcome first, then the one reason that matters.                            | You say "I don't follow" or "ELI5".          |
+| [performance-review-humanizer](performance-review-humanizer/SKILL.md) | Rewrites first-person self-review warmer. Keeps every fact and number. Can borrow a sample's style, not its words.   | Self-review draft reads stiff.               |
 
 ## Architecture
 
@@ -265,31 +249,31 @@ README.md          This file
   references/      Optional deep-dive docs loaded on demand
 ```
 
-There is no lockfile. Skill versions are tracked by git.
+No lockfile. Git tracks versions.
 
 ## Artifact Convention
 
-Workflow output goes into `.planning/*` in the target project, not into `docs/`, home directories, or cache folders.
+Output goes in `.planning/*` in the target project, not `docs/`, home dirs, or cache.
 
-- `.planning/reviews/`: review outputs and readiness summaries
-- `.planning/qa/`: QA plans, reports, test outcomes
-- `.planning/tasks/TODOS.md`: follow-up work and deferred tasks
-- `.planning/strategy/`: product or strategy notes
+- `.planning/reviews/`: review outputs, readiness summaries
+- `.planning/qa/`: QA plans, reports, results
+- `.planning/tasks/TODOS.md`: follow-ups, deferred tasks
+- `.planning/strategy/`: product/strategy notes
 - `.planning/plans/`, `.planning/requirements/`, `.planning/specs/`: plan inputs
 
 ## Contributing a Skill
 
-1. Create `{skill-name}/SKILL.md` with front-matter `name:` matching the folder name and a `description:` written for triggering: say _when_ to use it, not just what it does.
-2. Add a row to the index table in [AGENTS.md](AGENTS.md), alphabetical.
-3. Add it to the matching category in this README.
-4. Keep durable output paths under `.planning/*`.
-5. If the skill links to `references/*.md` or an `@`-prefixed external workflow file, commit or verify that target. A missing reference silently disables the workflow.
-6. Remove references to tools, folders, or sibling skills that do not exist.
-7. Prefer referencing existing skills over copying large blocks.
+1. Create `{skill-name}/SKILL.md`: front-matter `name:` matches folder, `description:` says _when_ to use it.
+2. Add row to [AGENTS.md](AGENTS.md) index, alphabetical.
+3. Add to matching category here.
+4. Output paths under `.planning/*`.
+5. Commit or verify any `references/*.md` or `@`-prefixed external workflow file. Missing reference silently disables the workflow.
+6. Remove references to tools, folders, sibling skills that don't exist.
+7. Reference existing skills, don't copy big blocks.
 
 ## Local Setup
 
-To edit a skill and have the change apply globally without reinstalling, symlink the repo into the skill store OpenCode reads:
+Edit a skill and apply globally without reinstall: symlink repo into the skill store OpenCode reads:
 
 ```bash
 REPO=~/calphonse-skills
@@ -301,12 +285,12 @@ for d in "$REPO"/*/; do
 done
 ```
 
-`~/.config/opencode/skills` is the path OpenCode reads (`skills.paths` in `opencode.json`). Edits to any `SKILL.md` take effect immediately. There is no reinstall step and no copy to keep in sync.
+`~/.config/opencode/skills` = path OpenCode reads (`skills.paths` in `opencode.json`). `SKILL.md` edits apply immediately. No reinstall, no copy.
 
-To make `swe` active from the first message in Claude Code, Kiro and OpenCode, run `git config core.hooksPath .githooks` once in your clone. After that `scripts/install-swe-hook` runs by itself on every pull and every Claude Code session in this repo. The same hook path enables `.githooks/commit-msg`, which rejects commit messages containing `Co-Authored-By`. See [swe/references/always-on.md](swe/references/always-on.md).
+To make `swe` active from first message in Claude Code, Kiro, OpenCode: run `git config core.hooksPath .githooks` once. Then `scripts/install-swe-hook` runs on every pull and every Claude Code session here. Same path enables `.githooks/commit-msg`, which rejects `Co-Authored-By`. See [swe/references/always-on.md](swe/references/always-on.md).
 
-Leave `~/.agents/skills` alone: it belongs to the Skills CLI and its lockfile.
+Leave `~/.agents/skills` alone: Skills CLI and its lockfile own it.
 
 ## Notes
 
-Skills come from a mix of sources. Some are original, some are adapted from other repos with small changes.
+Skills from mixed sources. Some original, some adapted from other repos with small changes.

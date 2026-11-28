@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # QA Review
 
-An unusually strict review of the quality and maintainability of the code the author changed. Be ambitious about how the author's change is structured: look for "code judo" moves that keep behavior and make the change dramatically simpler, smaller, and more direct.
+An unusually strict review of the quality and maintainability of the code the author changed. Be ambitious about how the change is structured: look for "code judo" moves that keep behavior and make the change dramatically simpler, smaller, and more direct.
 
 ## Scope: the author's changes only
 
@@ -14,17 +14,17 @@ Review what the author wrote or modified in this change. Nothing else.
 
 - To read a PR/MR instead of a local diff, use `gh` or `glab`, never `curl` or `wget`. See [forge-cli](../pr-follow-up/references/forge-cli.md).
 - Get the change set from the diff against the base branch. Every finding must point to a line the diff adds or modifies, or to code whose behavior the diff directly changes.
-- Never report a problem that already existed in code the author did not touch. This includes old spaghetti, oversized files, missing types, duplicated helpers, and outdated patterns. Do not mention them as "side notes", "while I was here", or "for a follow-up". Unbounded scope is the failure this rule prevents.
-- Touching a file does not put the whole file in scope. Only the changed lines, and what those lines do to their immediate surroundings, are in scope.
-- Read untouched code only to judge the author's change: to check whether a canonical helper already exists, whether a layer boundary is respected, or how the new code interacts with its callers. What you learn there is evidence for a finding about the author's code, never a finding in itself.
-- Suggested fixes must be edits to the author's own changes: simplify them, move them, split them, or replace them with an existing helper. Do not ask the author to refactor, rename, or clean up code they did not write in this change.
-- A change counts as making the surrounding code worse only when the diff itself introduced the problem, for example a new branch added to an existing function, or a file pushed over the size limit by the new lines.
-- If a pre-existing problem blocks a clean implementation, say so in one sentence tied to the author's change and recommend the smallest local workaround. Do not recommend fixing the pre-existing problem in this change.
-- If the diff cannot be obtained, stop and ask. Do not fall back to reviewing the whole codebase.
+- Never report a problem that already existed in code the author didn't touch: old spaghetti, oversized files, missing types, duplicated helpers, outdated patterns. No "side notes", "while I was here", or "for a follow-up". Unbounded scope is the failure this rule prevents.
+- Touching a file doesn't put the whole file in scope. Only the changed lines, and what they do to their immediate surroundings.
+- Read untouched code only to judge the author's change: whether a canonical helper exists, whether a layer boundary is respected, how the new code interacts with its callers. That is evidence for a finding about the author's code, never a finding itself.
+- Suggested fixes must be edits to the author's own changes: simplify, move, split, or replace with an existing helper. Don't ask the author to refactor, rename, or clean up code they didn't write in this change.
+- A change makes the surrounding code worse only when the diff itself introduced the problem, e.g. a new branch added to an existing function, or a file pushed over the size limit by the new lines.
+- If a pre-existing problem blocks a clean implementation, say so in one sentence tied to the author's change and recommend the smallest local workaround. Don't recommend fixing the pre-existing problem in this change.
+- If the diff can't be obtained, stop and ask. Don't fall back to reviewing the whole codebase.
 
 ## Steps
 
-Read the reference for each step when you reach it. Do not load them all up front.
+Read each step's reference when you reach it. Don't load them all up front.
 
 | Step | What you do | Read |
 | --- | --- | --- |
@@ -38,4 +38,4 @@ Read the reference for each step when you reach it. Do not load them all up fron
 
 - Findings ordered by severity, each tied to a line the diff changed, with a concrete remedy.
 - A verdict: approve, or block with the presumptive blockers that apply.
-- No findings about code the author did not change.
+- No findings about code the author didn't change.

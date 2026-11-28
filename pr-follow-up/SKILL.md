@@ -9,29 +9,29 @@ description: >
 
 # PR Follow Up
 
-Take over an existing PR/MR, bring it up to date, address all feedback, and push it to a merge-ready state. This skill is language- and framework-agnostic — substitute the project's actual build, lint, test, and format commands where examples are shown.
+Take over an existing PR/MR, bring it up to date, address all feedback, and push it to a merge-ready state. Language- and framework-agnostic: substitute the project's actual build, lint, test, and format commands where examples appear.
 
 ## Inputs
 
 - **PR/MR URL or number** (required): e.g. `https://<host>/<owner>/<repo>/pull/<N>` (GitHub) or `https://<host>/<group>/<project>/-/merge_requests/<IID>` (GitLab), or just `<N>` / `<IID>`.
-- **Branch name** (optional): if not provided, extract it from the PR/MR metadata.
+- **Branch name** (optional): if not given, take it from the PR/MR metadata.
 
 ## Detect the host
 
-Pick the tool before writing commands. Do not mix hosts.
+Pick the tool before writing commands. Don't mix hosts.
 
 | Host | CLI | API wrapper | Object | ID | Metadata endpoints |
 | --- | --- | --- | --- | --- | --- |
 | GitHub | `gh` | `gh api` | PR | `<N>` | `repos/{owner}/{repo}/pulls/<N>` |
 | GitLab | `glab` | `glab api` | MR | `<IID>` | `projects/:id/merge_requests/<IID>` |
 
-Detect from the URL if given, otherwise from `git remote get-url origin`. If neither is clear, ask once and name the candidates. Everything below says "PR/MR" — use the host's vocabulary in replies. Resolve `:id` as the URL-encoded project path when needed.
+Detect from the URL if given, otherwise from `git remote get-url origin`. If neither is clear, ask once and name the candidates. Below says "PR/MR": use the host's vocabulary in replies. Resolve `:id` as the URL-encoded project path when needed.
 
-Use only `git`, `gh`, and `glab`. Never use `curl` or `wget` for git or forge work; if the CLI is missing or logged out, stop and tell the user. Full command reference and rules: [references/forge-cli.md](references/forge-cli.md).
+Use only `git`, `gh`, and `glab`. Never `curl` or `wget` for git or forge work; if the CLI is missing or logged out, stop and tell the user. Full command reference and rules: [references/forge-cli.md](references/forge-cli.md).
 
 ## 1. Study the PR/MR
 
-Fetch the PR/MR to get file changes (diffs), reviewer comments (inline and general), CI status and logs, the description, and any linked ticket.
+Fetch the file changes (diffs), reviewer comments (inline and general), CI status and logs, the description, and any linked ticket.
 
 ```bash
 # GitHub
@@ -45,9 +45,9 @@ glab api "projects/:id/merge_requests/<IID>/discussions"
 glab api "projects/:id/merge_requests/<IID>/pipelines"
 ```
 
-Read all changed files in depth. Understand the intent and scope of the change.
+Read all changed files in depth. Understand the intent and scope.
 
-**If the PR/MR fixes a specific issue** (error report, user-reported bug): investigate the root cause before reviewing the code. Confirm the fix addresses the actual problem. PRs are sometimes already superseded by another fix — if so, say so and stop rather than polishing dead work.
+**If the PR/MR fixes a specific issue** (error report, user-reported bug): investigate the root cause before reviewing the code. Confirm the fix addresses the actual problem. A PR is sometimes already superseded by another fix: if so, say so and stop rather than polishing dead work.
 
 **Already-addressed comments**: skip comments that already have a reply (`in_reply_to_id` on GitHub; a later note in the same GitLab discussion). A resolved thread (`isResolved` on GitHub GraphQL; `resolved: true` on a GitLab discussion) needs no action.
 
@@ -69,7 +69,7 @@ git pull origin <base-branch> --rebase
 **If conflicts occur:**
 
 1. Read each conflicted file to understand both sides.
-2. Resolve conflicts, preserving the PR/MR's intent while incorporating base-branch changes.
+2. Resolve, preserving the PR/MR's intent while incorporating base-branch changes.
 3. `git add <resolved-files>`
 4. `git rebase --continue`
 
@@ -82,20 +82,20 @@ git diff --stat origin/<base-branch>..HEAD
 
 ## 4. Address reviewer comments
 
-Using the comments fetched in step 1, for each unresolved comment:
+Using the comments from step 1, for each unresolved comment:
 
-1. Read the comment and understand what is being asked.
-2. Make the code change (or record a clear reason why it is not needed).
+1. Read it and understand what is asked.
+2. Make the code change (or record a clear reason it isn't needed).
 3. Add tests if requested.
 4. Commit the fix with a descriptive Conventional Commits message (`<type>(<scope>): <description>`).
 
-Do not rewrite the original commits unless the rebase requires it; small follow-up commits keep the review history readable.
+Don't rewrite the original commits unless the rebase requires it; small follow-up commits keep review history readable.
 
 ## 5. Run local CI checks
 
 Run the project's lint, format, typecheck/compile, and test commands for the affected areas. Discover them from the repo root: `Makefile`, `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `build.gradle`, `mix.exs`, `Gemfile`, `composer.json`, `justfile`, `Taskfile.yml`, `README.md`, or the CI workflow config. See the [CI Checks Reference](../pr-body-style/SKILL.md) in `pr-body-style` for a broader template of checks.
 
-Prefer filter/target flags to scope runs to affected areas — faster than the whole repo:
+Prefer filter/target flags to scope runs to affected areas, which is faster than the whole repo:
 
 - JS/TS monorepos: `npm run test -- --filter=<workspace>`, `pnpm -r --filter <pkg> test`, `nx test <project>`
 - Python: `pytest <path>`, `tox -e <env>`, `ruff check --fix <path>`
@@ -105,9 +105,9 @@ Prefer filter/target flags to scope runs to affected areas — faster than the w
 - Bazel: `bazel test //path/...`
 - Terraform / OpenTofu: `terraform -chdir=<dir> fmt -check -recursive`, `terraform -chdir=<dir> init -backend=false && terraform -chdir=<dir> validate`, `terraform -chdir=<dir> plan -input=false -lock=false`, `tflint --recursive`, `tfsec <dir>` / `checkov -d <dir>`; commit `.terraform.lock.hcl` if providers changed
 
-**Distinguishing pre-existing failures from PR issues**: some CI failures exist on the base branch and are unrelated to the PR. If a failure occurs in a file the PR does not touch, verify it on the base branch before spending time fixing it. Common pre-existing issues include module/package resolution errors for recently added dependencies.
+**Pre-existing failures vs PR issues**: some CI failures exist on the base branch and are unrelated. If a failure is in a file the PR doesn't touch, verify it on the base branch before fixing it. Common pre-existing issues include module/package resolution errors for recently added dependencies.
 
-**E2E tests**: if the PR changes user-facing behavior (UI flow, defaults, keyboard handling, CLI output), E2E tests may break even when the code is correct. Read the failing test to see what it expects, then update it to match the new behavior. Do not assume E2E failures are flaky — read them first.
+**E2E tests**: if the PR changes user-facing behavior (UI flow, defaults, keyboard handling, CLI output), E2E tests may break even when the code is correct. Read the failing test to see what it expects, then update it to match the new behavior. Don't assume E2E failures are flaky: read them first.
 
 ## 6. Commit and push
 
@@ -118,11 +118,11 @@ git push origin <branch-name>
 git status -sb   # nothing in brackets after the branch name, no [ahead N]
 ```
 
-Push every commit in the same turn; a commit is not done until it is pushed. If the rebase in step 3 rewrote commits that were already pushed, the plain push is rejected and needs `--force-with-lease` (never a bare `--force`). Ask the user before running it, and only force-push if the branch is yours alone; check the PR/MR participants first.
+Push every commit in the same turn; a commit isn't done until pushed. If the rebase in step 3 rewrote commits already pushed, the plain push is rejected and needs `--force-with-lease` (never bare `--force`). Ask the user before running it, and force-push only if the branch is yours alone; check the PR/MR participants first.
 
-**If the branch is a factory worktree branch**, follow [pr-body-style](../pr-body-style/SKILL.md): push only when `git rev-parse <branch>` equals the job's `tip`, so a branch that moved after the job finished is not published by mistake. Never use `--no-verify`.
+**If the branch is a factory worktree branch**, follow [pr-body-style](../pr-body-style/SKILL.md): push only when `git rev-parse <branch>` equals the job's `tip`, so a branch that moved after the job finished isn't published by mistake. Never use `--no-verify`.
 
-**If a commit-scanning bot blocks the push** (GitGuardian, TruffleHog, etc.): this usually means unrelated test fixtures contain strings that look like secrets. The agent cannot override these. Tell the user to push manually or temporarily disable the scanner per the org's docs.
+**If a commit-scanning bot blocks the push** (GitGuardian, TruffleHog, etc.): usually unrelated test fixtures contain strings that look like secrets. The agent can't override these. Tell the user to push manually or temporarily disable the scanner per the org's docs.
 
 ## 7. Reply to reviewer comments
 
@@ -182,7 +182,7 @@ gh pr edit <N> --body-file <file>
 glab mr update <IID> --description "$(cat <file>)"
 ```
 
-Update the testing section to reflect the additional checks and tests added. Reply with the PR/MR link when done; do not paste the body back unless asked.
+Update the testing section to reflect the added checks and tests. Reply with the PR/MR link when done; don't paste the body back unless asked.
 
 ## Verification
 
