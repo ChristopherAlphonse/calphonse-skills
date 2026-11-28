@@ -1004,6 +1004,8 @@ class TestPolicy(Factory):
         self.human("commit", "j")
         self.adv("j", "ready")
         self.to_ship("k")
+        # Same file, parent and second as j would give the same commit hash, and k would count as merged.
+        self.wf("k", "commit.md", "feat: add feature for k\n")
         self.human("commit", "k")
         self.adv("k", "ready")
         self.git("merge", "--no-edit", "feature/J")
