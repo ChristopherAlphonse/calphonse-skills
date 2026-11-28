@@ -20,6 +20,19 @@ class Review(Factory):
         self.feature(files or {"src/math.ts": "export const sub = (a: number, b: number) => b - a;\n"}, name)
         self.ok("create", jid, "Review it", "--review", "main", name)
 
+    def review_hint(self, jid):
+        return [l for l in self.ok("queue").stdout.splitlines() if f"\t{jid}\t" in l][0]
+
+    def test_security_is_suggested_only_for_sensitive_paths(self):
+        self.new_review("plain", {"src/math.ts": "export const x = 1;\n"}, "feature/plain")
+        self.to_stage("plain", "review")
+        self.assertNotIn("sensitive paths", self.review_hint("plain"))
+        self.new_review("hot", {"src/auth/login.ts": "export const x = 1;\n"}, "feature/hot")
+        self.to_stage("hot", "review")
+        self.assertIn("job route <id> security", self.review_hint("hot"))
+        self.ok("route", "hot", "security")
+        self.assertNotIn("sensitive paths", self.review_hint("hot"))
+
     def to_stage(self, jid, stage):
         order = ["scope", "review", "reconcile", "verify", "report", "ready"]
         files = {

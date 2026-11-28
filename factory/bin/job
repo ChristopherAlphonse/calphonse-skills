@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Only writer of job.json. Refuses illegal stage moves. Serves the board and its chat."""
-import fcntl, fnmatch, hashlib, hmac, json, os, re, shutil, subprocess, sys, tempfile, threading, time
+import fcntl, fnmatch, hashlib, hmac, json, os, re, shutil, signal, subprocess, sys, tempfile, threading, time
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -27,7 +27,8 @@ HASH_FILE = "human.sha256"
 CHAT_HASH_FILE = "chat.sha256"
 CTX = threading.local()
 BASE_REVIEWERS = ["code", "qa", "test"]
-EXTRA_REVIEWERS = {"architecture"}
+EXTRA_REVIEWERS = {"architecture", "security"}
+SENSITIVE = re.compile(r"(^|/)(auth|login|session|token|secret|crypt|permission|acl|rbac|oauth|jwt|password|\.env)[^/]*|(^|/)(proxy|middleware)\.(ts|js)$", re.I)
 CHECKS_FILE = "checks.md"
 SPEC_FILE = "spec.md"
 HUMAN_STAGES = {"needs-human"}
@@ -104,6 +105,10 @@ def hint_for(job):
         out += f" | suggested stack skills (file -> skill, from this job's diff; load the one for the file you edit): {stack}"
     elif hint and job["stage"] == "build" and not job.get("review"):
         out += " | no stack skill suggested yet: pick by the files you touch (.ts -> typescript-strict-style, .py -> python), then run `job stack <id>`"
+    if hint and job["stage"] == "review" and "security" not in job["reviewers"]:
+        hot = [f for f in diff_files(job) if SENSITIVE.search(f)]
+        names = ",".join(sorted(set(job["reviewers"]) - set(BASE_REVIEWERS) | {"security"}))
+        out += f" | sensitive paths in the diff ({', '.join(hot[:5])}): run `job route <id> {names}` to add the security reviewer" if hot else ""
     note = job.get("briefs", {}).get(job["stage"])
     out += f" | USER NOTE for this stage, follow it: {' '.join(note.split())}" if hint and note else ""
     rules = standing_rules()
@@ -1480,6 +1485,51 @@ def cmd_prune():
         git(["worktree", "prune"], repo)
 
 
+def proc_start(pid):
+    """Start time of a process in clock ticks from /proc, or None where /proc is absent."""
+    try:
+        return int(Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[19])
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def alive(pid, start):
+    """True only when this pid is still the same process the record saw. No /proc start time means it cannot be proven."""
+    return start is not None and proc_start(pid) == start
+
+
+def kill_group(pgid):
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.killpg(pgid, sig)
+        except ProcessLookupError:
+            return
+        time.sleep(2 if sig == signal.SIGTERM else 0)
+
+
+def cmd_cleanup():
+    """Stop agent groups whose tick is gone, then prune finished jobs' worktrees. It kills only a process group a tick
+    recorded and only while that group's leader still has the recorded start time. Never matches by name."""
+    for rec in sorted((STATE / "run").glob("*.json")) if (STATE / "run").is_dir() else []:
+        try:
+            r = json.loads(rec.read_text())
+            pgid, start = int(r["pgid"]), r["start"]
+        except (OSError, ValueError, KeyError, TypeError):
+            rec.unlink(missing_ok=True)
+            continue
+        if alive(r["tick"], r.get("tick_start")):
+            continue  # its tick is still running the pass
+        if alive(pgid, start):
+            kill_group(pgid)
+            audit("cleanup", "", f"stopped orphan agent group {pgid}")
+            print(f"stopped orphan agent group {pgid}")
+        elif start is None and proc_start(pgid) is not None:
+            print(f"left group {pgid} alone: no /proc start time to prove it is the recorded process")
+            continue
+        rec.unlink(missing_ok=True)
+    cmd_prune()
+
+
 @serialized
 def cmd_retire(jid):
     """Stop a job the user no longer wants: it moves to rejected, a clean worktree goes, the branch stays."""
@@ -1707,7 +1757,7 @@ HUMAN_ONLY = {"approve", "commit", "unblock"}
 
 COMMANDS = {
     "create": (cmd_create, None), "advance": (cmd_advance, 2), "gate": (cmd_gate, 1), "stack": (cmd_stack, 1), "watch": (cmd_watch, 1), "board": (cmd_board, 0),
-    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_watch, 1), "pipeline": (cmd_pipeline, 0), "standing": (cmd_standing, 0), "times": (cmd_times, 0), "act": (cmd_act, 1), "brief": (cmd_brief, 3), "edit": (cmd_edit, 4), "wait": (cmd_wait, 1), "close": (cmd_close, 1), "prune": (cmd_prune, 0), "retire": (cmd_retire, 1),
+    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_watch, 1), "pipeline": (cmd_pipeline, 0), "standing": (cmd_standing, 0), "times": (cmd_times, 0), "act": (cmd_act, 1), "brief": (cmd_brief, 3), "edit": (cmd_edit, 4), "wait": (cmd_wait, 1), "close": (cmd_close, 1), "prune": (cmd_prune, 0), "cleanup": (cmd_cleanup, 0), "retire": (cmd_retire, 1),
 }
 
 if __name__ == "__main__":

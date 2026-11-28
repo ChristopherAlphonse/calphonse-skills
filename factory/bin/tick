@@ -611,6 +611,14 @@ def cmd_check(harness, quiet=False):
         print(f"{harness}: policy ok")
 
 
+def proc_start(pid):
+    """When a process started, in clock ticks from /proc, or None where /proc is absent. Pairs with the pid so a reused pid is never mistaken for ours."""
+    try:
+        return int(Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[19])
+    except (OSError, ValueError, IndexError):
+        return None
+
+
 def run_pass(harness):
     argv = COMMANDS[harness](PROMPT)
     if not shutil.which(argv[0]):
@@ -619,6 +627,10 @@ def run_pass(harness):
     log(harness, "start")
     # Its own process group, so a timeout also stops every agent the pass started.
     p = subprocess.Popen(argv, cwd=ROOT, start_new_session=True)
+    # `job cleanup` reads this to stop an agent group whose tick died. Removed on any exit from this pass.
+    rec = ROOT / ".planning" / SKILL / "run" / f"{os.getpid()}.json"
+    rec.parent.mkdir(parents=True, exist_ok=True)
+    rec.write_text(json.dumps({"tick": os.getpid(), "tick_start": proc_start(os.getpid()), "pgid": p.pid, "start": proc_start(p.pid), "harness": harness}))
     try:
         code = p.wait(timeout=limit)
     except subprocess.TimeoutExpired:
@@ -627,6 +639,8 @@ def run_pass(harness):
     except KeyboardInterrupt:
         stop_group(p)
         raise
+    finally:
+        rec.unlink(missing_ok=True)
     log(harness, f"exit {code}")
     return code
 
@@ -690,6 +704,8 @@ def loop_step(harness, stalls):
     if stalls.get(before, 0) >= STALL_LIMIT:
         return f"stalled: {', '.join(todo)} made no progress in {STALL_LIMIT} passes, look at the board"
     code = run_pass(harness)
+    subprocess.run([sys.executable, "-I", str(JOB), "cleanup"], cwd=ROOT, capture_output=True,
+                   env={**os.environ, "FACTORY_ROOT": str(ROOT), "FACTORY_NO_WATCH": "1"})
     if jobs_fingerprint() == before:
         stalls[before] = stalls.get(before, 0) + 1
     return f"pass for {', '.join(todo)} exit {code}"

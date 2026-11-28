@@ -9,6 +9,7 @@ Details: swe/references/always-on.md
 import argparse
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -84,6 +85,19 @@ def opencode(dry):
     save(path, data, dry)
 
 
+def githooks(dry):
+    """Point git at .githooks so the commit-msg check runs. A hooksPath you set yourself is never replaced."""
+    def git(*a):
+        return subprocess.run(["git", "-C", str(REPO), *a], capture_output=True, text=True)
+    cur = git("config", "--local", "--get", "core.hooksPath").stdout.strip()
+    if cur:
+        return say(f"git: core.hooksPath already {cur}")
+    if dry:
+        return say("would set core.hooksPath to .githooks")
+    git("config", "--local", "core.hooksPath", ".githooks")
+    say("set core.hooksPath to .githooks")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dry-run", action="store_true", help="print changes, write nothing")
@@ -97,6 +111,7 @@ def main():
     claude(args.dry_run)
     kiro(args.dry_run, args.kiro_agent)
     opencode(args.dry_run)
+    githooks(args.dry_run)
     say("Kiro IDE users: steering files are separate, see swe/references/always-on.md")
 
 

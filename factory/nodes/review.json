@@ -4,6 +4,6 @@
   "skill": "review-blind-spots",
   "model": "mid",
   "writes": "notes",
-  "hint": "code (lens chosen from the stack skills below: python for Python, dotnet for C#, typescript-strict-style and vercel-react-best-practices for TS/JS/React; code-review-frontend ONLY when TS/JS/React files are in the diff; for any other language the repo's own tooling alone, never a frontend skill), qa (qa-review), test (test-review), and routed extras -> round-1/review-<name>.md; read-only, never edit",
+  "hint": "code (lens chosen from the stack skills below: python for Python, dotnet for C#, typescript-strict-style and vercel-react-best-practices for TS/JS/React; code-review-frontend ONLY when TS/JS/React files are in the diff; for any other language the repo's own tooling alone, never a frontend skill), qa (qa-review), test (test-review), and routed extras (architecture; security, which traces untrusted input to a sink and runs only when the diff touches auth, input parsing or secrets) -> round-1/review-<name>.md; read-only, never edit",
   "on_demand": "The brief names your reviewer skill (qa-review by its absolute path, test-review, the code lens, or architecture-review): read it before you start."
 }

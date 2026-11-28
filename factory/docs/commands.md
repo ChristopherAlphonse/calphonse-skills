@@ -16,7 +16,7 @@ Reference for every command, setting, file and environment variable. Run command
 | `bin/job queue` | list jobs as `action id stage hint` |
 | `bin/job advance <id> <stage>` | move a job if the evidence allows it |
 | `bin/job gate <id>` | run `checks` in the worktree and record the result and tree hash |
-| `bin/job route <id> architecture` | add a reviewer |
+| `bin/job route <id> architecture,security` | add reviewers (comma-separated) |
 | `bin/job progress <id> <done> <total>` | set the task progress bar |
 | `bin/job note <id> "<text>"` | record what the agent is doing now. The card shows the latest note |
 | `bin/job act on\|off` | turn Act mode on for 30 minutes, or off. Only from the board's chat bar or the board; written to `audit.log` |
@@ -24,6 +24,7 @@ Reference for every command, setting, file and environment variable. Run command
 | `bin/job standing [add <text> \| rm <number>]` | list, add or remove the user's rules for every job, such as "plain push is fine". Changes work only from the board's chat bar |
 | `bin/job times` | where the time goes: for each stage, how many visits, the median, longest and total time, from `audit.log`. A stage visited more often than jobs exist looped back |
 | `bin/job close <id>` | finish a job at ship whose work you committed yourself on its branch: moves it to ready, removes its worktree, deletes the branch if merged |
+| `bin/job cleanup` | stop agent groups left running by a dead `tick` (only a group `tick` recorded, and only while its start time still matches), then prune. `tick loop` runs it after every pass |
 | `bin/job prune` | remove clean worktrees of finished jobs, delete their branches whose work is in main (merged, or squash-merged with every changed file identical in main), and move landed ready jobs to `.planning/factory/archive/`. Unlanded branches stay |
 | `bin/job retire <id>` | move a job you no longer want from any stage before ready to rejected; removes a clean worktree, keeps the branch |
 | `bin/job wait [seconds]` | block until a job that waited on you is free. Prints `RESUME: <ids>`, or `STILL WAITING` on timeout, and exits 0 either way: the agent then ends its turn. Default 90 seconds, maximum 3600 |
@@ -108,7 +109,7 @@ State lives in the project, never in this repo.
 | `spec.md` | spec | the plan you approve |
 | `build.md` | build | `STATUS: READY` or `STATUS: BLOCKED` |
 | `round-N/checks.md` | gate | `GATE: PASS` or `GATE: FAIL` |
-| `round-N/review-<name>.md` | reviewers (`code`, `qa`, `test`, `architecture`) | `VERDICT: PASS` or `VERDICT: CHANGES` |
+| `round-N/review-<name>.md` | reviewers (`code`, `qa`, `test`, `architecture`, `security`) | `VERDICT: PASS` or `VERDICT: CHANGES` |
 | `reconcile.md` | reconcile | `STATUS: READY` in a review job |
 | `polish.md` | polish | `STATUS: DONE` or `STATUS: REWORK` |
 | `uat.md` | prove (prove job) | `STATUS: PASS` or `STATUS: FAIL` |
