@@ -93,7 +93,7 @@ export const BOARD_DEFINITIONS: Record<string, Omit<BoardDefinition, "id" | "lab
           ? [{ text: `gate ${job.gate || "pending"}`, cls: job.gate || "" }]
           : []),
         ...(job.commit || job.tip
-          ? [{ text: `commit ${(job.commit || job.tip).slice(0, 7)}`, cls: "PASS" }]
+          ? [{ text: `commit ${(job.commit || job.tip || "").slice(0, 7)}`, cls: "PASS" }]
           : []),
       ],
       ...stackChips(job),

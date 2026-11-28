@@ -62,7 +62,7 @@ Buttons along the top that hide the noise:
 
 ### 1.8 The side panel
 
-Click a chip and a panel opens. It shows the job's status, the right button for you to click, the skill switches, a note box for each stage, a list of every file the job has written, and the latest "now:" note from the agent.
+Click a chip and a panel opens. It shows the job's status, the right button for you to click, the skills the current stage uses (read-only), a note box for each stage, a list of every file the job has written, and the latest "now:" note from the agent.
 
 ### 1.9 Live updates
 
@@ -225,9 +225,13 @@ A **skill** is a packaged set of instructions. Each stage runs one skill. The fa
 
 For a build job it looks at the files the job has changed so far (none at the start, so the hint says to pick by the files you touch). For a review job it looks only at the files in the diff. The hint names stack skills only at build and at a review job's review stage, as a map such as `*.ts -> typescript-strict-style`; shape, spec, polish, prove and ship get none. Run `bin/job stack <id>` to look again after the build adds new files.
 
-### 4.3 The skill switch
+### 4.3 Skills are fixed per stage
 
-Do not want a helper on one job? Switch it off in the job's panel, or with `bin/job skill <id> <name> off`. Every later agent is told not to use it. Switch it back on any time.
+Each stage's skill comes from its node file in `factory/nodes/`, and the job's panel shows it with the language skills picked for the job's files. You do not switch skills per job. To steer one job, use the stage's note box.
+
+### 4.3.1 Act mode from chat
+
+Say "turn on act mode" in the chat bar and it turns on for 30 minutes: Factory Bot then applies the pipeline changes it prepares without waiting for Apply. The Act button stays lit and its tooltip shows when it ends. Click **Chat** to end it early. Turning it on and off is written to `audit.log`.
 
 ### 4.4 Stage notes
 

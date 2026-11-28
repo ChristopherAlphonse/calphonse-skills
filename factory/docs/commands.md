@@ -19,7 +19,7 @@ Reference for every command, setting, file and environment variable. Run command
 | `bin/job route <id> architecture` | add a reviewer |
 | `bin/job progress <id> <done> <total>` | set the task progress bar |
 | `bin/job note <id> "<text>"` | record what the agent is doing now. The card shows the latest note |
-| `bin/job skill <id> <name> on\|off` | switch a skill off or on for one job |
+| `bin/job act on\|off` | turn Act mode on for 30 minutes, or off. Only from the board's chat bar or the board; written to `audit.log` |
 | `bin/job brief <id> <stage> <text>` | set a note the next agent for that stage follows. Empty text clears it |
 | `bin/job standing [add <text> \| rm <number>]` | list, add or remove the user's rules for every job, such as "plain push is fine". Changes work only from the board's chat bar |
 | `bin/job times` | where the time goes: for each stage, how many visits, the median, longest and total time, from `audit.log`. A stage visited more often than jobs exist looped back |

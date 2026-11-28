@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+"""Lint the factory's Python sources: python factory/scripts/lint."""
+
+import sys
+
+from _tooling import ruff
+
+if __name__ == "__main__":
+    sys.exit(ruff("check", "."))

@@ -1,0 +1,16 @@
+# Tooling for the factory itself. Commands live in scripts/.
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+# bin/ and scripts/ are Python without a .py extension.
+extend-include = ["bin/*", "scripts/*"]
+extend-exclude = ["dashboard/dist", "**/__pycache__"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "UP"]
+# The engine and its tests group imports on one line and use short names on purpose.
+ignore = ["E401", "E741", "E731", "B905", "UP031"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

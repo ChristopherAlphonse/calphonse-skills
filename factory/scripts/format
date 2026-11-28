@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+"""Format Python sources, or report only with --check."""
+
+import sys
+
+from _tooling import ruff
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    if args not in ([], ["--check"]):
+        print("usage: format [--check]", file=sys.stderr)
+        sys.exit(2)
+    sys.exit(ruff("format", ".", *args))

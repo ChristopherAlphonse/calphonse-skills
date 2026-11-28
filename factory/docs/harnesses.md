@@ -39,7 +39,7 @@ Not verified: the line rendering inside a live Claude Code session. The script a
 
 `tick install` writes one `factory-<stage>.json` for every stage in the current `pipeline.json` order of both workflows (the gate is a script and gets none), custom stages included. Each one:
 
-- preloads one skill: shape `lets-talk-about-it`, spec `prd-mode`, build `swe`, review `review-blind-spots`, polish `comment-sicko`, prove and verify `prove-it-works`, ship `pr-body-style`, reconcile `reconcile-reviews`, report `simplify`, scope none, a custom stage its own `skill`. Second skills and stack skills are named in its prompt and loaded on demand. A `USER TURNED OFF` line in the brief wins over the preloaded skill.
+- preloads one skill: shape `lets-talk-about-it`, spec `prd-mode`, build `swe`, review `review-blind-spots`, polish `comment-sicko`, prove and verify `prove-it-works`, ship `pr-body-style`, reconcile `reconcile-reviews`, report `simplify`, scope none, a custom stage its own `skill`. Second skills and stack skills are named in its prompt and loaded on demand.
 - has no `subagent` tool. Only the orchestrator spawns agents.
 - may write only its area, both in `fs_write` and in its guard rules file: shape and spec `**/.planning/**`; build and polish `**/.worktrees/**` and `**/.planning/factory/jobs/**`; every other stage only `**/.planning/factory/jobs/**`. The protected paths (`job.json`, `audit.log`, `config.json`, `.git`, harness config) win over all three.
 - carries exactly the orchestrator's shell deny, ask and allow lists.

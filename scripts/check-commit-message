@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+"""Reject a commit message containing a Co-Authored-By trailer.
+
+Git calls this as: commit-msg <path-to-message-file>
+Exit 0 allows the commit, 1 blocks it, 2 means the hook was called wrong.
+"""
+import sys
+from pathlib import Path
+
+TRAILER = "co-authored-by"
+
+
+def blocked(message):
+    """True when a real message line carries the trailer. Git's # comments are ignored."""
+    for line in message.splitlines():
+        stripped = line.lstrip()
+        if not stripped.startswith("#") and TRAILER in stripped.lower():
+            return True
+    return False
+
+
+def main(argv):
+    if len(argv) != 2:
+        print("check-commit-message: expected one commit message file", file=sys.stderr)
+        return 2
+    path = Path(argv[1])
+    try:
+        message = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"check-commit-message: cannot read {path}: {exc}", file=sys.stderr)
+        return 2
+    if blocked(message):
+        print("commit blocked: remove the Co-Authored-By trailer from the message", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

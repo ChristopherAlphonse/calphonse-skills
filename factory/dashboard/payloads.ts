@@ -159,9 +159,8 @@ function parseJob(value: unknown): Job {
     roundLimit: optionalNumber(raw.round_limit, "job.round_limit"),
     reviewers: stringArray(raw.reviewers, "job.reviewers"),
     stack: stringArray(raw.stack, "job.stack"),
-    skillsOff: raw.skills_off === undefined ? undefined : stringArray(raw.skills_off, "job.skills_off"),
     briefs: raw.briefs === undefined || raw.briefs === null ? undefined : stringRecord(raw.briefs, "job.briefs"),
-    skills: stringArray(raw.skills, "job.skills"),
+    stageSkill: optionalString(raw.stage_skill, "job.stage_skill") ?? "",
     branch: nullableString(raw.branch, "job.branch"),
     worktree: nullableString(raw.worktree, "job.worktree"),
     repo: optionalString(raw.repo, "job.repo") ?? null,
@@ -270,9 +269,10 @@ export function parseFeatureFlags(value: unknown): { mermaid: boolean } {
   return { mermaid: optionalBoolean(raw.mermaid, "features.mermaid") ?? false };
 }
 
-export function parseAskResponse(value: unknown): { answer?: string; session?: string; error?: string } {
+export function parseAskResponse(value: unknown): { answer?: string; session?: string; error?: string; actUntil?: string } {
   const raw = expectRecord(value, "ask response");
   return {
+    actUntil: optionalString(raw.act_until, "ask response.act_until"),
     answer: optionalString(raw.answer, "ask response.answer"),
     session: optionalString(raw.session, "ask response.session"),
     error: optionalString(raw.error, "ask response.error"),

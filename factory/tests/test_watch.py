@@ -1,8 +1,9 @@
 from pathlib import Path
-import http.client, json, os, re, shutil, signal, subprocess, sys, threading, time, unittest
+import hashlib, http.client, importlib.machinery, importlib.util, json, os, re, shutil, signal, subprocess, sys, threading, time, unittest
 
 from test_dashboard_build import NODE_24
 from test_job import JOB, Factory
+import unittest.mock
 
 
 class Watch(Factory):
@@ -153,18 +154,32 @@ class TestWatch(Watch):
         self.assertTrue(self.js("s")["approvals"].get("spec"))
         self.assertTrue(any(e["actor"] == "human" and e["action"] == "approve" for e in self.audit_lines()))
 
-    def test_the_board_changes_skills_and_stage_notes(self):
+    def test_the_board_sets_stage_notes_and_shows_the_fixed_stage_skill(self):
         self.spec_ready_job()
         self.start_watch()
-        self.assertEqual(self.http("POST", "/api/build/skill", body={"id": "s", "name": "qa-review", "off": True})[0], 200)
+        self.assertEqual(self.http("POST", "/api/build/skill", body={"id": "s", "name": "qa-review", "off": True})[0], 404)
         self.assertEqual(self.http("POST", "/api/build/brief", body={"id": "s", "stage": "spec", "text": "keep it small"})[0], 200)
-        job = self.js("s")
-        self.assertEqual(job["skills_off"], ["qa-review"])
-        self.assertEqual(job["briefs"], {"spec": "keep it small"})
-        hint = self.ok("queue").stdout
-        self.assertIn("USER TURNED OFF, do not use: qa-review", hint)
-        self.assertIn("USER NOTE for this stage, follow it: keep it small", hint)
-        self.assertEqual(self.http("POST", "/api/build/skill", body={"id": "s", "name": "../x", "off": True})[0], 409)
+        self.assertEqual(self.js("s")["briefs"], {"spec": "keep it small"})
+        self.assertIn("USER NOTE for this stage, follow it: keep it small", self.ok("queue").stdout)
+        self.assertEqual(json.loads(self.http("GET", "/api/build/jobs")[1])[0]["stage_skill"], "prd-mode")
+
+    def test_act_mode_from_chat_shows_runs_out_and_the_board_can_end_it(self):
+        self.spec_ready_job()
+        self.start_watch()
+        self.no("act", "on")
+        (self.state / "chat.sha256").write_text(hashlib.sha256(b"k").hexdigest() + "\n")
+        self.ok("act", "on", extra_env={"FACTORY_CHAT_KEY": "k"})
+        until = (self.state / "act-until").read_text().strip()
+        self.assertGreater(until, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+        self.assertEqual(self.http("POST", "/api/build/actoff", body={"id": ""})[0], 200)
+        self.assertFalse((self.state / "act-until").exists())
+        (self.state / "act-until").write_text("2000-01-01T00:00:00Z\n")
+        loader = importlib.machinery.SourceFileLoader("job_act", str(JOB))
+        mod = importlib.util.module_from_spec(importlib.util.spec_from_loader("job_act", loader))
+        with unittest.mock.patch.dict(os.environ, {"FACTORY_ROOT": str(self.root)}):
+            loader.exec_module(mod)
+        self.assertEqual(mod.act_until(), "")
+        self.assertEqual([e["action"] for e in self.audit_lines() if e["action"].startswith("act-")], ["act-on", "act-off"])
 
     def test_the_cli_human_commands_stay_refused_next_to_a_watcher(self):
         self.spec_ready_job()

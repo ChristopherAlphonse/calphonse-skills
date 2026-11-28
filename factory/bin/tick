@@ -449,7 +449,6 @@ def stage_prompt(sid, skill, brief, area, preloaded=True):
         "Before you edit a file, load the stack skill for that kind of file (.ts -> typescript-strict-style, "
         ".py -> python, and so on).",
         f"You may write only {AREA_TEXT[area]}. Everything else is read-only.",
-        "A `USER TURNED OFF, do not use: ...` line in the brief wins over anything preloaded here: never use a skill it names.",
         "Plain git commit and git push are allowed; never force-push, merge, rebase, or open a PR or MR, and never use the network beyond a plain push.",
         "Write the stage's file with its status line first, then reply with one line.",
     ]

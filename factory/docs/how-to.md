@@ -60,13 +60,7 @@ Replace `claude` with `opencode` or `kiro` for those harnesses. The loop never a
 
 ## Change what a job uses
 
-**Switch a skill off for one job.** Use the skill switch in the job's panel, or:
-
-```sh
-$FACTORY/bin/job skill <id> <name> off
-```
-
-Use `on` to turn it back on.
+**Skills are fixed per stage.** Each stage's node file in `factory/nodes/` names its skill, and the job's panel shows it. To give one job different instructions, use the stage's note box.
 
 **Give the next agent a note.** Type it in the stage note box in the panel, or:
 

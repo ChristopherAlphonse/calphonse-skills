@@ -22,6 +22,9 @@ A board of jobs. Each job moves through fixed stages, one fresh agent per stage,
 | `policy.yaml`, `policy.build.yaml` | The shell allow, ask and deny rules. Deny beats ask, ask beats allow. Never loosen them to make something work. |
 | `dashboard/*.ts` | The page. `dashboard/dist/*.js` is generated and committed. |
 | `tests/` | `unittest`. `test_job.py` covers stages and the board over a real `serve 0` process. |
+| `pyproject.toml` | Ruff lint and format settings. Includes extensionless `bin/` and `scripts/` files. |
+| `package.json` | npm scripts wrapping `scripts/`, with TypeScript as a dev dependency. CI calls these scripts. |
+| `scripts/` | Developer commands: `lint`, `format`, `check`, `test`, plus their shared `_tooling.py`. |
 
 ## Rules that must keep holding
 

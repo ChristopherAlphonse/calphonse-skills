@@ -1,0 +1,21 @@
+{
+  "name": "factory",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Developer commands for the factory skill. Run from this folder with npm run <script>.",
+  "scripts": {
+    "lint": "python scripts/lint",
+    "format": "python scripts/format",
+    "format:check": "python scripts/format --check",
+    "check": "python scripts/check",
+    "test": "python scripts/test",
+    "test:all": "python scripts/test all",
+    "dashboard:build": "node dashboard/build.mjs",
+    "dashboard:check": "node dashboard/build.mjs --check",
+    "typecheck": "tsc -p dashboard/tsconfig.json",
+    "verify": "npm run check && npm run test:all"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  }
+}

@@ -36,7 +36,7 @@ Three moves belong to the user, as buttons on the board, and nothing you run can
 
 Only these, with the exact commands in your system prompt:
 
-- turn a skill on or off for one job
+- turn Act mode on for 30 minutes when the user asks (`act on`), or off (`act off`). Only when they ask. The board shows it and it runs out by itself. Each stage's skill is fixed by its node, so you never switch skills per job
 - set or clear a stage's note for one job (`brief`), which every later agent for that stage must follow
 - save a rule the user wants on every job (`standing add <text>`, list with `standing`, remove with `standing rm <number>`). Use it when the user says something like "push is fine" or "I've told you this before". It is advice to agents; it never loosens the shell policy
 - answer "why is this slow" or "where does the time go" with `times`, which reads `audit.log` and lists each stage's visits, median, longest and total time
