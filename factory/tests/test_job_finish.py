@@ -45,11 +45,10 @@ class TestStackHint(Factory):
             else:
                 self.assertNotIn("stack skill", hint, stage)
 
-    def test_turning_off_the_stage_skill_still_reaches_the_hint(self):
+    def test_a_stage_skill_cannot_be_switched_off_and_stack_skills_still_reach_the_hint(self):
         self.git("branch", "feature/J")
         self.ok("create", "j", "t")
-        self.ok("skill", "j", "swe", "off")
-        self.assertIn("USER TURNED OFF, do not use: swe", self.hint("j"))
+        self.no("skill", "j", "swe", "off")
         self.wf("j", "shape.md", "STATUS: READY\n")
         self.adv("j", "spec")
         self.wf("j", "spec.md", "# spec\n")
@@ -57,7 +56,7 @@ class TestStackHint(Factory):
         self.adv("j", "build")
         (self.wt("j") / "feature.ts").write_text("x\n")
         hint = self.hint("j")
-        self.assertIn("USER TURNED OFF, do not use: swe", hint)
+        self.assertNotIn("USER TURNED OFF", hint)
         self.assertIn("*.ts -> typescript-strict-style", hint)
 
 

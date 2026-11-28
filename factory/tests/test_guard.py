@@ -1,7 +1,7 @@
 import json, shutil, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
-from test_tick import SKILL, TICK, run
+from test_tick import SKILL, run
 
 
 # Each harness names its tools and their path argument differently.

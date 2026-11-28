@@ -33,9 +33,8 @@ interface JobFields {
   roundLimit?: number;
   reviewers: string[];
   stack: string[];
-  skillsOff?: string[];
   briefs?: Record<string, string>;
-  skills: string[];
+  stageSkill: string;
   branch: string | null;
   worktree: string | null;
   repo?: string | null;
@@ -116,7 +115,6 @@ export interface BoardView {
   zoomOverride: number | null;
   payloadSignature: string;
   session: string;
-  showAllSkills: boolean;
   builtInStages: Stage[];
   proposal: Proposal | null;
 }

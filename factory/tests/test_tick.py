@@ -630,7 +630,6 @@ class StageAgentTests(unittest.TestCase):
             with self.subTest(f.name):
                 got = {r.split("/")[-2] for r in json.loads(f.read_text())["resources"]}
                 self.assertFalse(got & STACK_SKILLS)
-                self.assertIn("USER TURNED OFF", json.loads(f.read_text())["prompt"])
 
     def test_every_stage_agent_has_the_same_shell_policy(self):
         self.pipeline(CUSTOM)
@@ -978,7 +977,7 @@ class OtherHarnessStageAgentTests(unittest.TestCase):
         self.assertEqual({sid: model(sid) for sid in want}, want)
         body = (root / ".claude" / "agents" / f"{SKILL}-tidy.md").read_text()
         self.assertIn("Load the documentation-writer skill", body)
-        self.assertIn("USER TURNED OFF", body)
+        self.assertNotIn("USER TURNED OFF", body)
 
 
 if __name__ == "__main__":

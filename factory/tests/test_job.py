@@ -1396,11 +1396,11 @@ class TestServer(Factory):
         self.assertNotIn("Factory Bot", mod.ask_system("a", "build", False).split("# Factory board assistant")[0])
         act = mod.ask_system("a", "build", True)
         self.assertIn("pipeline show|propose|clear", act)
-        self.assertIn("Never refuse it", act)
+        self.assertIn("never invent one", act)
         self.assertIn("start one yourself", act)
         self.assertNotIn("start one yourself", mod.ask_system("a", "build", False))
-        self.assertIn("never perform it", guide)
-        self.assertIn("commit-and-push", guide)
+        self.assertIn("you never invent a stage", guide)
+        self.assertIn("pipeline propose add build commit-push polish", guide)
 
     def test_approve_over_http(self):
         self.new_spec("a")

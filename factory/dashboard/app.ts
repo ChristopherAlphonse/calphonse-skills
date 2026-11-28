@@ -567,36 +567,12 @@ function createNeedsCallout(needs: Needs, job: Job): HTMLElement {
 }
 
 function renderSkillsSection(job: Job): HTMLElement {
-  const boardView = currentView();
-  const disabledSkills = new Set(job.skillsOff ?? []);
-  const createTag = (skillName: string): HTMLButtonElement => {
-    const tagButton = createElement("button", `tag${disabledSkills.has(skillName) ? " off" : ""}`, skillName);
-    tagButton.type = "button";
-    tagButton.title = disabledSkills.has(skillName)
-      ? "Off for this job. Click to use it again."
-      : "Click to stop using this skill on this job.";
-    tagButton.onclick = () => void postAction("skill", { id: job.id, name: skillName, off: !disabledSkills.has(skillName) });
-    return tagButton;
-  };
-  const tagContainer = createElement("div", "tags");
-  tagContainer.append(
-    ...(boardView.showAllSkills ? job.skills : job.skills.filter((name) => disabledSkills.has(name))).map(createTag),
-  );
-  if (!boardView.showAllSkills && !disabledSkills.size) {
-    tagContainer.append(createElement("span", "pd empty", "All skills on"));
-  }
-  const actionRow = createElement("div", "actions");
-  actionRow.append(
-    createButton(
-      boardView.showAllSkills ? "Hide list" : "Choose skills",
-      "btn ghost small",
-      () => {
-        boardView.showAllSkills = !boardView.showAllSkills;
-        renderPanel();
-      },
-    ),
-  );
-  return createSection(createHeading("Skills", disabledSkills.size), tagContainer, actionRow);
+  // Each stage's skill is fixed by its node file, so this only shows it.
+  const tags = createElement("div", "tags");
+  const names = [job.stageSkill, ...job.stack].filter((name) => name);
+  tags.append(...names.map((name) => createElement("span", "tag", name)));
+  if (!names.length) tags.append(createElement("span", "pd empty", "No skill for this stage"));
+  return createSection(createHeading("Skills"), tags);
 }
 
 function renderStageNote(job: Job): HTMLElement {
@@ -907,7 +883,6 @@ async function start(): Promise<void> {
         zoomOverride: null,
         payloadSignature: "",
         session: "",
-        showAllSkills: false,
         builtInStages: definition.stages,
         proposal: null,
       });

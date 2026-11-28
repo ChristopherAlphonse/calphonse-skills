@@ -1,0 +1,9 @@
+{
+  "id": "code-review",
+  "workflow": "build",
+  "label": "Code review",
+  "skill": "review-blind-spots",
+  "model": "mid",
+  "writes": "notes",
+  "hint": "Read the job's diff in the worktree and list real problems with file and line. Never edit code."
+}

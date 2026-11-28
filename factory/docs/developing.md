@@ -51,6 +51,25 @@ The quick subset covers the logic that does not need a git repo or an HTTP serve
 
 The private-names list lives outside the repo, in `$PRIVATE_NAMES_FILE` or else `~/.config/calphonse-skills/private-names`, one whole-word pattern per line like `\bname\b`. Without it, `test_private_names.py` skips its repo check.
 
+## Lint, format and checks
+
+The commands are listed once in [package.json](../package.json). From `factory/`, run `npm install` once, then:
+
+```
+npm run lint           # ruff check on bin/, tests/ and scripts/
+npm run format         # ruff format, writes files
+npm run format:check   # report only
+npm run check          # lint + dashboard build check + tsc
+npm test               # fast tests
+npm run test:all       # every test
+npm run verify         # check + test:all
+npm run dashboard:build
+npm run dashboard:check
+npm run typecheck
+```
+
+The npm scripts call `python scripts/<name>`, so `python` must be on PATH. The same commands work directly from the repo root as `python factory/scripts/<name>`. Ruff lives in [pyproject.toml](../pyproject.toml) and is found as `python -m ruff`, then `ruff`, then `uvx ruff`. Node is needed for `dashboard/build.mjs --check`, and `npm install` supplies `tsc`; when it is absent, `scripts/check` skips the TypeScript check with a message. CI installs ruff, runs `npm ci`, then calls `npm run check` and `npm run test:all` on Linux. The current tree is not ruff-formatted end to end, so `format --check` is a command, not a CI gate. The full unit suite also depends on Linux (`fcntl` in `bin/tick` and byte-exact CRLF checks), so failures on Windows are not proof of a regression; CI is authoritative.
+
 ## Checking the page for real
 
 A passing test is not proof the page works. Start a board on a scratch project and click through what you changed. The steps are in [AGENTS.md](../AGENTS.md#checking-the-page-for-real).

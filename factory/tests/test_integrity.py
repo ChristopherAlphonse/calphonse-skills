@@ -1,4 +1,4 @@
-import contextlib, importlib.machinery, importlib.util, io, json, os, subprocess, unittest
+import contextlib, importlib.machinery, importlib.util, io, json, os, unittest
 from unittest import mock
 
 from test_job import JOB, Factory

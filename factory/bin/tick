@@ -61,7 +61,7 @@ AREA_TEXT = {
 CLAUDE_TOOLS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "NotebookEdit", "TodoWrite", "Skill"]
 CLAUDE_DROPPED = ["Agent", "Task", "WebFetch", "WebSearch"]
 OPENCODE_DROPPED = ["task", "webfetch", "websearch", "codesearch"]
-# Each node file names a model tier. A custom stage gets mid, except `amend` (a one-line plan change), which gets small.
+# Each node file, built-in or from the catalog, names a model tier. A custom stage outside the catalog gets mid.
 CLAUDE_TIER = {"large": "opus", "mid": "sonnet", "small": "haiku"}
 GEN_VERSION = "factory-gen v1"
 STAMP = re.compile(r"factory-gen v\d+ sha256:[0-9a-f]{64}")
@@ -410,7 +410,8 @@ def pipeline_stages():
 
 
 def node(sid):
-    return job_module().NODES.get(sid, {})
+    job = job_module()
+    return job.NODES.get(sid) or job.load_catalog().get(sid, {})
 
 
 def area_of(sid):
@@ -418,7 +419,7 @@ def area_of(sid):
 
 
 def claude_model(sid):
-    return CLAUDE_TIER[node(sid).get("model") or ("small" if sid == "amend" else "mid")]
+    return CLAUDE_TIER[node(sid).get("model", "mid")]
 
 
 def stamp():
@@ -427,7 +428,7 @@ def stamp():
         data = job_module().PIPELINE_FILE.read_bytes()
     except OSError:
         data = b""
-    data += json.dumps(job_module().NODES, sort_keys=True).encode()
+    data += json.dumps([job_module().NODES, job_module().load_catalog()], sort_keys=True).encode()
     digest = hashlib.sha256(GEN_VERSION.encode() + b"\0" + data).hexdigest()
     return f"{GEN_VERSION} sha256:{digest}"
 
@@ -448,7 +449,6 @@ def stage_prompt(sid, skill, brief, area, preloaded=True):
         "Before you edit a file, load the stack skill for that kind of file (.ts -> typescript-strict-style, "
         ".py -> python, and so on).",
         f"You may write only {AREA_TEXT[area]}. Everything else is read-only.",
-        "A `USER TURNED OFF, do not use: ...` line in the brief wins over anything preloaded here: never use a skill it names.",
         "Plain git commit and git push are allowed; never force-push, merge, rebase, or open a PR or MR, and never use the network beyond a plain push.",
         "Write the stage's file with its status line first, then reply with one line.",
     ]

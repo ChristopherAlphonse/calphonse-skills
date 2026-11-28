@@ -1,0 +1,9 @@
+{
+  "id": "qa-review",
+  "workflow": "build",
+  "label": "QA review",
+  "skill": "qa-review",
+  "model": "mid",
+  "writes": "notes",
+  "hint": "Review the job's diff for maintainability: abstraction, file size, tangled conditions. Never edit code."
+}

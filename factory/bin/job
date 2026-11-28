@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Only writer of job.json. Refuses illegal stage moves. Serves the board and its chat."""
-import fcntl, fnmatch, hashlib, hmac, json, os, re, shlex, shutil, subprocess, sys, tempfile, threading, time
+import fcntl, fnmatch, hashlib, hmac, json, os, re, shutil, subprocess, sys, tempfile, threading, time
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(os.environ.get("FACTORY_ROOT", Path.cwd())).resolve()
@@ -96,17 +96,14 @@ def transitions(job):
 
 def hint_for(job):
     hint = comp_of(job)["hints"].get(job["stage"], "")
-    off = set(job.get("skills_off", []))
     codes = job["stage"] == ("review" if job.get("review") else "build")
-    stack = stack_map(diff_files(job), off) if hint and codes else ""
+    stack = stack_map(diff_files(job), set()) if hint and codes else ""
     forward = sorted(transitions(job).get(job["stage"], set()) - {"build", "needs-human", "rejected"})
     out = hint + (f" | on success advance to: {forward[0]}" if hint and forward else "")
     if stack:
         out += f" | suggested stack skills (file -> skill, from this job's diff; load the one for the file you edit): {stack}"
     elif hint and job["stage"] == "build" and not job.get("review"):
         out += " | no stack skill suggested yet: pick by the files you touch (.ts -> typescript-strict-style, .py -> python), then run `job stack <id>`"
-    if hint and off:
-        out += f" | USER TURNED OFF, do not use: {', '.join(sorted(off))}"
     note = job.get("briefs", {}).get(job["stage"])
     out += f" | USER NOTE for this stage, follow it: {' '.join(note.split())}" if hint and note else ""
     rules = standing_rules()
@@ -165,6 +162,52 @@ def load_nodes():
     errs += [f"no node file for {sid}" for order in BASE_ORDER.values() for sid in order if sid not in nodes]
     need(not errs, f"{NODES_DIR} is not valid: {'; '.join(errs)}")
     return nodes
+
+
+CATALOG_DIR = Path(os.environ.get("FACTORY_CATALOG") or NODES_DIR / "catalog")
+CATALOG_FIELDS = {"id": str, "workflow": str, "label": str, "skill": str, "model": str, "writes": str, "hint": str}
+
+
+def catalog_problems(n, stem):
+    """Why one catalog node cannot be offered. A catalog node only writes notes: code changes go through build."""
+    if not isinstance(n, dict):
+        return ["must hold an object"]
+    errs = [f"unknown field {k!r}" for k in n if k not in CATALOG_FIELDS]
+    errs += [f"needs {k} as text" for k, t in CATALOG_FIELDS.items() if not isinstance(n.get(k), t)]
+    if errs:
+        return errs
+    if n["id"] != stem or not STAGE_ID.fullmatch(stem) or stem in BUILTIN_IDS:
+        errs.append(f"id {n['id']!r} must match the file name and not be a built-in stage")
+    if n["workflow"] not in BASE_ORDER:
+        errs.append("workflow must be build, review or prove")
+    if n["model"] not in MODELS:
+        errs.append(f"model must be one of {', '.join(MODELS)}")
+    if n["writes"] != "notes":
+        errs.append("writes must be notes: only build and polish change code")
+    if not 1 <= len(n["label"]) <= MAX_LABEL or not n["hint"] or len(n["hint"]) > MAX_BRIEF:
+        errs.append(f"label must be 1 to {MAX_LABEL} characters and hint 1 to {MAX_BRIEF}")
+    if n["skill"] and not SKILL_NAME.fullmatch(n["skill"]):
+        errs.append(f"{n['skill']!r} is not a skill name")
+    return errs
+
+
+def load_catalog():
+    """The nodes a pipeline change may add, from factory/nodes/catalog/<id>.json. Fails closed."""
+    cat, errs = {}, []
+    for f in sorted(CATALOG_DIR.glob("*.json")):
+        try:
+            n = json.loads(f.read_text())
+        except ValueError:
+            errs.append(f"{f.name}: not valid JSON")
+            continue
+        errs += [f"{f.name}: {e}" for e in catalog_problems(n, f.stem)]
+        cat[f.stem] = n
+    need(not errs, f"{CATALOG_DIR} is not valid: {'; '.join(errs)}")
+    return cat
+
+
+def catalog_text(cat):
+    return ", ".join(f"{i} ({n['workflow']}: {n['label']})" for i, n in cat.items()) or "none"
 
 
 def stage_hints(wf):
@@ -642,7 +685,7 @@ def stage_spans(lines):
 def cmd_times():
     """Where the time goes: per stage, how many jobs passed through it and how long they stayed."""
     by = {}
-    for jid, stage, t in stage_spans(audit_lines()):
+    for _jid, stage, t in stage_spans(audit_lines()):
         by.setdefault(stage, []).append(t)
     if not by:
         return print("no stage moves in the audit log yet")
@@ -921,13 +964,21 @@ def place(order, sid, after):
     order.insert(order.index(after) + 1, sid)
 
 
-def op_add(state, wf, cid, after, label, brief, skill=""):
+def op_add(state, wf, cid, after):
     need(wf in BASE_ORDER, "workflow must be build, review or prove")
     need(cid not in BUILTIN_IDS, f"{cid} is a built-in stage name")
-    need(cid not in {c["id"] for c in state["stages"]}, f"{cid} already exists")
+    cat = load_catalog()
+    need(cid in cat, f"{cid} is not in the node catalog. Nodes you can add: {catalog_text(cat)}")
+    n = cat[cid]
+    need(n["workflow"] == wf, f"{cid} is a {n['workflow']} node, not a {wf} one")
+    return insert_stage(state, wf, {"id": cid, "workflow": wf, "label": n["label"], "brief": n["hint"], **({"skill": n["skill"]} if n["skill"] else {})}, after)
+
+
+def insert_stage(state, wf, stage, after):
+    need(stage["id"] not in {c["id"] for c in state["stages"]}, f"{stage['id']} already exists")
     new = copy_state(state)
-    new["stages"].append({"id": cid, "workflow": wf, "label": label, "brief": brief, **({"skill": skill} if skill else {})})
-    place(new["order"][wf], cid, after)
+    new["stages"].append(stage)
+    place(new["order"][wf], stage["id"], after)
     return new
 
 
@@ -953,7 +1004,7 @@ def valid_places(state, wf):
     out = []
     for after in ["start"] + state["order"][wf]:
         try:
-            trial = op_add(state, wf, "zz-trial", after, "Trial", "")
+            trial = insert_stage(state, wf, {"id": "zz-trial", "workflow": wf, "label": "Trial", "brief": ""}, after)
         except SystemExit:
             continue
         if not check_state(trial):
@@ -1042,8 +1093,8 @@ def cmd_pipeline(*args):
     return pipeline_propose(rest[0], rest[1:])
 
 
-PROPOSE_USAGE = ("usage: pipeline propose add WORKFLOW ID AFTER \"Label\" \"What the stage does\" [skill] | remove WORKFLOW ID | move WORKFLOW ID AFTER "
-                 "(WORKFLOW is build, review or prove, AFTER is a stage id or start)")
+PROPOSE_USAGE = ("usage: pipeline propose add WORKFLOW NODE AFTER | remove WORKFLOW ID | move WORKFLOW ID AFTER "
+                 "(WORKFLOW is build, review or prove, NODE is a node from the catalog, AFTER is a stage id or start)")
 
 
 def pipeline_show():
@@ -1051,6 +1102,7 @@ def pipeline_show():
     print(order_text(state))
     print("the gate runs by itself after build and polish. These stay true: build after spec; polish after build; ship last. For reviews: scope, review, report stay; report last. The prove board has one stage, prove.")
     print("a stage can go after: " + "; ".join(f"{wf}: {', '.join(valid_places(state, wf))}" for wf in BASE_ORDER))
+    print("nodes you can add: " + catalog_text(load_catalog()))
     prop = proposal_state()
     print("pending: " + ("; ".join(prop["ops"]) + " (waits for the user to click Apply on the board)" if prop else "nothing"))
 
@@ -1059,7 +1111,7 @@ def pipeline_propose(op, a):
     prop, now_state = read_proposal(), read_state()
     base = state_key(now_state)
     state = prop["state"] if prop and prop.get("base") == base and isinstance(prop.get("state"), dict) and not check_state(prop["state"]) else now_state
-    arity = {"add": (5, 6), "remove": (2, 2), "move": (3, 3)}
+    arity = {"add": (3, 3), "remove": (2, 2), "move": (3, 3)}
     need(op in arity and arity[op][0] <= len(a) <= arity[op][1], PROPOSE_USAGE)
     new = {"add": op_add, "remove": op_remove, "move": op_move}[op](state, *a)
     errs = check_state(new)
@@ -1191,17 +1243,6 @@ NODES = load_nodes()
 
 
 @serialized
-def cmd_skill(jid, name, state):
-    """Turn a skill off or on for one job. The queue hint tells the orchestrator."""
-    need(SKILL_NAME.fullmatch(name) and state in ("on", "off"), "usage: skill <id> <name> on|off")
-    job = load(jid)
-    off = set(job.get("skills_off", [])) - {name}
-    job["skills_off"] = sorted(off | ({name} if state == "off" else set()))
-    save(job)
-    audit("skill", jid, f"{name} {state}")
-
-
-@serialized
 def cmd_brief(jid, stage, text):
     """Set (or clear, with empty text) the user's note for one stage of one job."""
     job = load(jid)
@@ -1273,6 +1314,32 @@ def cmd_standing(*args):
     STANDING_FILE.write_text("".join(f"- {r}\n" for r in rules))
     audit(f"standing-{op}", "", text[:200])
     print(f"standing rules now: {len(rules)}")
+
+
+ACT_FILE = STATE / "act-until"
+ACT_MINUTES = 30
+
+
+def act_until():
+    """When Act mode, turned on from chat, runs out; empty when it is off or has run out."""
+    try:
+        until = ACT_FILE.read_text().strip()
+    except OSError:
+        return ""
+    return until if until > now() else ""
+
+
+def cmd_act(state):
+    """Turn Act mode on for ACT_MINUTES because the user asked in the chat bar, or off. The board shows it and it runs out."""
+    need(state in ("on", "off"), "usage: act on|off")
+    need(from_chat_bar() or is_human(), "act changes only from the board's chat bar or the board")
+    if state == "on":
+        until = (datetime.now(timezone.utc) + timedelta(minutes=ACT_MINUTES)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        write_private_text(ACT_FILE, until + "\n")
+    else:
+        ACT_FILE.unlink(missing_ok=True)
+    audit(f"act-{state}", "", act_until())
+    print(f"act mode on until {act_until()}" if state == "on" else "act mode off")
 
 
 def human_only():
@@ -1540,14 +1607,15 @@ def snapshot(job):
     return {**job, "kind": workflow_of(job), "report": kv(d / ("uat.md" if job.get("prove") else "report.md")),
             "gate": kv(rd / CHECKS_FILE).get("GATE"), "reviews": reviews,
             "files": files, "needs_human": waiting_on_human(job), "needs": needs_you(job),
-            "skills": skill_names(), "can_approve": job["stage"] == "spec" and waiting_on_human(job),
+            "stage_skill": stage_skill(job), "can_approve": job["stage"] == "spec" and waiting_on_human(job),
             "can_commit": job["stage"] == "ship" and waiting_on_human(job)}
 
 
-def skill_names():
-    """The sibling skills the board lets the user switch off."""
-    root = SELF.parent.parent.parent
-    return sorted(p.parent.name for p in root.glob("*/SKILL.md") if p.parent.name != "factory")
+def stage_skill(job):
+    """The skill the job's current stage is fixed to, from its node. The board shows it; nobody switches it."""
+    if job["stage"] in NODES:
+        return NODES[job["stage"]]["skill"]
+    return comp_of(job)["custom"].get(job["stage"], {}).get("skill", "")
 
 
 def ensure_watcher():
@@ -1588,9 +1656,9 @@ def _text(body, key):
 # What the shared board may run for this engine, by button or chat action.
 ACTIONS = {
     "approve": lambda jid, body: cmd_approve(jid, "spec"),
+    "actoff": lambda jid, body: cmd_act("off"),
     "commit": lambda jid, body: cmd_commit(jid),
     "unblock": lambda jid, body: cmd_unblock(jid),
-    "skill": lambda jid, body: cmd_skill(jid, _text(body, "name"), "off" if body.get("off") else "on"),
     "brief": lambda jid, body: cmd_brief(jid, _text(body, "stage"), _text(body, "text")),
     "applypipe": lambda jid, body: cmd_pipeline("apply"),
     "discardpipe": lambda jid, body: cmd_pipeline("discard"),
@@ -1618,17 +1686,17 @@ def ask_system(jid, board="build", act=False):
     return (f"You are the factory {'review ' if review else ''}board's assistant, working in {ROOT}. Job state is under .planning/factory/jobs/. "
             f"The user is looking at {'review' if review else 'job'} {jid or '(none)'}. "
             + ("This is a read-only review: never edit, create, or delete code, and never post anywhere. " if review else "")
-            + f"To change the board run only: {me} skill <id> <name> on|off, "
+            + f"To change the board run only: "
             f"{me} brief <id> <stage> <text> (empty text clears), {me} note <id> <text>, {me} pipeline show|propose|clear (adding, removing or moving a stage; the guide below has the exact form), {me} edit <id> <file.md> <old text> <new text> (one exact, unique piece of a job file such as spec.md; when the user comments on lines or asks for a change to a job file, make it with this instead of a brief). "
             + "Plain git add, commit and push are allowed; force pushes are not. "
             + f"When the user states a rule for every job (\"plain push is fine\", \"never touch infra/\"), save it with {me} standing add <text>; {me} standing lists them, {me} standing rm <number> removes one. "
             + (f"Their standing rules now: {'; '.join(standing_rules())}. " if standing_rules() else "")
+            + f"Only when the user asks to turn Act mode on, run {me} act on (it lasts {ACT_MINUTES} minutes and the board shows it); {me} act off when they ask to stop. "
             + ("Unblock is a button the user clicks. " if review else "Approve spec, Commit locally and Unblock are buttons the user clicks: say which one. ")
             + (BOT_PERSONA if act else "")
             + (f"ACT MODE: the user chose Act. When they ask for work and no job exists, start one yourself with `{me} create <id> <title>` (a build job; add --quick for a small, clear change), `{me} create <id> <title> --investigate` for a read-only look into a question with no diff, or `{me} create <id> <title> --prove` to check that a finished task works for real. Use only those forms, pick a short lowercase id, then tell them to select it on the board. "
                "A pipeline change you propose is applied for them the moment you finish, so propose exactly what they asked and nothing else, and do not tell them to click Apply. "
-               "A request to add a workflow, task, node, step or stage is a request to run `pipeline propose add`. Do it. Never refuse it, never ask a question first, and never push back on it: only the command may refuse. "
-               "What the new stage would do (commit, push, repeat on a timer) is the stage agent's business, not a reason to decline; add the stage and say in one sentence what will block. " if act else
+               "A request to add a workflow, task, node, step or stage is a request to run `pipeline propose add` with the closest node from the catalog that `pipeline show` lists. Do it without asking first. If no node fits, say so and list the nodes you can add; never invent one. " if act else
                "CHAT MODE: a pipeline change you propose waits for the user's Apply click on the board. ")
             + "Answer in a few plain lines."
             + f"\n\nThe factory skill is in {SELF.parent.parent}.\n\n{board_agent_guide()}")
@@ -1639,7 +1707,7 @@ HUMAN_ONLY = {"approve", "commit", "unblock"}
 
 COMMANDS = {
     "create": (cmd_create, None), "advance": (cmd_advance, 2), "gate": (cmd_gate, 1), "stack": (cmd_stack, 1), "watch": (cmd_watch, 1), "board": (cmd_board, 0),
-    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_watch, 1), "pipeline": (cmd_pipeline, 0), "standing": (cmd_standing, 0), "times": (cmd_times, 0), "skill": (cmd_skill, 3), "brief": (cmd_brief, 3), "edit": (cmd_edit, 4), "wait": (cmd_wait, 1), "close": (cmd_close, 1), "prune": (cmd_prune, 0), "retire": (cmd_retire, 1),
+    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_watch, 1), "pipeline": (cmd_pipeline, 0), "standing": (cmd_standing, 0), "times": (cmd_times, 0), "act": (cmd_act, 1), "brief": (cmd_brief, 3), "edit": (cmd_edit, 4), "wait": (cmd_wait, 1), "close": (cmd_close, 1), "prune": (cmd_prune, 0), "retire": (cmd_retire, 1),
 }
 
 if __name__ == "__main__":

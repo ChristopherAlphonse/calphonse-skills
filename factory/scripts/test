@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+"""Run the unit tests: python factory/scripts/test [fast|all] [--workers N]."""
+
+import subprocess
+import sys
+
+from _tooling import FACTORY
+
+if __name__ == "__main__":
+    result = subprocess.run([sys.executable, str(FACTORY / "tests" / "run.py"), *sys.argv[1:]], cwd=FACTORY)
+    sys.exit(result.returncode)

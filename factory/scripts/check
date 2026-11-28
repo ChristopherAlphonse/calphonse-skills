@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+"""All gates that need no git repo: python factory/scripts/check."""
+
+import sys
+
+from _tooling import dashboard_checks, ruff
+
+if __name__ == "__main__":
+    sys.exit(ruff("check", ".") or dashboard_checks())

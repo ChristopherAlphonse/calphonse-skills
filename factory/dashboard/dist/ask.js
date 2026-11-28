@@ -25,6 +25,7 @@ import { parseAskResponse, parseChatTurns,                } from "/static/payloa
                                            
                          
                                    
+                   
  
 
 let dependencies                         = null;
@@ -34,6 +35,7 @@ const state           = {
   modelsByEngine: {},
   selectedEngine: "claude",
   interactionMode: "chat",
+  actUntil: "",
 };
 
 const ENGINE_LABELS                         = {
@@ -264,6 +266,11 @@ export async function requestAnswer(question        )                  {
     const reply = parseAskResponse(payload);
     boardView.session = reply.session ?? boardView.session;
     const answerText = reply.error ?? reply.answer ?? "";
+    if (reply.actUntil || state.actUntil) {
+      state.actUntil = reply.actUntil ?? "";
+      state.interactionMode = state.actUntil ? "act" : "chat";
+      showMode();
+    }
     const isActAnswer = state.interactionMode === "act" && !reply.error;
     appendChatBubble(reply.error ? "err" : "bot", answerText, true, isActAnswer ? BOT_DISPLAY_NAME : "");
     await askDependencies.pollBoard(boardView.definition.id);
@@ -278,6 +285,14 @@ export function showMode()       {
   requireElement("modes").replaceChildren(
     ...(["chat", "act"]                     ).map((mode) => {
       const modeButton = createButton(mode === "chat" ? "Chat" : "Act", `mode${mode === state.interactionMode ? " on" : ""}`, () => {
+        if (mode === "chat" && state.actUntil) {
+          // Act mode the chat turned on ends here, on the server too.
+          state.actUntil = "";
+          void requireDependencies().request(`/api/${requireDependencies().getView().definition.id}/actoff`, {
+            method: "POST",
+            body: JSON.stringify({ id: "" }),
+          });
+        }
         state.interactionMode = mode;
         try {
           localStorage.setItem(MODE_STORAGE_KEY, mode);
@@ -286,7 +301,9 @@ export function showMode()       {
         }
         showMode();
       });
-      modeButton.title = MODE_DESCRIPTIONS[mode];
+      modeButton.title = mode === "act" && state.actUntil
+        ? `Act is on until ${new Date(state.actUntil).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} because you asked in chat. Click Chat to end it.`
+        : MODE_DESCRIPTIONS[mode];
       modeButton.setAttribute("role", "radio");
       modeButton.setAttribute("aria-checked", String(mode === state.interactionMode));
       return modeButton;
@@ -296,7 +313,7 @@ export function showMode()       {
   if (composer instanceof HTMLTextAreaElement) {
     composer.placeholder = state.interactionMode === "act"
       ? "Tell Factory Bot what to change on the board"
-      : "Ask anything. Say: skip qa-review, or turn off simplify";
+      : "Ask anything. Say: add a code review node, or turn on act mode";
   }
 }
 

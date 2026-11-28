@@ -62,7 +62,7 @@ Buttons along the top that hide the noise:
 
 ### 1.8 The side panel
 
-Click a chip and a panel opens. It shows the job's status, the right button for you to click, the skill switches, a note box for each stage, a list of every file the job has written, and the latest "now:" note from the agent.
+Click a chip and a panel opens. It shows the job's status, the right button for you to click, the skills the current stage uses (read-only), a note box for each stage, a list of every file the job has written, and the latest "now:" note from the agent.
 
 ### 1.9 Live updates
 
@@ -225,9 +225,13 @@ A **skill** is a packaged set of instructions. Each stage runs one skill. The fa
 
 For a build job it looks at the files the job has changed so far (none at the start, so the hint says to pick by the files you touch). For a review job it looks only at the files in the diff. The hint names stack skills only at build and at a review job's review stage, as a map such as `*.ts -> typescript-strict-style`; shape, spec, polish, prove and ship get none. Run `bin/job stack <id>` to look again after the build adds new files.
 
-### 4.3 The skill switch
+### 4.3 Skills are fixed per stage
 
-Do not want a helper on one job? Switch it off in the job's panel, or with `bin/job skill <id> <name> off`. Every later agent is told not to use it. Switch it back on any time.
+Each stage's skill comes from its node file in `factory/nodes/`, and the job's panel shows it with the language skills picked for the job's files. You do not switch skills per job. To steer one job, use the stage's note box.
+
+### 4.3.1 Act mode from chat
+
+Say "turn on act mode" in the chat bar and it turns on for 30 minutes: Factory Bot then applies the pipeline changes it prepares without waiting for Apply. The Act button stays lit and its tooltip shows when it ends. Click **Chat** to end it early. Turning it on and off is written to `audit.log`.
 
 ### 4.4 Stage notes
 
@@ -480,7 +484,7 @@ The built-in stages are fixed. You can add **custom stages**, extra boxes on the
 
 ### 9.1 What a custom stage is
 
-Data, not code. It has an id, a workflow (`build`, `review` or `prove`), the stage it follows, a label, a short brief, and optionally one skill from this repo. It runs like any stage: the agent writes `<id>.md` with `STATUS: READY`, or `STATUS: BLOCKED` to park the job on you. A custom stage runs once per job and never waits on you itself.
+A node from the catalog, `factory/nodes/catalog/<id>.json`. Each node fixes its workflow, label, skill, model size and instructions, and writes only notes in the job folder: changing code stays with build and polish. Nobody makes one up from chat. The catalog ships code review, QA review, test review, architecture review, demo script, commit and push, and amend plan. A new kind of node is a reviewed change to that folder. For one job's extra instructions, use the stage's note box. It runs like any stage: the agent writes `<id>.md` with `STATUS: READY`, or `STATUS: BLOCKED` to park the job on you. A custom stage runs once per job and never waits on you itself.
 
 ### 9.2 Where one can go
 
@@ -488,7 +492,7 @@ After `shape`, `spec`, `build` or `polish` on the Feature board. After `scope`, 
 
 ### 9.3 Ask, then click Apply
 
-1. Tell the chat bar, for example "add a QA pass after review". It runs `job pipeline propose` to check everything. The board shows the waiting change under **Pipeline change**, with the new stage highlighted.
+1. Tell the chat bar, for example "add a code review node after build". It runs `job pipeline propose` to check everything. The board shows the waiting change under **Pipeline change**, with the new stage highlighted.
 2. Click **Apply**, or **Discard**. Only then is `.planning/factory/pipeline.json` written.
 
 Apply is refused if a job sits in a stage the change removes, or if the pipeline changed since the proposal. In Act mode the board applies it for you.

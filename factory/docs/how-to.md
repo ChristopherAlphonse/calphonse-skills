@@ -60,13 +60,7 @@ Replace `claude` with `opencode` or `kiro` for those harnesses. The loop never a
 
 ## Change what a job uses
 
-**Switch a skill off for one job.** Use the skill switch in the job's panel, or:
-
-```sh
-$FACTORY/bin/job skill <id> <name> off
-```
-
-Use `on` to turn it back on.
+**Skills are fixed per stage.** Each stage's node file in `factory/nodes/` names its skill, and the job's panel shows it. To give one job different instructions, use the stage's note box.
 
 **Give the next agent a note.** Type it in the stage note box in the panel, or:
 
@@ -93,7 +87,7 @@ $FACTORY/bin/job route <id> architecture
 
 ## Add a custom stage
 
-1. In the board's chat bar, ask for it: "add a QA pass after review".
+1. In the board's chat bar, ask for it: "add a code review node after build". The chat bar picks from the node catalog (`job pipeline show` lists it) and says so if nothing fits.
 2. The agent runs `job pipeline propose ...`. The board shows the waiting change under **Pipeline change**, with the new stage highlighted.
 3. Click **Apply**, or **Discard**.
 
