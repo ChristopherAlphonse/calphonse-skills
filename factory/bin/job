@@ -79,11 +79,12 @@ QUICK = ("spec", "build", "ship")  # a quick build keeps the spec approval and t
 
 
 def comp_of(job):
-    """The compiled pipeline this job runs: its workflow's, cut down to QUICK for a quick build."""
-    if job.get("route") != "quick":
+    """The compiled pipeline this job runs: its workflow's, cut down to QUICK for a quick build, or without shape for a lean one."""
+    route = job.get("route")
+    if route not in ("quick", "lean"):
         return pipeline()[workflow_of(job)]
     state = read_state()
-    state["order"]["build"] = [x for x in state["order"]["build"] if x in QUICK]
+    state["order"]["build"] = [x for x in state["order"]["build"] if (x in QUICK if route == "quick" else x != "shape")]
     return compile_state(state)["build"]
 
 
@@ -395,16 +396,16 @@ def review_files(job):
 
 @serialized
 def cmd_create(jid, title, *opts):
-    usage = "usage: create <id> <title> [--repo DIR] [--quick | --review BASE HEAD | --investigate | --prove]"
+    usage = "usage: create <id> <title> [--repo DIR] [--quick | --full | --review BASE HEAD | --investigate | --prove]"
     opts, repo = list(opts), None
-    quick = opts[-1:] == ["--quick"]
-    opts = opts[:-1] if quick else opts
+    quick, full = opts[-1:] == ["--quick"], opts[-1:] == ["--full"]
+    opts = opts[:-1] if quick or full else opts
     investigate, prove = opts == ["--investigate"], opts == ["--prove"]
     if opts[:1] == ["--repo"]:
         need(len(opts) >= 2, usage)
         repo, opts = resolve_repo(opts[1]), opts[2:]
     need(investigate or prove or (len(opts) in (0, 3) and (not opts or opts[0] == "--review")), usage)
-    need(not quick or not opts, "--quick is for a build job, not a review or prove job")
+    need(not (quick or full) or not opts, "--quick and --full are for a build job, not a review or prove job")
     if investigate:
         review = {"mode": "investigate", "base_ref": "", "head_ref": "", "base": "", "head": ""}
     else:
@@ -423,6 +424,10 @@ def cmd_create(jid, title, *opts):
         job["prove"] = True
     if quick:
         job.update(route="quick", stage=QUICK[0])
+    elif not (full or prove or review):
+        # shape and spec overlap, so a build starts at spec with the shape decisions at the top; --full keeps shape.
+        job["route"] = "lean"
+        job["stage"] = comp_of(job)["order"][0]
     if review:
         job.update(stage=pipeline_order("review")[0], round=1, review=review)
         if not investigate:
@@ -1773,7 +1778,7 @@ if __name__ == "__main__":
     if name in ("pipeline", "standing"):
         pass
     elif name == "create":
-        need(len(args) in (2, 3, 4, 5, 7), "create takes <id> <title> [--repo DIR] [--quick | --review BASE HEAD | --investigate | --prove]")
+        need(len(args) in (2, 3, 4, 5, 7), "create takes <id> <title> [--repo DIR] [--quick | --full | --review BASE HEAD | --investigate | --prove]")
     else:
         need(len(args) == arity, f"{name} takes {arity} args")
     fn(*args)

@@ -7,6 +7,7 @@ Reference for every command, setting, file and environment variable. Run command
 | Command | Does |
 | --- | --- |
 | `bin/job create <id> "<title>"` | start a build job at shape |
+| `bin/job create <id> "<title>" --full` | start a build job with the shape stage first. A plain create starts at spec, with the shape decisions at the top of `spec.md` |
 | `bin/job create <id> "<title>" --quick` | start a quick build job: spec, build, gate, ship. It skips shape, polish and custom stages, and keeps your spec approval and the gate. `--repo DIR` may go before it |
 | `bin/job create <id> "<title>" --repo DIR` | start a build job that works in the git repo at `DIR` (relative to the project folder). The board shows one lane per repo. `--repo DIR` also goes before `--review BASE HEAD` |
 | `bin/job create <id> "<title>" --review BASE HEAD` | start a review job at scope. It shows on the Audit board |

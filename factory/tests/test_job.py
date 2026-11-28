@@ -68,7 +68,11 @@ class Factory(unittest.TestCase):
             raise AssertionError(f"git {args} failed: {r.stderr}")
         return r
 
-    def run_job(self, *args, extra_env=None):
+    def run_job(self, *args, extra_env=None, lean=False):
+        # A plain create is lean (no shape stage). The older tests walk the whole pipeline, so they ask for --full.
+        modes = {"--quick", "--full", "--review", "--investigate", "--prove"}
+        if args[:1] == ("create",) and not lean and not modes & set(args):
+            args += ("--full",)
         env = {**self.env, **(extra_env or {})}
         return subprocess.run([sys.executable, "-I", str(JOB), *map(str, args)], cwd=str(self.base),
                               env=env, capture_output=True, text=True, timeout=60)

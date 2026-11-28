@@ -4,6 +4,6 @@
   "skill": "prd-mode",
   "model": "large",
   "writes": "planning",
-  "hint": "prd-mode then simplify on spec.md and the tasks file (decisions to approve first, below the STATUS line) -> spec.md and the tasks file, then wait for the user to approve",
+  "hint": "when the job has no shape.md, first settle what to build and what not to, and put those decisions at the top of spec.md; then prd-mode then simplify on spec.md and the tasks file (decisions to approve first, below the STATUS line) -> spec.md and the tasks file, then wait for the user to approve",
   "on_demand": "Load simplify for spec.md and the tasks file."
 }
