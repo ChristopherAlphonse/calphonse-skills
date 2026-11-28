@@ -4,8 +4,9 @@ Build (jobs that write code) and Review (read-only code reviews). It runs the bu
 
   board watch [port|auto]   run the board in the foreground
   board ensure              print the link of the running board, starting one if needed
+  board stop                stop this project's board (run it when a session ends)
 """
-import contextlib, fcntl, hashlib, io, hmac, importlib.machinery, importlib.util, json, os, re, secrets, select, shutil, socket, subprocess, sys, tempfile, threading, time
+import contextlib, fcntl, hashlib, io, hmac, importlib.machinery, importlib.util, json, os, re, secrets, select, shutil, signal, socket, subprocess, sys, tempfile, threading, time
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -53,6 +54,8 @@ CHAT_SHOWN = 200
 CHAT_MAX_BYTES = 1_000_000
 FIRST_PORT = 8766
 PORT_TRIES = 11
+IDLE_EXIT = 1800  # seconds without a request before the board stops itself; FACTORY_BOARD_IDLE overrides, 0 turns it off
+LAST_REQUEST = [time.monotonic()]
 MAX_BODY = 64 * 1024
 ASK_TIMEOUT = 300
 COOKIE = "factory-board"
@@ -107,23 +110,39 @@ def engines():
 
 
 def model_choices():
-    """Model names to suggest per installed CLI."""
-    out = {name: [] for name in engines()}
-    if "claude" in out:
-        out["claude"] = CLAUDE_MODELS
-    if "opencode" in out:
+    """Model names to suggest per installed CLI. It never starts one: a page load must not launch an agent, and the
+    CLIs check the login on every call. Only claude has a fixed list; for the others the user types a name."""
+    return {name: CLAUDE_MODELS if name == "claude" else [] for name in engines()}
+
+
+class Busy(Exception):
+    pass
+
+
+def run_agent(engine, args, stdin, env):
+    """The one place the board starts a CLI. One agent at a time per project, shared with tick passes. It runs in its
+    own process group and is recorded so `job cleanup` stops it if the board dies; a timeout kills the whole group."""
+    run = ENGINE.STATE / "run"
+    run.mkdir(parents=True, exist_ok=True)
+    with open(run / "agent.lock", "w") as slot:
         try:
-            r = subprocess.run([ENGINES["opencode"], "models"], capture_output=True, text=True, timeout=8)
-            out["opencode"] = r.stdout.split()[:200]
-        except (OSError, subprocess.SubprocessError):
-            pass
-    if "kiro" in out:
+            fcntl.flock(slot, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            raise Busy
+        p = subprocess.Popen(args, stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, text=True, cwd=str(ROOT), env=env, start_new_session=True)
+        rec = run / f"{os.getpid()}-{p.pid}.json"
+        rec.write_text(json.dumps({"tick": os.getpid(), "tick_start": ENGINE.proc_start(os.getpid()), "pgid": p.pid,
+                                   "start": ENGINE.proc_start(p.pid), "harness": engine}))
         try:
-            r = subprocess.run([ENGINES["kiro"], "chat", "--list-models"], capture_output=True, text=True, timeout=8)
-            out["kiro"] = [l.split()[1 if l.startswith("*") else 0] for l in r.stdout.splitlines()[2:] if l.strip()]
-        except (OSError, subprocess.SubprocessError, IndexError):
-            pass
-    return out
+            out, err = p.communicate(stdin, timeout=ASK_TIMEOUT)
+        except BaseException:
+            ENGINE.kill_group(p.pid)
+            p.wait()
+            raise
+        finally:
+            rec.unlink(missing_ok=True)
+        return subprocess.CompletedProcess(args, p.returncode, out, err)
 
 
 def ask_args(engine, exe, me, system, question, session, model, effort):
@@ -161,8 +180,9 @@ def ask(board, jid, question, session, engine, model, effort, act=False):
     note = lambda answer: f"{NEW_CHAT}\n\n{answer}" if fresh else answer
     args, stdin = ask_args(engine, exe, str(ENGINE.SELF), ENGINE.ask_system(jid, board, act), question, session, model, effort if effort in EFFORTS else "")
     try:
-        r = subprocess.run(args, input=stdin, capture_output=True, text=True, timeout=ASK_TIMEOUT,
-                           cwd=str(ROOT), env={**os.environ, "FACTORY_ROOT": str(ROOT), "FACTORY_CHAT_KEY": CHAT_KEY})
+        r = run_agent(engine, args, stdin, {**os.environ, "FACTORY_ROOT": str(ROOT), "FACTORY_CHAT_KEY": CHAT_KEY})
+    except Busy:
+        return {"error": "another agent is running for this project (one at a time). Try again when it finishes."}
     except (OSError, subprocess.SubprocessError) as e:
         return {"error": f"chat failed: {e}"}
     if engine == "claude":
@@ -210,6 +230,10 @@ def edit_file(old, new):
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
+
+    def handle_one_request(self):
+        LAST_REQUEST[0] = time.monotonic()
+        super().handle_one_request()
 
     def send(self, code, body, ctype="application/json", extra=None):
         data = body if isinstance(body, bytes) else body.encode()
@@ -540,7 +564,22 @@ def cmd_watch(port):
     srv = bind(port)
     ENGINE.audit("watch", "", f"port {srv.server_port}")
     print(f"watch: 127.0.0.1:{srv.server_port}/?c={CODE}", flush=True)
+    threading.Thread(target=exit_when_idle, args=(srv,), daemon=True).start()
     srv.serve_forever()
+
+
+def exit_when_idle(srv):
+    """Stop a board nobody has asked anything of for a while. An open page polls, so a board with a tab open stays up."""
+    try:
+        limit = float(os.environ.get("FACTORY_BOARD_IDLE", IDLE_EXIT))
+    except ValueError:
+        limit = IDLE_EXIT
+    if limit <= 0:
+        return
+    while time.monotonic() - LAST_REQUEST[0] < limit:
+        time.sleep(min(limit / 4, 5))
+    ENGINE.audit("watch", "", f"stopped: no request for {limit:g} seconds")
+    srv.shutdown()
 
 
 def port_listening(port):
@@ -588,6 +627,28 @@ def cmd_ensure():
         print(m.group(1))
 
 
+def cmd_stop():
+    """Stop this project's board. It signals only the process watch.json recorded, and only while that process is still
+    this board: alive, holding the recorded port, running this file. Never matches by name."""
+    try:
+        info = json.loads((STATE / WATCH_FILE).read_text())
+    except (OSError, ValueError):
+        print("no board running")
+        return
+    pid = info.get("pid")
+    command = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True).stdout if pid_alive(pid) else ""
+    if not (port_listening(info.get("port", 0)) and str(Path(__file__).resolve()) in command):
+        (STATE / WATCH_FILE).unlink(missing_ok=True)
+        print("no board running")
+        return
+    os.kill(int(pid), signal.SIGTERM)
+    for _ in range(30):
+        if not pid_alive(pid):
+            break
+        time.sleep(0.1)
+    print(f"stopped board {pid}")
+
+
 def dev_supervise(port):
     """FACTORY_DEV=1: restart the board when bin/board or bin/job change. Each restart makes a new link, because the session and keys live in memory on purpose."""
     env = {k: v for k, v in os.environ.items() if k != "FACTORY_DEV"}
@@ -616,5 +677,7 @@ if __name__ == "__main__":
         cmd_watch(sys.argv[2] if len(sys.argv) > 2 else str(FIRST_PORT))
     elif cmd == "ensure":
         cmd_ensure()
+    elif cmd == "stop":
+        cmd_stop()
     else:
-        sys.exit("usage: board watch [port|auto] | board ensure")
+        sys.exit("usage: board watch [port|auto] | board ensure | board stop")

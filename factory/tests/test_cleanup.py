@@ -5,16 +5,14 @@ from test_job import Factory
 
 
 def start_of(pid):
-    with open(f"/proc/{pid}/stat") as f:
-        return int(f.read().rsplit(")", 1)[1].split()[19])
+    return subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
 
 
-@unittest.skipUnless(os.path.exists("/proc/self/stat"), "needs /proc")
 class TestCleanup(Factory):
     def record(self, name, pgid, start):
         d = self.state / "run"
         d.mkdir(parents=True, exist_ok=True)
-        (d / f"{name}.json").write_text(json.dumps({"tick": 2**22 + 1, "tick_start": 1, "pgid": pgid, "start": start, "harness": "claude"}))
+        (d / f"{name}.json").write_text(json.dumps({"tick": 2**22 + 1, "tick_start": "never", "pgid": pgid, "start": start, "harness": "claude"}))
         return d / f"{name}.json"
 
     def sleeper(self):
@@ -31,7 +29,7 @@ class TestCleanup(Factory):
 
     def test_leaves_a_process_whose_start_time_differs(self):
         p = self.sleeper()
-        rec = self.record("b", p.pid, start_of(p.pid) + 1)
+        rec = self.record("b", p.pid, "Thu Jan  1 00:00:00 1970")
         self.ok("cleanup")
         time.sleep(0.3)
         self.assertIsNone(p.poll())
@@ -44,6 +42,12 @@ class TestCleanup(Factory):
         self.ok("cleanup")
         self.assertIsNone(p.poll())
         self.assertTrue(rec.exists())
+
+    def test_procs_lists_a_recorded_group_and_signals_nothing(self):
+        p = self.sleeper()
+        self.record("d", p.pid, start_of(p.pid))
+        self.assertIn(f"managed    pgid {p.pid}", self.ok("procs").stdout)
+        self.assertIsNone(p.poll())
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ You are the orchestrator. You do no stage work yourself. For each stage, spawn a
 
 ## First action
 
-Before any other tool call, including `JOB create` and `JOB queue`, run `JOB board`. It starts the board if none is running and prints its link as `127.0.0.1:PORT/?c=CODE`. Write that link to the user as a message of its own, with the `http` scheme added and the code included, so it is clickable, and only then continue. Do not spawn a subagent, read the repo, or plan first. Repeat the link in every report that ends a pass. The board keeps running between passes and the link stays the same. If `JOB board` also prints a `restart the board` line, pass it on to the user.
+When the user asked for the factory (see Small tasks), then before any other tool call, including `JOB create` and `JOB queue`, run `JOB board`. It starts the board if none is running and prints its link as `127.0.0.1:PORT/?c=CODE`. Write that link to the user as a message of its own, with the `http` scheme added and the code included, so it is clickable, and only then continue. Do not spawn a subagent, read the repo, or plan first. Repeat the link in every report that ends a pass. The board keeps running between passes and the link stays the same. If `JOB board` also prints a `restart the board` line, pass it on to the user.
 
 The board has buttons (Approve spec, Commit locally, Unblock), a note box per job, and a chat bar. Each stage's skill is fixed by its node file and shown read-only. The user does everything there and never needs a terminal.
 
@@ -194,4 +194,6 @@ No stage or unattended pass opens a PR or MR, merges, or deploys. Plain pushes a
 
 ## Small tasks
 
-The pipeline is for features the user wants shaped, specced, reviewed and approved. For a fix, an edit, a history repair or any one-off command, skip it: do the work directly in the repo, run the repo's tests, and leave one change for the user to review. Do not create a job for it. If the user's own words say to skip the factory, skip it. A request to look into, audit or learn about something is not a small task: make an `--investigate` job. Missing config is not a reason to skip the factory either: see First run.
+The user typing `/factory`, or naming the factory, is an explicit request to use it. Never judge that request too small, and never skip the pipeline after the board link is shown. Create the job and run it. A fix or a feature is a build job: `--quick` when the change is small and clear, `--full` when the cause or the design is unknown, so the shape stage works it out and the job still ends in a fix. `--investigate` is only for a request to look into, audit or learn about something, and it writes no code. Only the user's own words ("skip the factory", "just fix it") skip it.
+
+Skipping is for work the factory was never asked to do: when this skill loaded without the user naming it, a fix, an edit, a history repair or a one-off command is done directly in the repo, with the repo's tests run and one change left for the user to review. Do not create a job for it, and do not run `JOB board` for it. Missing config is not a reason to skip the factory either: see First run.

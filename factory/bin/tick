@@ -612,11 +612,17 @@ def cmd_check(harness, quiet=False):
 
 
 def proc_start(pid):
-    """When a process started, in clock ticks from /proc, or None where /proc is absent. Pairs with the pid so a reused pid is never mistaken for ours."""
+    """When a process started, or None if it is gone. Pairs with the pid so a reused pid is never mistaken for ours.
+    Clock ticks from /proc where it exists, else the `ps` start time (macOS has no /proc)."""
     try:
         return int(Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[19])
     except (OSError, ValueError, IndexError):
+        pass
+    try:
+        out = subprocess.run(["ps", "-o", "lstart=", "-p", str(int(pid))], capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, ValueError, subprocess.SubprocessError):
         return None
+    return out or None
 
 
 def run_pass(harness):
@@ -625,11 +631,14 @@ def run_pass(harness):
         die(f"{argv[0]} is not on PATH")
     limit = pass_timeout()
     log(harness, "start")
+    rec = ROOT / ".planning" / SKILL / "run" / f"{os.getpid()}.json"
+    rec.parent.mkdir(parents=True, exist_ok=True)
+    # One agent at a time per project; the board's chat takes the same slot. flock dies with its holder, so it cannot go stale.
+    slot = open(rec.parent / "agent.lock", "w")
+    fcntl.flock(slot, fcntl.LOCK_EX)
     # Its own process group, so a timeout also stops every agent the pass started.
     p = subprocess.Popen(argv, cwd=ROOT, start_new_session=True)
     # `job cleanup` reads this to stop an agent group whose tick died. Removed on any exit from this pass.
-    rec = ROOT / ".planning" / SKILL / "run" / f"{os.getpid()}.json"
-    rec.parent.mkdir(parents=True, exist_ok=True)
     rec.write_text(json.dumps({"tick": os.getpid(), "tick_start": proc_start(os.getpid()), "pgid": p.pid, "start": proc_start(p.pid), "harness": harness}))
     try:
         code = p.wait(timeout=limit)
@@ -641,6 +650,7 @@ def run_pass(harness):
         raise
     finally:
         rec.unlink(missing_ok=True)
+        slot.close()
     log(harness, f"exit {code}")
     return code
 
@@ -649,7 +659,7 @@ def stop_group(p):
     for sig, grace in ((signal.SIGTERM, 5), (signal.SIGKILL, None)):
         try:
             os.killpg(p.pid, sig)
-        except ProcessLookupError:
+        except (ProcessLookupError, PermissionError):  # macOS answers EPERM for a group that is only a zombie now
             break
         try:
             p.wait(timeout=grace)

@@ -1,5 +1,5 @@
 """The board chat starts a new conversation after 20 turns on one session, so a resumed chat never grows without end."""
-import json, unittest
+import fcntl, json, unittest
 
 from test_job import Factory
 
@@ -49,6 +49,27 @@ class TestChatTurnCap(Factory):
         self.assertEqual(self.resumed(), [True] * 20 + [False])
         self.assertEqual(self.ask("fresh")["answer"], "ok")
         self.assertTrue(self.resumed()[-1])
+
+    def test_loading_the_dashboard_starts_no_agent(self):
+        marker = self.base / "started"
+        for name in ("opencode", "kiro-cli"):
+            stub = self.fakebin / name
+            stub.write_text(f"#!/bin/sh\ntouch {marker}\n")
+            stub.chmod(0o755)
+        self.board()
+        st, body = self.http("GET", "/api/engines")
+        self.assertEqual(st, 200)
+        self.assertEqual(sorted(json.loads(body)), ["claude", "kiro", "opencode"])
+        self.assertFalse(marker.exists(), "GET /api/engines started a CLI")
+
+    def test_a_second_agent_is_refused_while_one_runs(self):
+        self.board()
+        (self.state / "run").mkdir(parents=True, exist_ok=True)
+        with open(self.state / "run" / "agent.lock", "w") as slot:
+            fcntl.flock(slot, fcntl.LOCK_EX)
+            self.assertIn("one at a time", self.ask("")["error"])
+        self.assertEqual(self.ask("")["answer"], "ok")
+        self.assertEqual(list((self.state / "run").glob("*.json")), [], "the run record outlived its agent")
 
 
 if __name__ == "__main__":

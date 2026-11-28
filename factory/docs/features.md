@@ -28,6 +28,8 @@ A web page on your own computer. It shows every job as a little chip sitting on 
 
 The board prints a link that ends in `?c=` and a code. The code is a secret handshake. Open the link once and the board remembers you. The same link works in many browser tabs until the board is switched off. After the board remembers you, it sends you on to a plain address, so the code does not stay in the address bar.
 
+The board outlives the session that started it, on purpose, so the link survives between passes. It ends in two ways: `bin/board stop` ends this project's board on demand, and a board that has had no request for 30 minutes stops itself (`FACTORY_BOARD_IDLE` sets the seconds, `0` turns it off). An open page polls the board, so a board with a tab still open does not count as idle: close the tab or run `bin/board stop`.
+
 When the board's own code changed after it started, `bin/job board` still prints the same link and adds a line saying to restart the board, and the page keeps saying "restart the board" until you do. It never restarts by itself, because that would log out every open tab. Page edits are different: after a `.ts` edit the board rebuilds the page and an open tab reloads itself (it waits while an editor tab has unsaved text). For work on the factory itself, `FACTORY_DEV=1 bin/job watch` restarts the board when `bin/board` or `bin/job` change, with a new link each time.
 
 ### 1.3 Three boards: Feature, Audit and Acceptance

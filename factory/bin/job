@@ -1491,15 +1491,21 @@ def cmd_prune():
 
 
 def proc_start(pid):
-    """Start time of a process in clock ticks from /proc, or None where /proc is absent."""
+    """When a process started, or None if it is gone. Pairs with the pid so a reused pid is never mistaken for ours.
+    Clock ticks from /proc where it exists, else the `ps` start time (macOS has no /proc)."""
     try:
         return int(Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[19])
     except (OSError, ValueError, IndexError):
+        pass
+    try:
+        out = subprocess.run(["ps", "-o", "lstart=", "-p", str(int(pid))], capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, ValueError, subprocess.SubprocessError):
         return None
+    return out or None
 
 
 def alive(pid, start):
-    """True only when this pid is still the same process the record saw. No /proc start time means it cannot be proven."""
+    """True only when this pid is still the same process the record saw."""
     return start is not None and proc_start(pid) == start
 
 
@@ -1507,9 +1513,44 @@ def kill_group(pgid):
     for sig in (signal.SIGTERM, signal.SIGKILL):
         try:
             os.killpg(pgid, sig)
-        except ProcessLookupError:
+        except (ProcessLookupError, PermissionError):  # macOS answers EPERM, not ESRCH, for a group that is only a zombie now
             return
         time.sleep(2 if sig == signal.SIGTERM else 0)
+
+
+AGENT_CLIS = {"claude", "opencode", "opencode-pty", "kiro", "kiro-cli"}
+
+
+def cmd_procs():
+    """Every agent CLI running on this machine and who owns it. Read-only: it never signals anything. A process Factory
+    did not record is UNMANAGED, with what you need to investigate it; Factory does not adopt or kill it."""
+    managed = set()
+    for rec in (STATE / "run").glob("*.json") if (STATE / "run").is_dir() else []:
+        try:
+            r = json.loads(rec.read_text())
+            if alive(int(r["pgid"]), r["start"]):
+                managed.add(int(r["pgid"]))
+                print(f"managed    pgid {r['pgid']}  {r.get('harness', '?')}  owner {r['tick']}")
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    table = {}
+    for line in subprocess.run(["ps", "-axo", "pid=,ppid=,pgid=,command="], capture_output=True, text=True).stdout.splitlines():
+        pid, ppid, pgid, command = (line.split(None, 3) + [""])[:4]
+        table[int(pid)] = (int(ppid), int(pgid), command)
+    mine, pid = set(), os.getpid()
+    while pid in table and pid not in mine:
+        mine.add(pid)
+        pid = table[pid][0]
+    shown = 0
+    for pid, (ppid, pgid, command) in sorted(table.items()):
+        if os.path.basename(command.split(" ", 1)[0]) not in AGENT_CLIS or pgid in managed:
+            continue
+        label = "yours      " if pid in mine or ppid in mine else "UNMANAGED "
+        cwd = subprocess.run(["lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"], capture_output=True, text=True).stdout
+        cwd = next((l[1:] for l in cwd.splitlines() if l.startswith("n")), "?")
+        print(f"{label} pid {pid}  ppid {ppid}  since {proc_start(pid)}  cwd {cwd}\n           {command[:160]}")
+        shown += 1
+    print(f"{len(managed)} managed group(s), {shown} other agent process(es)")
 
 
 def cmd_cleanup():
@@ -1528,9 +1569,6 @@ def cmd_cleanup():
             kill_group(pgid)
             audit("cleanup", "", f"stopped orphan agent group {pgid}")
             print(f"stopped orphan agent group {pgid}")
-        elif start is None and proc_start(pgid) is not None:
-            print(f"left group {pgid} alone: no /proc start time to prove it is the recorded process")
-            continue
         rec.unlink(missing_ok=True)
     cmd_prune()
 
@@ -1762,7 +1800,7 @@ HUMAN_ONLY = {"approve", "commit", "unblock"}
 
 COMMANDS = {
     "create": (cmd_create, None), "advance": (cmd_advance, 2), "gate": (cmd_gate, 1), "stack": (cmd_stack, 1), "watch": (cmd_watch, 1), "board": (cmd_board, 0),
-    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_watch, 1), "pipeline": (cmd_pipeline, 0), "standing": (cmd_standing, 0), "times": (cmd_times, 0), "act": (cmd_act, 1), "brief": (cmd_brief, 3), "edit": (cmd_edit, 4), "wait": (cmd_wait, 1), "close": (cmd_close, 1), "prune": (cmd_prune, 0), "cleanup": (cmd_cleanup, 0), "retire": (cmd_retire, 1),
+    "route": (cmd_route, 2), "progress": (cmd_progress, 3), "note": (cmd_note, 2), "queue": (cmd_queue, 0), "serve": (cmd_watch, 1), "pipeline": (cmd_pipeline, 0), "standing": (cmd_standing, 0), "times": (cmd_times, 0), "act": (cmd_act, 1), "brief": (cmd_brief, 3), "edit": (cmd_edit, 4), "wait": (cmd_wait, 1), "close": (cmd_close, 1), "prune": (cmd_prune, 0), "cleanup": (cmd_cleanup, 0), "procs": (cmd_procs, 0), "retire": (cmd_retire, 1),
 }
 
 if __name__ == "__main__":

@@ -104,6 +104,63 @@ class TestAutoStart(AutoWatch):
         self.assertTrue((self.state / "human.sha256").exists())
 
 
+class TestBoardEnds(AutoWatch):
+    BOARD = Path(JOB).resolve().parent / "board"
+
+    def board_cmd(self, *args):
+        return subprocess.run([sys.executable, "-I", str(self.BOARD), *args], cwd=str(self.base), env=self.env,
+                              capture_output=True, text=True, timeout=60)
+
+    def wait_gone(self, pid, seconds=10):
+        for _ in range(int(seconds * 10)):
+            if not self.alive(pid):
+                return True
+            time.sleep(0.1)
+        return False
+
+    def test_stop_ends_the_board_the_project_started(self):
+        self.ok("create", "j", "T")
+        pid = self.watch_info()["pid"]
+        r = self.board_cmd("stop")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(f"stopped board {pid}", r.stdout)
+        self.assertTrue(self.wait_gone(pid))
+
+    def test_stop_with_no_board_says_so_and_succeeds(self):
+        r = self.board_cmd("stop")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("no board running", r.stdout)
+
+    def test_stop_never_signals_a_process_that_is_not_the_board(self):
+        other = subprocess.Popen(["sleep", "60"])
+        self.addCleanup(other.kill)
+        self.addCleanup(other.wait)
+        listener = socket.socket()
+        self.addCleanup(listener.close)
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        self.board_state.mkdir(parents=True, exist_ok=True)
+        (self.board_state / "watch.json").write_text(json.dumps({"pid": other.pid, "port": listener.getsockname()[1], "url": "x"}))
+        r = self.board_cmd("stop")
+        self.assertIn("no board running", r.stdout)
+        self.assertIsNone(other.poll())
+        self.assertFalse((self.board_state / "watch.json").exists())
+
+    def test_a_board_nobody_asks_anything_of_stops_itself(self):
+        self.env["FACTORY_BOARD_IDLE"] = "1"
+        self.ok("create", "j", "T")
+        self.assertTrue(self.wait_gone(self.watch_info()["pid"]))
+
+    def test_a_board_that_keeps_being_asked_stays_up(self):
+        self.env["FACTORY_BOARD_IDLE"] = "2"
+        self.redeem(self.link(self.ok("create", "j", "T")))
+        pid = self.watch_info()["pid"]
+        for _ in range(6):
+            self.assertEqual(self.http("GET", "/api/build/jobs")[0], 200)
+            time.sleep(0.7)
+        self.assertTrue(self.alive(pid))
+
+
 class TestOutOfDate(AutoWatch):
     def board_from(self, copy):
         r = subprocess.run([sys.executable, "-I", str(copy / "bin" / "job"), "board"], cwd=str(self.base), env=self.env,

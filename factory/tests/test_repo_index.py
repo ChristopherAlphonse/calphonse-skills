@@ -94,5 +94,13 @@ class RepoIndex(unittest.TestCase):
         for rule in ("**Read-only.**", "**Never post, unless the user says so.**", "Never run", "`git commit`", "`gh`"):
             self.assertIn(rule, text)
 
+    def test_typing_factory_is_never_judged_too_small_to_use_it(self):
+        text = (REPO / "factory" / "SKILL.md").read_text()
+        small = text.split("## Small tasks", 1)[1]
+        for rule in ("is an explicit request to use it", "never skip the pipeline after the board link is shown", "A fix or a feature is a build job", "`--quick` when the change is small and clear", "`--full` when the cause or the design is unknown", "`--investigate` is only for a request to look into"):
+            with self.subTest(rule=rule):
+                self.assertIn(rule, small)
+        self.assertIn("When the user asked for the factory (see Small tasks)", text.split("## First action", 1)[1].split("## First run", 1)[0])
+
 if __name__ == "__main__":
     unittest.main()

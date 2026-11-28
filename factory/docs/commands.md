@@ -30,6 +30,7 @@ Reference for every command, setting, file and environment variable. Run command
 | `bin/job retire <id>` | move a job you no longer want from any stage before ready to rejected; removes a clean worktree, keeps the branch |
 | `bin/job wait [seconds]` | block until a job that waited on you is free. Prints `RESUME: <ids>`, or `STILL WAITING` on timeout, and exits 0 either way: the agent then ends its turn. Default 90 seconds, maximum 3600 |
 | `bin/job board` | start the board if none runs and print its link. Adds a `restart the board` line on stderr when the running board's code changed since it started |
+| `bin/board stop` | stop this project's board. It signals only the process `watch.json` recorded, and only while that process is still this board (alive, on the recorded port, running `bin/board`). Prints `no board running` otherwise. Run it when a session ends |
 | `bin/job serve [port]` / `bin/job watch [port]` | run the board in the foreground (default ports 8765 / 8766) |
 | `bin/job pipeline show` | print the current stage order and where a new stage can go |
 | `bin/job pipeline propose add WORKFLOW NODE AFTER` | propose adding a node from the catalog (`factory/nodes/catalog/`). `pipeline show` lists them |
